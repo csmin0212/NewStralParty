@@ -264,7 +264,7 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
   s.seq += 1;
   s.lastCard = { seq: s.seq, player: s.current, card: hand.card };
   log(s, `${p.name}: 🃏 「${info.name}」${info.cost ? ` (코인 ${info.cost})` : ''}`);
-  cardEffect(s, rng, p, hand.card, target, value, giftDamageBonus(giver));
+  cardEffect(s, rng, p, hand.card, target, value, giver);
   // 모나 패시브: 준 카드를 아군이 쓰면 팬 +1 (피해는 쓰기 전 팬으로 계산)
   if (giver && onGiftUsed(giver, p)) {
     log(s, `  ${giver.name}: 「${CHARACTERS[giver.character].passive.name}」 팬 ${giver.stacks}`);
@@ -272,7 +272,9 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
 }
 
 /** 카드 효과 (data/cards.ts의 글과 맞춘다) */
-function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: number, value?: number, bonus = 0) {
+function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: number, value?: number, giver?: Player) {
+  const bonus = giftDamageBonus(giver);
+  const strike = (e: Enemy, amount: number) => strikeEnemy(s, rng, p, e, amount, giver);
   const t = s.turn;
   const b = t.battle;
   const st = p.status;
@@ -383,21 +385,21 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       break;
     // bonus: 모나가 준 카드면 + 팬
     case 'slingshot':
-      strike(s, p, enemy!, 2 + bonus);
+      strike(enemy!, 2 + bonus);
       break;
     case 'laser':
-      strike(s, p, enemy!, 3 + bonus);
+      strike(enemy!, 3 + bonus);
       break;
     case 'brick':
-      strike(s, p, enemy!, 5 + bonus);
+      strike(enemy!, 5 + bonus);
       break;
     case 'railgun':
-      strike(s, p, enemy!, 6 + bonus);
+      strike(enemy!, 6 + bonus);
       break;
     case 'blast': {
       const dist = distances(s.board, enemy!.tile);
       for (const e of [...s.enemies]) {
-        if ((dist.get(e.tile) ?? Infinity) <= 2 && !isOver(s)) strike(s, p, e, 4 + bonus);
+        if ((dist.get(e.tile) ?? Infinity) <= 2 && !isOver(s)) strike(e, 4 + bonus);
       }
       break;
     }
@@ -483,8 +485,8 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
   }
 }
 
-/** 전투 밖에서 에너미에게 피해 (이벤트 카드). 쓰러뜨리면 보상, 보스면 승리 */
-function strike(s: GameState, p: Player, enemy: Enemy, amount: number) {
+/** 전투 밖에서 에너미에게 피해 (이벤트 카드). 쓰러뜨리면 보상, 보스면 승리. giver: 모나가 준 카드면 팬레터 */
+function strikeEnemy(s: GameState, rng: Rng, p: Player, enemy: Enemy, amount: number, giver?: Player) {
   enemy.hp = Math.max(0, enemy.hp - amount);
   log(s, `  ${enemy.name}에게 ${amount} 피해 (체력 ${enemy.hp})`);
   if (enemy.hp > 0) return;
@@ -492,6 +494,11 @@ function strike(s: GameState, p: Player, enemy: Enemy, amount: number) {
   s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
   p.coins += enemy.reward;
   if (onEnemyDefeated(p, def)) log(s, `  ${p.name}: 「${CHARACTERS[p.character].passive.name}」 ${p.stacks}스택`);
+  // 모나 팬레터: 아군이 받은 효과 카드로 처치하면 모나가 카드 1장
+  if (giver?.character === 'mona' && giver.id !== p.id) {
+    drawCards(s, giver, rng, 1);
+    log(s, `  ${giver.name}: 「${CHARACTERS[giver.character].passive2!.name}」 카드 1장`);
+  }
   if (enemy.isBoss) {
     s.phase = { kind: 'gameOver', result: 'victory' };
     log(s, `🎉 ${enemy.name} 처치! 모두의 승리!`);
@@ -971,6 +978,10 @@ function tryLevelUp(s: GameState, p: Player) {
   if (growth.move) {
     p.move += growth.move;
     gains.push(`이동거리 +${growth.move}`);
+  }
+  if (growth.coins) {
+    p.coins += growth.coins;
+    gains.push(`코인 +${growth.coins}`);
   }
   log(s, `${p.name}: ⭐ 코인 ${cost}개로 ${p.level}성 달성!${gains.length ? ` (${gains.join(', ')})` : ''}`);
 }

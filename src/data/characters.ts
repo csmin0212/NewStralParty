@@ -6,6 +6,8 @@ export interface StatGrowth {
   def?: number;
   /** 이동거리: 주사위를 굴릴 때마다 더 가는 칸 수 */
   move?: number;
+  /** 별을 딸 때 한 번 받는 코인 */
+  coins?: number;
 }
 
 export interface SkillText {
@@ -31,6 +33,8 @@ export interface CharacterDef {
   /** 대상을 고르는 액티브: 대상 종류와 사거리 (칸) */
   active: SkillText & { cooldown: number; target?: 'enemy' | 'ally'; range?: number };
   passive: SkillText;
+  /** 두 번째 패시브 (모나 팬레터) */
+  passive2?: SkillText;
   /** 캐릭터 고유 스택 이름과 최대치 (Soda 연마 · 모나 팬) */
   stack?: { name: string; max: number };
   /** 정해진 캐릭터만 */
@@ -96,9 +100,9 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     hp: 9,
     atk: 1,
     def: 1,
-    startCoins: 6,
+    startCoins: 12,
     deckPoints: 15,
-    stars: [{ def: 1, maxHp: 2 }, {}, { atk: 1, def: 1, move: 1 }],
+    stars: [{ coins: 10, maxHp: 2 }, {}, { atk: 1, def: 1, move: 1 }],
     active: {
       name: '역조공',
       cooldown: 3,
@@ -109,6 +113,10 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     passive: {
       name: '팬섭 해 버릴거야!',
       description: "아군에게 준 카드를 아군이 사용하면 '팬' +1 (최대 5). 아군에게 준 효과 카드의 피해 + '팬'.",
+    },
+    passive2: {
+      name: '팬레터',
+      description: '아군이 받은 효과 카드로 적을 처치하면 카드 1장을 얻는다.',
     },
     stack: { name: '팬', max: 5 },
   },

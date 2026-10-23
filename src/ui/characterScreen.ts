@@ -103,7 +103,8 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
         </dl>
         <div class="ba-band">스킬</div>
         ${skillCard('액티브', art.skillActive, c.active.name, c.active.description, `⏱ ${c.active.cooldown}`)}
-        ${skillCard('패시브', art.skillPassive, c.passive.name, c.passive.description)}`;
+        ${skillCard('패시브', art.skillPassive, c.passive.name, c.passive.description)}
+        ${c.passive2 ? skillCard('패시브', undefined, c.passive2.name, c.passive2.description) : ''}`;
     } else if (current === 'growth') {
       const rows = c.stars
         .map(
@@ -193,5 +194,6 @@ function growthText(g: StatGrowth): string {
   if (g.atk) parts.push(`공격력 +${g.atk}`);
   if (g.def) parts.push(`방어력 +${g.def}`);
   if (g.move) parts.push(`이동거리 +${g.move}`);
+  if (g.coins) parts.push(`코인 +${g.coins}`);
   return parts.join(' · ');
 }

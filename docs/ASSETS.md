@@ -372,6 +372,7 @@ isolated on transparent background, no text, no letters, no frame, no border
 |---|---|
 | `characters/mona/skill-active.png` | 「역조공」 아이콘 — 선물 상자를 건네는 느낌 |
 | `characters/mona/skill-passive.png` | 「팬섭 해 버릴거야!」 아이콘 — 하트와 응원봉 |
+| `characters/mona/skill-passive2.png` | 「팬레터」 아이콘 — 하트 스티커를 붙인 편지 봉투 |
 
 ---
 

@@ -1048,10 +1048,18 @@ describe('모나', () => {
   const gift = (s: GameState, target: number, cards: number[]) =>
     applyAction(s, { type: 'USE_SKILL', player: 0, target, cards });
 
-  it('시작 능력치: 체력 9 · 공격력 1 · 방어력 1 · 코인 6 · 성장 1성 방어력 +1 · 최대 체력 +2', () => {
+  it('시작 능력치: 체력 9 · 공격력 1 · 방어력 1 · 코인 12', () => {
     const s = monaGame();
-    expect(s.players[0]).toMatchObject({ character: 'mona', maxHp: 9, atk: 1, def: 1, coins: 6 + RULES.turnIncome });
-    expect(MONA.stars).toEqual([{ def: 1, maxHp: 2 }, {}, { atk: 1, def: 1, move: 1 }]);
+    expect(s.players[0]).toMatchObject({ character: 'mona', maxHp: 9, atk: 1, def: 1, coins: 12 + RULES.turnIncome });
+  });
+
+  it('성장: 1성 코인 +10 · 최대 체력 +2 / 2성 없음 / 3성 공격력 +1 · 방어력 +1 · 이동거리 +1', () => {
+    let s = monaGame();
+    s.players[0].coins = 20;
+    s = rollExactly(s, 15); // 한 바퀴 돌아 본부
+    expect(s.players[0]).toMatchObject({ level: 1, maxHp: 11, hp: 11, coins: 20 - RULES.levelUpCost[0] + 10 });
+    expect(MONA.stars[1]).toEqual({});
+    expect(MONA.stars[2]).toEqual({ atk: 1, def: 1, move: 1 });
   });
 
   it('역조공: 손패 1~2장을 10칸 안 아군에게 주고, 팬만큼 뽑는다', () => {
@@ -1105,5 +1113,25 @@ describe('모나', () => {
     s.turn.cardPlayed = false;
     s = applyAction(s, { type: 'PLAY_CARD', player: 1, handIndex: 0 });
     expect(s.players[0].stacks).toBe(5);
+  });
+
+  it('팬레터: 아군이 받은 효과 카드로 적을 처치하면 모나가 카드 1장', () => {
+    let s = gift(monaGame(), 1, [0]); // 새총
+    s = applyAction(rollExactly(s, 1), { type: 'END_TURN', player: 0 });
+    s = withEnemy(s, 'robot', s.players[1].tile + 1);
+    s.enemies[0].hp = 2;
+    const monaHand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'PLAY_CARD', player: 1, handIndex: 0, target: s.enemies[0].id });
+    expect(s.enemies).toHaveLength(0);
+    expect(s.players[0].hand).toHaveLength(monaHand + 1);
+
+    // 처치하지 못하면 없음
+    let t2 = gift(monaGame(), 1, [0]);
+    t2 = applyAction(rollExactly(t2, 1), { type: 'END_TURN', player: 0 });
+    t2 = withEnemy(t2, 'robot', t2.players[1].tile + 1);
+    t2.enemies[0].hp = 20;
+    const hand2 = t2.players[0].hand.length;
+    t2 = applyAction(t2, { type: 'PLAY_CARD', player: 1, handIndex: 0, target: t2.enemies[0].id });
+    expect(t2.players[0].hand).toHaveLength(hand2);
   });
 });

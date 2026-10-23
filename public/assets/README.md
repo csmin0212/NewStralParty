@@ -39,7 +39,7 @@ enemies/slime/idle.webp는 과거 테마의 미사용 파일이며 현재 게임
 - characters/mutbyeol/{token,portrait}.webp — 보드 SD 토큰·초상화, 각 512×512
 - characters/mutbyeol/battle-{idle,attack,hit,block,evade,down}.webp — 오른쪽을 보는 SD 전투 6종, 각 768×768
 
-모든 파일은 투명 배경이며, 전투 그림은 공통 배율과 발 기준선으로 정렬했습니다. CHARACTER_ART.mutbyeol에 이름·경로를 등록했습니다. 캐릭터 선택이나 플레이어 배정은 아직 연결하지 않았습니다. 생성 원본·전체 프롬프트·변환 스크립트·검증 결과는 assets-raw/characters/mutbyeol/에 있습니다.
+모든 파일은 투명 배경이며, 전투 그림은 공통 배율과 발 기준선으로 정렬했습니다. CHARACTER_ART.mutbyeol에 등록했고 시작 화면 · HUD · 보드 말 · 전투 · 캐릭터 화면에서 쓰입니다. 생성 원본·전체 프롬프트·변환 스크립트·검증 결과는 assets-raw/characters/mutbyeol/에 있습니다.
 
 ## 로비 · 스킬 추가분 (5종)
 
@@ -49,3 +49,14 @@ enemies/slime/idle.webp는 과거 테마의 미사용 파일이며 현재 게임
 내장 image_gen으로 제작했습니다. 스킬 아이콘은 액티브 원본을 공통 디자인 참고로 사용하고 같은 원형 틀·배율로 정리했습니다. 배경 원본은 1672×941이며 최종 크기로 변환했습니다. LOBBY_ART 및 CHARACTER_ART.mutbyeol에 경로를 등록했습니다. 신규 로비·캐릭터 상세 화면 구현은 별도이며, 준비된 배경·아이콘을 해당 화면에서 참조하면 됩니다.
 
 생성 PNG·전체 프롬프트·변환 스크립트·검증 기록: assets-raw/lobby-assets/.
+
+## 뭇별 메모리얼 (레이어 애니메이션)
+
+- characters/mutbyeol/memorial/night-v3/{background,body,hair-back,eyes-closed,original}.webp — 밤 도시 창가 버전 레이어. MEMORIAL_ART.mutbyeol에 등록
+- characters/mutbyeol/memorial/{background,character,foreground,original}.webp — 처음 만든 낮 버전 레이어
+- ../memorial.html (밤) · ../memorial-day.html (낮) — 레이어 애니메이션 시연 페이지, 스타일 · 스크립트는 ../memorial/night.{css,js}
+
+## 아직 없는 그림
+
+- Soda · 모나 캐릭터 그림 — 게임에서는 임시 실루엣 (src/ui/placeholderArt.ts). 요청: docs/ASSETS.md 6-1
+- 카드 39장 · 상점 칸 — 게임에서는 아이콘. 요청: docs/ASSETS.md 6

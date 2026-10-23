@@ -253,7 +253,7 @@ function skillButton(state: GameState): string {
     (!targets || targets.length > 0) &&
     (c.active.target !== 'ally' || p.hand.length > 0);
   const status = p.skillActiveUntil !== null ? '효과 중' : p.skillCooldown > 0 ? `${p.skillCooldown}R` : '';
-  const tip = `액티브 「${c.active.name}」 (재사용 ${c.active.cooldown}라운드)\n${c.active.description}\n\n패시브 「${c.passive.name}」\n${c.passive.description}`;
+  const tip = `액티브 「${c.active.name}」 (재사용 ${c.active.cooldown}라운드)\n${c.active.description}\n\n패시브 「${c.passive.name}」\n${c.passive.description}${c.passive2 ? `\n\n패시브 「${c.passive2.name}」\n${c.passive2.description}` : ''}`;
   return `
     <button class="skill-btn ${p.skillActiveUntil !== null ? 'active' : status ? 'cooling' : ''}" data-action="skill" title="${esc(tip)}" ${ready ? '' : 'disabled'}>
       <b>스킬</b>${status ? `<small>${status}</small>` : ''}
