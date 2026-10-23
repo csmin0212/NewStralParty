@@ -10,7 +10,6 @@ export const PLACEHOLDER_BOSS: BossDef = {
   hpPerPlayer: 6,
   atk: 3,
   def: 1,
-  eva: 0,
   counter: true,
   defense: 'block',
   defeatAt: 16,

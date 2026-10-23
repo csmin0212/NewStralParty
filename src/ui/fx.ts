@@ -2,13 +2,14 @@
 // trpg-vtt의 연출 모음(src/components/session/fxevents.css · FxEvents.tsx)을 바닐라 DOM으로 옮기고 학원 도시 색으로 바꿨다.
 // 연출은 한 번에 하나씩 순서대로 재생하고, 화면을 누르면 건너뛴다.
 
-export type FxKind = 'encounter' | 'round' | 'turn' | 'banner' | 'warning' | 'levelup' | 'ko' | 'victory' | 'defeat';
+export type FxKind = 'encounter' | 'round' | 'turn' | 'skill' | 'banner' | 'warning' | 'levelup' | 'ko' | 'victory' | 'defeat';
 
 /** 연출마다 전체 길이(ms). CSS의 --dur로도 넘어간다 */
 const DUR: Record<FxKind, number> = {
   encounter: 1300,
   round: 1500,
   turn: 1600,
+  skill: 1700,
   banner: 2000,
   warning: 2800,
   levelup: 2400,
@@ -18,7 +19,7 @@ const DUR: Record<FxKind, number> = {
 };
 
 /** 화면을 막지 않는 연출 (지나가는 띠). 나머지는 누르면 건너뛸 수 있다 */
-const PASS_THROUGH: FxKind[] = ['round', 'turn', 'banner'];
+const PASS_THROUGH: FxKind[] = ['round', 'turn', 'skill', 'banner'];
 
 export interface FxSpec {
   kind: FxKind;
@@ -28,6 +29,8 @@ export interface FxSpec {
   color?: string;
   /** 턴 컷인의 얼굴 자리. 캐릭터 그림이 생기면 이미지 주소를 넣는다 */
   face?: { label: string; image?: string };
+  /** 스킬 컷인에 크게 들어오는 캐릭터 메인 일러스트 */
+  art?: string;
 }
 
 export type FloatKind = 'coin' | 'hurt' | 'heal' | 'level';
@@ -59,6 +62,10 @@ function markup(spec: FxSpec): string {
         ? `<div class="fxe-face">${spec.face.image ? `<img src="${spec.face.image}" alt="">` : `<span>${escapeHtml(spec.face.label)}</span>`}</div>`
         : '';
       return `<div class="fxe-band">${face}<div class="fxe-band-text">${big(text)}${sub}</div></div>`;
+    }
+    case 'skill': {
+      const art = spec.art ? `<img class="fxe-skill-art" src="${spec.art}" alt="">` : '';
+      return `<div class="fxe-band fxe-band--skill"><div class="fxe-band-text">${sub}${big(text)}</div></div>${art}`;
     }
     case 'warning':
       return `<div class="fxe-hazard fxe-hazard--top"></div><div class="fxe-hazard fxe-hazard--bottom"></div>${big(text)}${sub}`;

@@ -4,44 +4,49 @@ import type { AttackResult, DefenseMode } from './types';
 export interface Fighter {
   atk: number;
   def: number;
-  eva: number;
 }
 
 /**
  * 공격 1회 판정.
- * - 공격값: d6 + ATK
- * - 방어: 피해 = max(1, 공격값 - (d6 + DEF))
- * - 회피: d6 + EVA > 공격값 이면 피해 0, 아니면 공격값 그대로
+ * - 공격값: 공격력 + 주사위
+ * - 방어: 피해 = max(1, 공격값 - (방어력 + 주사위))
+ * - 회피: 내 주사위 > 상대 공격 주사위(공격력 빼고 눈만)이면 피해 0, 아니면 공격값 그대로
+ *   예) 공격력 2 + 주사위 3 → 4 · 5 · 6이 나오면 회피 성공
+ * evadeDice: 회피할 때 굴릴 주사위 수. 여러 개면 가장 높은 눈을 쓴다 (뭇별 액티브)
  */
 export function resolveAttack(
   attacker: Fighter,
   defender: Fighter,
   mode: DefenseMode,
   rng: Rng,
+  evadeDice = 1,
 ): AttackResult {
   const attackRoll = rng.d6();
   const attackValue = attackRoll + attacker.atk;
-  const defenseRoll = rng.d6();
 
   if (mode === 'block') {
+    const defenseRoll = rng.d6();
     const defenseValue = defenseRoll + defender.def;
     return {
       mode,
       attackRoll,
       attackValue,
       defenseRoll,
+      defenseRolls: [defenseRoll],
       defenseValue,
       damage: Math.max(1, attackValue - defenseValue),
     };
   }
 
-  const defenseValue = defenseRoll + defender.eva;
+  const defenseRolls = Array.from({ length: Math.max(1, evadeDice) }, () => rng.d6());
+  const defenseRoll = Math.max(...defenseRolls);
   return {
     mode,
     attackRoll,
     attackValue,
     defenseRoll,
-    defenseValue,
-    damage: defenseValue > attackValue ? 0 : attackValue,
+    defenseRolls,
+    defenseValue: defenseRoll,
+    damage: defenseRoll > attackRoll ? 0 : attackValue,
   };
 }

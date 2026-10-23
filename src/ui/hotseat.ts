@@ -2,6 +2,8 @@ import { DEFAULT_BOARD } from '../data/board';
 import { PLACEHOLDER_BOSS } from '../data/bosses';
 import { applyAction, createGame, RuleError, type PlayerSetup } from '../engine/game';
 import type { Action, GameState } from '../engine/types';
+import { CHARACTERS } from '../data/characters';
+import { CHARACTER_ART } from './assets';
 import { BattleView } from './battleView';
 import { BoardView } from './boardView';
 import { FxLayer } from './fx';
@@ -32,7 +34,9 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   const battle = new BattleView(gameEl);
   const fx = new FxLayer(gameEl);
   // 개발 중에만: 콘솔에서 window.__fx.play({ kind: 'levelup', text: 'LEVEL UP!' })로 연출을 바로 볼 수 있다
-  if (import.meta.env.DEV) (window as unknown as { __fx: FxLayer }).__fx = fx;
+  if (import.meta.env.DEV) {
+    Object.assign(window, { __fx: fx, __battle: battle, __state: () => state });
+  }
   battle.onChoice = (choice) => dispatch({ ...choice, player: state.current });
 
   // ───────── 연출 ─────────
@@ -68,14 +72,23 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
           text: p!.name,
           sub: `${s.round}라운드 · 지금 차례`,
           color: p!.color,
-          face: { label: String(ev.player + 1) },
+          face: { label: String(ev.player + 1), image: CHARACTER_ART[p!.character].portrait },
+        });
+        break;
+      case 'skill':
+        await fx.play({
+          kind: 'skill',
+          text: CHARACTERS[p!.character].active.name,
+          sub: 'SKILL',
+          color: CHARACTER_ART[p!.character].color,
+          art: CHARACTER_ART[p!.character].main,
         });
         break;
       case 'revive':
         fx.float(board.tokenPoint(ev.player), '부활!', 'heal');
         break;
       case 'levelUp':
-        await fx.play({ kind: 'levelup', text: 'LEVEL UP!', sub: `${p!.name} · Lv.${ev.level}` });
+        await fx.play({ kind: 'levelup', text: 'LEVEL UP!', sub: `${p!.name} · ${CHARACTERS[p!.character].name} ${ev.level}성` });
         break;
       case 'ko':
         await fx.play({ kind: 'ko', text: 'K.O.', sub: `${p!.name} · 다음 라운드는 쉰다 · 진행도 +1` });
@@ -108,16 +121,11 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     }
   }
 
-  /** 새로 시작된 인카운터면 ENCOUNTER 컷인 (보스면 BOSS BATTLE) */
+  /** 보스와 만나면 인카운터 화면 전에 BOSS BATTLE 컷인 (일반 에너미는 원작처럼 바로 FIGHT 화면) */
   async function encounterCutin(prev: GameState, s: GameState) {
     const b = s.battles.at(-1);
-    if (!b || b.done || b.seq === prev.battles.at(-1)?.seq) return;
-    await fx.play({
-      kind: 'encounter',
-      text: b.enemy.isBoss ? 'BOSS BATTLE' : 'ENCOUNTER',
-      sub: `${b.enemy.name} 등장`,
-      color: b.enemy.isBoss ? '#ffb627' : undefined,
-    });
+    if (!b || b.done || b.seq === prev.battles.at(-1)?.seq || !b.enemy.isBoss) return;
+    await fx.play({ kind: 'encounter', text: 'BOSS BATTLE', sub: `${b.enemy.name} 등장`, color: '#ffb627' });
   }
 
   // ───────── 진행 ─────────
@@ -160,6 +168,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     draw(prev, true);
     battle.renderChoices(state, true);
     if (action.type === 'ROLL') board.showDice(state.turn.dice, state.turn.extraSteps);
+    if (action.type === 'USE_SKILL') await present(state, { type: 'skill', player: action.player });
 
     // 연출 순서: 진행 중이던 전투 마무리 → 말 이동 → 숫자 · 레벨업 · KO → 기믹 알림
     //          → 승패 → 라운드 · 차례 컷인 → 새로 만난 에너미와 전투 시작

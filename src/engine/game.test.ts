@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BOARD } from '../data/board';
+import { CHARACTERS } from '../data/characters';
 import { PLACEHOLDER_BOSS } from '../data/bosses';
 import { ENEMIES } from '../data/enemies';
 import { applyAction, createGame, RuleError, validateBoard } from './game';
@@ -13,7 +14,6 @@ const TEST_BOSS: BossDef = {
   hpPerPlayer: 5,
   atk: 1,
   def: 0,
-  eva: 0,
   counter: false,
   defense: 'block',
   defeatAt: 99,
@@ -38,9 +38,17 @@ function ring(kinds: TileKind[], opts: { spawnTiles?: number[]; bossTile?: numbe
   };
 }
 
-function newGame(board: Board, opts: { players?: number; seed?: number; boss?: BossDef } = {}): GameState {
-  const { players = 2, seed = 42, boss = TEST_BOSS } = opts;
-  const setups = Array.from({ length: players }, (_, i) => ({ name: `P${i + 1}`, color: '#fff' }));
+function newGame(
+  board: Board,
+  opts: { players?: number; seed?: number; boss?: BossDef; potential?: boolean } = {},
+): GameState {
+  const { players = 2, seed = 42, boss = TEST_BOSS, potential = false } = opts;
+  const setups = Array.from({ length: players }, (_, i) => ({
+    name: `P${i + 1}`,
+    color: '#fff',
+    character: 'mutbyeol' as const,
+    potential,
+  }));
   return createGame({ board, boss, players: setups, seed });
 }
 
@@ -59,7 +67,6 @@ function withEnemy(state: GameState, kind: EnemyKind, tile: number): GameState {
     maxHp: info.hp,
     atk: info.atk,
     def: info.def,
-    eva: info.eva,
     counter: info.counter,
     defense: info.defense,
     reward: info.reward,
@@ -84,13 +91,14 @@ const release = (s: GameState) => applyAction(s, { type: 'ENCOUNTER', player: s.
 const defend = (s: GameState, mode: 'block' | 'evade') => applyAction(s, { type: 'DEFEND', player: s.current, mode });
 
 const empties = (n: number): TileKind[] => Array(n).fill('empty');
+const MUT = CHARACTERS.mutbyeol;
 
 describe('createGame', () => {
   it('모두 본부에서 시작하고, 첫 플레이어는 턴 수입을 받고, 진행도 1에서 시작한다', () => {
     const s = newGame(ring(empties(5)), { players: 3 });
     expect(s.players.map((p) => p.tile)).toEqual([0, 0, 0]);
-    expect(s.players[0].coins).toBe(RULES.startCoins + RULES.turnIncome);
-    expect(s.players[1].coins).toBe(RULES.startCoins);
+    expect(s.players[0].coins).toBe(MUT.startCoins + RULES.turnIncome);
+    expect(s.players[1].coins).toBe(MUT.startCoins);
     expect(s.phase).toEqual({ kind: 'preRoll' });
     expect([s.round, s.progress]).toEqual([1, 1]);
   });
@@ -166,7 +174,7 @@ describe('주사위와 이동', () => {
     let s = newGame(ring(empties(12)));
     s = finishTurn(s);
     expect(s.current).toBe(1);
-    expect(s.players[1].coins).toBe(RULES.startCoins + RULES.turnIncome);
+    expect(s.players[1].coins).toBe(MUT.startCoins + RULES.turnIncome);
     expect([s.round, s.progress]).toEqual([1, 1]);
     s = finishTurn(s);
     expect(s.current).toBe(0);
@@ -206,29 +214,40 @@ describe('주사위와 이동', () => {
 });
 
 describe('본부와 레벨업', () => {
-  it('본부를 지나가면 코인을 내고 레벨업한다', () => {
+  it('본부를 지나가면 코인을 내고 별을 따고, 캐릭터의 그 별 능력치를 얻는다', () => {
     const s0 = newGame(ring(['empty', 'empty']));
-    s0.players[0].coins = 25;
+    s0.players[0].coins = 20;
     const s = rollExactly(s0, 4); // 0 → 1 → 2 → 0(본부) → 1
     expect(s.players[0].tile).toBe(1);
-    expect(s.players[0].level).toBe(2);
-    expect(s.players[0].coins).toBe(5);
-  });
-
-  it('코인이 모자라면 레벨업하지 않는다', () => {
-    const s0 = newGame(ring(['empty', 'empty']));
-    s0.players[0].coins = 19;
-    const s = rollExactly(s0, 3);
     expect(s.players[0].level).toBe(1);
-    expect(s.players[0].coins).toBe(19);
+    expect(s.players[0].coins).toBe(20 - RULES.levelUpCost[0]);
+    // 뭇별 1성: 체력 +2 (지금 HP도 같이)
+    expect([s.players[0].maxHp, s.players[0].hp]).toEqual([MUT.hp + 2, MUT.hp + 2]);
   });
 
-  it('레벨 3이 되어도 게임은 끝나지 않는다 (승리는 보스 처치)', () => {
+  it('코인이 모자라면 별을 따지 않는다', () => {
+    const s0 = newGame(ring(['empty', 'empty']));
+    s0.players[0].coins = RULES.levelUpCost[0] - 1;
+    const s = rollExactly(s0, 3);
+    expect(s.players[0].level).toBe(0);
+    expect(s.players[0].coins).toBe(RULES.levelUpCost[0] - 1);
+  });
+
+  it('뭇별 2성 · 3성: 체력 +1, 공격력 +1씩', () => {
+    let s = newGame(ring(['empty', 'empty']));
+    s.players[0].level = 1;
+    s.players[0].coins = 100;
+    s = rollExactly(s, 3);
+    expect(s.players[0]).toMatchObject({ level: 2, maxHp: MUT.hp + 1, atk: MUT.atk + 1 });
+  });
+
+  it('3성이 되어도 게임은 끝나지 않고, 더 올라가지 않는다', () => {
     const s0 = newGame(ring(['empty', 'empty']));
     s0.players[0].level = 2;
-    s0.players[0].coins = 40;
-    const s = rollExactly(s0, 5);
+    s0.players[0].coins = 100;
+    const s = rollExactly(s0, 6); // 본부를 두 번 지나간다
     expect(s.players[0].level).toBe(3);
+    expect(s.players[0].coins).toBe(100 - RULES.levelUpCost[2]);
     expect(s.phase).toEqual({ kind: 'endTurn' });
   });
 });
@@ -236,7 +255,7 @@ describe('본부와 레벨업', () => {
 describe('칸 효과', () => {
   it('코인+ / 코인- (0 아래로는 안 내려간다)', () => {
     const plus = rollExactly(newGame(ring(['coinPlus', 'empty'])), 1);
-    expect(plus.players[0].coins).toBe(RULES.turnIncome + RULES.coinPlus);
+    expect(plus.players[0].coins).toBe(MUT.startCoins + RULES.turnIncome + RULES.coinPlus);
 
     const s0 = newGame(ring(['coinMinus', 'empty']));
     s0.players[0].coins = 1;
@@ -320,12 +339,18 @@ describe('인카운터', () => {
     expect(s2.phase).toEqual({ kind: 'endTurn' });
   });
 
-  it('회피에 성공하면 피해가 0이다', () => {
-    const s0 = rollExactly(enemyRing('delinquent'), 4);
-    s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
-    s0.players[0].eva = 100;
-    const s = defend(attack(s0), 'evade');
-    expect(s.players[0].hp).toBe(s.players[0].maxHp);
+  it('회피: 내 주사위가 상대 공격 주사위보다 크면 피해 0, 아니면 공격값 전부', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const s0 = rollExactly(withEnemy(newGame(ring(empties(9)), { seed }), 'delinquent', 2), 4);
+      s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
+      const s = defend(attack(s0), 'evade');
+      const counter = s.battles.at(-1)!.events[1];
+      if (counter.type !== 'attack') throw new Error();
+      const r = counter.result;
+      expect(r.defenseValue).toBe(r.defenseRoll); // 회피는 능력치 없이 주사위만
+      expect(r.damage).toBe(r.defenseRoll > r.attackRoll ? 0 : r.attackValue);
+      expect(s.players[0].hp).toBe(Math.max(0, MUT.hp - r.damage));
+    }
   });
 
   it('에너미 칸에 딱 도착해도 인카운터가 일어나고, 끝나면 그 칸에 머문다', () => {
@@ -408,6 +433,90 @@ describe('KO', () => {
     expect([s.current, s.round]).toEqual([0, 3]);
     expect(s.players[0]).toMatchObject({ ko: false, hp: s.players[0].maxHp, tile: 2, reviveRound: null });
     expect(s.players[0].coins).toBe(11 + RULES.turnIncome);
+  });
+});
+
+describe('뭇별', () => {
+  const useSkill = (s: GameState) => applyAction(s, { type: 'USE_SKILL', player: s.current });
+
+  /** 불량배의 반격 앞까지. 시드를 바꿔 가며 원하는 결과가 나오는 판을 찾는다 */
+  function counterCase(opts: { potential?: boolean; skill?: boolean; enemyHp?: number }, want: (evaded: boolean) => boolean) {
+    for (let seed = 1; seed < 300; seed++) {
+      let s = withEnemy(newGame(ring(empties(9)), { seed, potential: opts.potential }), 'delinquent', 2);
+      if (opts.skill) s = useSkill(s);
+      s = rollExactly(s, 4);
+      s.enemies[0].hp = s.enemies[0].maxHp = 100;
+      const before = attack(s);
+      before.enemies[0].hp = opts.enemyHp ?? 100;
+      const after = defend(before, 'evade');
+      const counter = after.battles.at(-1)!.events[1];
+      if (counter.type === 'attack' && want(counter.result.damage === 0)) return { before, after };
+    }
+    throw new Error('원하는 판을 못 찾음');
+  }
+
+  it('시작 능력치: 체력 9 · 공격력 1 · 방어력 0 · 코인 9 · 0성', () => {
+    const p = newGame(ring(empties(5))).players[1];
+    expect(p).toMatchObject({ character: 'mutbyeol', hp: 9, maxHp: 9, atk: 1, def: 0, coins: 9, level: 0 });
+  });
+
+  it('액티브: 굴리기 전에만, 턴마다 한 번, 쓰면 재사용 대기 4라운드', () => {
+    const s0 = newGame(ring(empties(9)));
+    const s1 = useSkill(s0);
+    expect(s1.players[0]).toMatchObject({ skillCooldown: 4, skillActiveUntil: 2 });
+    expect(() => useSkill(s1)).toThrow(RuleError);
+    const rolled = applyAction(s0, { type: 'ROLL', player: 0 });
+    expect(() => useSkill(rolled)).toThrow(RuleError);
+  });
+
+  it('재사용 대기는 라운드마다 1씩 줄고, 효과는 다음 자기 차례가 오면 끝난다', () => {
+    let s = useSkill(newGame(ring(empties(12))));
+    s = finishTurn(finishTurn(s)); // 2라운드, 다시 P1 차례
+    expect(s.round).toBe(2);
+    expect(s.players[0]).toMatchObject({ skillCooldown: 3, skillActiveUntil: null });
+    expect(() => useSkill(s)).toThrow(RuleError);
+  });
+
+  it('액티브 효과 중에는 회피 주사위 2개 중 높은 값을 쓴다', () => {
+    const { after } = counterCase({ skill: true }, () => true);
+    const counter = after.battles.at(-1)!.events[1];
+    if (counter.type !== 'attack') throw new Error();
+    expect(counter.result.defenseRolls).toHaveLength(2);
+    expect(counter.result.defenseRoll).toBe(Math.max(...counter.result.defenseRolls));
+  });
+
+  it('효과가 없으면 회피 주사위는 1개', () => {
+    const { after } = counterCase({}, () => true);
+    const counter = after.battles.at(-1)!.events[1];
+    if (counter.type !== 'attack') throw new Error();
+    expect(counter.result.defenseRolls).toHaveLength(1);
+  });
+
+  it('패시브: 회피에 성공하면 액티브 재사용 대기 -1', () => {
+    const { after } = counterCase({ skill: true }, (evaded) => evaded);
+    expect(after.players[0].skillCooldown).toBe(3);
+    expect(after.battles.at(-1)!.events).toContainEqual({ type: 'skill', name: MUT.passive.name });
+  });
+
+  it('회피에 실패하면 재사용 대기는 그대로', () => {
+    const { after } = counterCase({ skill: true }, (evaded) => !evaded);
+    expect(after.players[0].skillCooldown).toBe(4);
+  });
+
+  it('잠재 능력: 해방했으면 회피 성공 시 그 몬스터에게 공격력만큼 피해', () => {
+    const on = counterCase({ potential: true }, (evaded) => evaded).after;
+    expect(on.enemies[0].hp).toBe(100 - MUT.atk);
+    expect(on.battles.at(-1)!.events).toContainEqual({ type: 'skill', name: MUT.potential.name, damage: MUT.atk, targetHp: 100 - MUT.atk });
+
+    const off = counterCase({ potential: false }, (evaded) => evaded).after;
+    expect(off.enemies[0].hp).toBe(100);
+  });
+
+  it('잠재 능력 피해로 몬스터를 쓰러뜨리면 보상을 받는다', () => {
+    const { before, after } = counterCase({ potential: true, enemyHp: 1 }, (evaded) => evaded);
+    expect(after.enemies).toEqual([]);
+    expect(after.players[0].coins).toBe(before.players[0].coins + ENEMIES.delinquent.reward);
+    expect(after.battles.at(-1)!.events.at(-1)).toEqual({ type: 'enemyDefeated', reward: ENEMIES.delinquent.reward });
   });
 });
 

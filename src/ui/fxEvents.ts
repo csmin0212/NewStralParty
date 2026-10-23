@@ -4,6 +4,7 @@ import type { GameState } from '../engine/types';
 export type FxEvent =
   | { type: 'round'; round: number }
   | { type: 'turn'; player: number }
+  | { type: 'skill'; player: number }
   | { type: 'coins'; player: number; delta: number }
   | { type: 'hp'; player: number; delta: number }
   | { type: 'levelUp'; player: number; level: number }

@@ -2,16 +2,19 @@
 // applyAction(state, action) → 새 state. 입력 state는 건드리지 않는다.
 
 import { CARD_IDS } from '../data/cards';
+import { CHARACTERS } from '../data/characters';
 import { ENEMIES } from '../data/enemies';
 import { resolveAttack } from './combat';
 import { createRng, type Rng } from './rng';
 import { RULES } from './rules';
+import { activateSkill, evadeDice, onEvadeSuccess } from './skills';
 import type {
   Action,
   Battle,
   BossDef,
   Board,
   CardId,
+  CharacterId,
   DefenseMode,
   Enemy,
   EnemyKind,
@@ -26,6 +29,9 @@ export class RuleError extends Error {}
 export interface PlayerSetup {
   name: string;
   color: string;
+  character: CharacterId;
+  /** 잠재 능력 해방 */
+  potential?: boolean;
 }
 
 export interface GameOptions {
@@ -44,26 +50,31 @@ export function createGame({ board, boss, players, seed }: GameOptions): GameSta
     throw new RuleError(`잘못된 보드: ${problems.join(', ')}`);
   }
 
-  const { hp, atk, def, eva } = RULES.baseStats;
   const state: GameState = {
     board,
     boss,
-    players: players.map((p, id) => ({
-      id,
-      name: p.name,
-      color: p.color,
-      tile: board.baseTile,
-      coins: RULES.startCoins,
-      level: 1,
-      hp,
-      maxHp: hp,
-      atk,
-      def,
-      eva,
-      hand: [],
-      ko: false,
-      reviveRound: null,
-    })),
+    players: players.map((p, id) => {
+      const c = CHARACTERS[p.character];
+      return {
+        id,
+        name: p.name,
+        color: p.color,
+        character: p.character,
+        potential: p.potential ?? false,
+        tile: board.baseTile,
+        coins: c.startCoins,
+        level: 0,
+        hp: c.hp,
+        maxHp: c.hp,
+        atk: c.atk,
+        def: c.def,
+        hand: [],
+        skillCooldown: 0,
+        skillActiveUntil: null,
+        ko: false,
+        reviveRound: null,
+      };
+    }),
     enemies: [],
     nextEnemyId: 0,
     enemyBonus: { atk: 0, def: 0 },
@@ -115,6 +126,9 @@ export function applyAction(state: GameState, action: Action): GameState {
       break;
     case 'DEFEND':
       defend(s, rng, action.mode);
+      break;
+    case 'USE_SKILL':
+      useSkill(s);
       break;
     case 'END_TURN':
       endTurn(s, rng);
@@ -252,18 +266,7 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   log(s, `  ${p.name}의 공격 ${hit.attackValue} vs ${defenseName(hit.mode)} ${hit.defenseValue} → ${hit.damage} 피해`);
 
   if (enemy.hp === 0) {
-    s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
-    p.coins += enemy.reward;
-    battle.events.push({ type: 'enemyDefeated', reward: enemy.reward });
-
-    if (enemy.isBoss) {
-      battle.done = true;
-      s.phase = { kind: 'gameOver', result: 'victory' };
-      log(s, `🎉 ${enemy.name} 처치! 모두의 승리!`);
-      notice(s, `🎉 ${enemy.name} 처치!`);
-      return;
-    }
-    log(s, `  ${enemy.name} 처치! 코인 +${enemy.reward}`);
+    if (defeatEnemy(s, p, enemy, battle)) return;
     finishBattle(s, rng, stepsLeft);
     return;
   }
@@ -284,14 +287,15 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   const battle = currentBattle(s);
   const p = currentPlayer(s);
 
-  const hit = resolveAttack(enemy, p, mode, rng);
+  const hit = resolveAttack(enemy, p, mode, rng, mode === 'evade' ? evadeDice(p) : 1);
   battle.events.push({
     type: 'attack',
     attacker: 'enemy',
     result: hit,
     targetHp: Math.max(0, p.hp - hit.damage),
   });
-  log(s, `  ${enemy.name}의 반격 ${hit.attackValue} vs ${defenseName(mode)} ${hit.defenseValue} → ${hit.damage} 피해`);
+  const rolls = hit.defenseRolls.length > 1 ? ` (주사위 ${hit.defenseRolls.join('·')} 중 높은 값)` : '';
+  log(s, `  ${enemy.name}의 반격 ${hit.attackValue} vs ${defenseName(mode)} ${hit.defenseValue}${rolls} → ${hit.damage} 피해`);
 
   damage(s, rng, p, hit.damage);
   if (p.ko) {
@@ -301,7 +305,60 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
     if (!isOver(s)) s.phase = { kind: 'endTurn' };
     return;
   }
+
+  if (mode === 'evade' && hit.damage === 0) {
+    if (evadeSucceeded(s, p, enemy, battle)) return;
+  }
   finishBattle(s, rng, stepsLeft);
+}
+
+/** 회피 성공 시 캐릭터 효과 (패시브 · 잠재 능력). 그걸로 보스를 쓰러뜨려 게임이 끝나면 true */
+function evadeSucceeded(s: GameState, p: Player, enemy: Enemy, battle: Battle): boolean {
+  const c = CHARACTERS[p.character];
+  const effects = onEvadeSuccess(p);
+
+  if (effects.cooldownCut > 0 && p.skillCooldown > 0) {
+    p.skillCooldown = Math.max(0, p.skillCooldown - effects.cooldownCut);
+    battle.events.push({ type: 'skill', name: c.passive.name });
+    log(s, `  ${p.name}: 「${c.passive.name}」 액티브 재사용 대기 -${effects.cooldownCut} (남은 ${p.skillCooldown})`);
+  }
+
+  if (effects.counterDamage > 0) {
+    enemy.hp = Math.max(0, enemy.hp - effects.counterDamage);
+    battle.events.push({ type: 'skill', name: c.potential.name, damage: effects.counterDamage, targetHp: enemy.hp });
+    log(s, `  ${p.name}: 「${c.potential.name}」 ${enemy.name}에게 ${effects.counterDamage} 피해`);
+    if (enemy.hp === 0) return defeatEnemy(s, p, enemy, battle);
+  }
+  return false;
+}
+
+/** 에너미 처치: 보상을 주고 판에서 치운다. 보스면 모두의 승리로 게임이 끝나고 true */
+function defeatEnemy(s: GameState, p: Player, enemy: Enemy, battle: Battle): boolean {
+  s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
+  p.coins += enemy.reward;
+  battle.events.push({ type: 'enemyDefeated', reward: enemy.reward });
+
+  if (enemy.isBoss) {
+    battle.done = true;
+    s.phase = { kind: 'gameOver', result: 'victory' };
+    log(s, `🎉 ${enemy.name} 처치! 모두의 승리!`);
+    notice(s, `🎉 ${enemy.name} 처치!`);
+    return true;
+  }
+  log(s, `  ${enemy.name} 처치! 코인 +${enemy.reward}`);
+  return false;
+}
+
+/** 액티브 스킬: 주사위를 굴리기 전에, 재사용 대기가 끝났을 때만 */
+function useSkill(s: GameState) {
+  if (s.phase.kind !== 'preRoll') throw new RuleError('스킬은 주사위를 굴리기 전에만 쓸 수 있습니다');
+  const p = currentPlayer(s);
+  if (s.turn.skillUsed) throw new RuleError('스킬은 턴마다 한 번만 쓸 수 있습니다');
+  if (p.skillCooldown > 0) throw new RuleError(`재사용까지 ${p.skillCooldown}라운드 남았습니다`);
+
+  activateSkill(s, p);
+  s.turn.skillUsed = true;
+  log(s, `${p.name}: ✨ 액티브 스킬 「${CHARACTERS[p.character].active.name}」!`);
 }
 
 function endTurn(s: GameState, rng: Rng) {
@@ -313,15 +370,17 @@ function endTurn(s: GameState, rng: Rng) {
 // ───────────────────────── 진행 ─────────────────────────
 
 function freshTurn(): TurnInfo {
-  return { cardPlayed: false, diceCount: 1, extraSteps: 0, dice: [] };
+  return { cardPlayed: false, skillUsed: false, diceCount: 1, extraSteps: 0, dice: [] };
 }
 
-/** 다음 플레이어로. 한 바퀴 돌면 라운드 +1, 진행도 +1 */
+/** 다음 플레이어로. 한 바퀴 돌면 라운드 +1, 진행도 +1, 스킬 재사용 대기 -1 */
 function nextPlayer(s: GameState, rng: Rng) {
   s.current = (s.current + 1) % s.players.length;
   if (s.current !== 0) return;
   s.round += 1;
   log(s, `── ${s.round}라운드 ──`);
+  // 재사용 대기는 진짜 라운드만 센다 (KO로 오르는 진행도에는 줄지 않는다)
+  for (const p of s.players) p.skillCooldown = Math.max(0, p.skillCooldown - 1);
   advanceProgress(s, rng, '라운드');
 }
 
@@ -340,6 +399,8 @@ function beginTurn(s: GameState, rng: Rng) {
     }
 
     log(s, `${p.name}의 차례`);
+    // 액티브 스킬의 "1라운드 동안"은 다음 자기 차례가 시작되면 끝난다
+    if (p.skillActiveUntil !== null && s.round >= p.skillActiveUntil) p.skillActiveUntil = null;
     if (p.ko) {
       p.ko = false;
       p.reviveRound = null;
@@ -437,13 +498,29 @@ function tryLevelUp(s: GameState, p: Player) {
   const cost = RULES.levelUpCost[p.level];
   if (cost === undefined) return;
   if (p.coins < cost) {
-    log(s, `${p.name}: 본부 도착 — 레벨업까지 코인 ${cost - p.coins} 부족`);
+    log(s, `${p.name}: 본부 도착 — ${p.level + 1}성까지 코인 ${cost - p.coins} 부족`);
     return;
   }
   p.coins -= cost;
   p.level += 1;
-  // 캐릭터별 레벨업 능력치는 캐릭터 시스템이 생기면 여기서 적용한다
-  log(s, `${p.name}: ⭐ 코인 ${cost}개로 레벨 ${p.level} 달성!`);
+
+  // 캐릭터마다 별을 딸 때 오르는 능력치. 최대 HP가 오르면 지금 HP도 같이 오른다
+  const growth = CHARACTERS[p.character].stars[p.level - 1] ?? {};
+  const gains: string[] = [];
+  if (growth.maxHp) {
+    p.maxHp += growth.maxHp;
+    p.hp += growth.maxHp;
+    gains.push(`최대 HP +${growth.maxHp}`);
+  }
+  if (growth.atk) {
+    p.atk += growth.atk;
+    gains.push(`공격력 +${growth.atk}`);
+  }
+  if (growth.def) {
+    p.def += growth.def;
+    gains.push(`방어력 +${growth.def}`);
+  }
+  log(s, `${p.name}: ⭐ 코인 ${cost}개로 ${p.level}성 달성!${gains.length ? ` (${gains.join(', ')})` : ''}`);
 }
 
 /** 도착한 칸의 효과. 워프하면 path에 도착 칸을 덧붙인다 */
@@ -518,7 +595,6 @@ function summon(s: GameState, rng: Rng, kind: EnemyKind) {
     maxHp: info.hp,
     atk: info.atk + s.enemyBonus.atk,
     def: info.def + s.enemyBonus.def,
-    eva: info.eva,
     counter: info.counter,
     defense: info.defense,
     reward: info.reward,
@@ -542,7 +618,6 @@ function bossAppear(s: GameState) {
     maxHp: hp,
     atk: b.atk,
     def: b.def,
-    eva: b.eva,
     counter: b.counter,
     defense: b.defense,
     reward: 0,

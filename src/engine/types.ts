@@ -35,19 +35,28 @@ export interface Board {
 
 export type CardId = 'dash' | 'doubleDice' | 'bandage';
 
+export type CharacterId = 'mutbyeol';
+
 export interface Player {
   id: number;
   name: string;
   color: string;
+  character: CharacterId;
+  /** 잠재 능력 해방 여부 (게임 시작 때 정한다) */
+  potential: boolean;
   tile: number;
   coins: number;
+  /** 스타(성). 0성에서 시작해 본부에서 코인을 내고 올린다 */
   level: number;
   hp: number;
   maxHp: number;
   atk: number;
   def: number;
-  eva: number;
   hand: CardId[];
+  /** 액티브 스킬 재사용 대기 (라운드). 0이면 쓸 수 있다 */
+  skillCooldown: number;
+  /** 액티브 스킬 효과가 이 라운드의 자기 차례 시작까지 유지된다 (뭇별: 회피 주사위 2개) */
+  skillActiveUntil: number | null;
   /** KO 상태. 쓰러진 자리에 누워 있다 */
   ko: boolean;
   /** KO 상태일 때, 이 라운드의 자기 차례에 부활한다 */
@@ -70,7 +79,6 @@ export interface Enemy {
   maxHp: number;
   atk: number;
   def: number;
-  eva: number;
   /** 반격형이면 공격받고 살아남았을 때 1회 반격한다 */
   counter: boolean;
   /** 공격받을 때 쓰는 방어 방식 */
@@ -98,7 +106,6 @@ export interface BossDef {
   hpPerPlayer: number;
   atk: number;
   def: number;
-  eva: number;
   counter: boolean;
   defense: DefenseMode;
   /** 진행도가 여기에 닿으면 패배 */
@@ -108,9 +115,15 @@ export interface BossDef {
 
 export interface AttackResult {
   mode: DefenseMode;
+  /** 공격 주사위 눈 */
   attackRoll: number;
+  /** 공격값 = 공격력 + 주사위 */
   attackValue: number;
+  /** 방어 · 회피에 쓴 주사위 눈 (여러 개 굴렸으면 그중 고른 값) */
   defenseRoll: number;
+  /** 굴린 주사위 전부 (뭇별 액티브처럼 2개 굴려 높은 값을 고를 때) */
+  defenseRolls: number[];
+  /** 방어: 방어력 + 주사위, 회피: 주사위 (공격 주사위와 비교) */
   defenseValue: number;
   damage: number;
 }
@@ -119,7 +132,9 @@ export type BattleEvent =
   | { type: 'attack'; attacker: 'player' | 'enemy'; result: AttackResult; targetHp: number }
   | { type: 'enemyDefeated'; reward: number }
   | { type: 'playerKO' }
-  | { type: 'release' };
+  | { type: 'release' }
+  /** 회피에 성공해서 발동한 캐릭터 효과 (뭇별 패시브 · 잠재 능력) */
+  | { type: 'skill'; name: string; damage?: number; targetHp?: number };
 
 /** 인카운터 한 번의 기록. 화면은 events를 순서대로 연출한다 */
 export interface Battle {
@@ -142,6 +157,7 @@ export type Phase =
 /** 현재 턴의 임시 값 */
 export interface TurnInfo {
   cardPlayed: boolean;
+  skillUsed: boolean;
   diceCount: number;
   extraSteps: number;
   dice: number[];
@@ -193,4 +209,5 @@ export type Action =
   | { type: 'CHOOSE_PATH'; player: number; to: number }
   | { type: 'ENCOUNTER'; player: number; choice: 'attack' | 'release' }
   | { type: 'DEFEND'; player: number; mode: DefenseMode }
+  | { type: 'USE_SKILL'; player: number }
   | { type: 'END_TURN'; player: number };

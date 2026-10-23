@@ -116,7 +116,7 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 | 정찰 드론 `enemies/drone/idle.png` | `small agile patrol drone with four propellers, sleek white and blue shell, red sensor eye, hovering` |
 | 불량배 `enemies/delinquent/idle.png` | `delinquent student thug in a messy school uniform, cap and face mask, holding a toy-like blaster, cocky stance` |
 
-### 3차 요청 — 인카운터 · 전투 화면 (⬅ 지금)
+### 3차 요청 — 인카운터 · 전투 화면 (✅ 제작·적용)
 
 원작 인카운터 · 전투 화면([docs/REFERENCE.md](REFERENCE.md) 2 · 3번)을 따라 만들기 위한 그림. 공통 프롬프트를 앞에 붙인다.
 
@@ -137,6 +137,9 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 ---
 
 ## 3. 캐릭터 — 캐릭터 시스템을 만들 때
+
+**뭇별 (`mutbyeol`) 9종 제작 완료:** 승인된 기본 스탠딩, 보드 SD 토큰, 초상화, 전투 대기·공격·피격·방어·회피·쓰러짐. `public/assets/characters/mutbyeol/`에 투명 WebP로 저장했고 `CHARACTER_ART.mutbyeol`에 등록했습니다. 캐릭터 선택·플레이어 배정은 추후 연결합니다. 나머지 캐릭터와 보스는 별도 설정을 기다립니다.
+
 
 학원 도시의 학생들. 처음엔 **4명**(4인 플레이), 나중에 6~8명까지 늘린다.
 **같은 캐릭터로 보여야** 하니, 교복 · 머리색 · 소품(무기, 가방 등)을 프롬프트에 똑같이 적는다.
@@ -284,10 +287,12 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 | 추가 에너미 포즈 — drone hit | ✅ |
 | 3차 UI — coin / heart / star / card-back / logo | ✅ ✅ ✅ ✅ ✅ |
 | 3차 아이템 — dash / double-dice / bandage | ✅ ✅ ✅ |
-| **요청** 인카운터 그림 — robot / drone / delinquent `encounter` | ☐ ☐ ☐ |
-| **요청** 전투 — stage / background, 이펙트 — impact / smoke | ☐ ☐ ☐ ☐ |
+| **요청** 인카운터 그림 — robot / drone / delinquent `encounter` | ✅ ✅ ✅ |
+| **요청** 전투 — stage / background, 이펙트 — impact / smoke | ✅ ✅ ✅ ✅ |
 | 선택용 길 — board/path | ✅ (현재 맵은 SVG 보행로 사용) |
 | 캐릭터 1~4 — main / token / portrait | ☐ ☐ ☐ ☐ |
 | 캐릭터 1~4 — 전투 포즈 (idle / attack / hit / block / evade) | ☐ ☐ ☐ ☐ |
 
 2026-10-23: 사용자 요청에 따라 캐릭터와 보스를 제외한 남은 22종을 제작했습니다. 원본 PNG·프롬프트·검증 기록은 `assets-raw/remaining-assets/`, 게임용 WebP는 `public/assets/`에 있습니다. 전체 목록은 `public/assets/gallery.html`에서 볼 수 있습니다. 전투 포즈 5종은 전투 이벤트에 연결했고, 아이템·UI·로고도 해당 화면에 적용했습니다.
+
+2026-10-23 추가 요청: 인카운터 에너미 3장·전투 무대·옥상 배경·충격·연기 7종을 제작해 기존 인카운터/아레나 화면에 등록했습니다. 원본·프롬프트·변환 스크립트·검증 기록은 `assets-raw/battle-assets/`에 보관합니다. 배경 원본은 1672×941이며 최종 적용 크기 1920×1080으로 변환했습니다.

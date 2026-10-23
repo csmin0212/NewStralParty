@@ -5,7 +5,8 @@ import type { Action, GameState, Player } from '../engine/types';
 import { tileLabel } from './boardView';
 import { campusVector } from './campusMap';
 import { esc } from './html';
-import { CARD_ART, UI_ART } from './assets';
+import { CHARACTERS } from '../data/characters';
+import { CARD_ART, CHARACTER_ART, UI_ART } from './assets';
 
 export interface HudHandlers {
   dispatch(action: Action): void;
@@ -52,6 +53,7 @@ export function renderHud(el: HTMLElement, state: GameState, busy: boolean, logO
     const player = state.current;
     const { action, card, path } = btn.dataset;
     if (action === 'roll') h.dispatch({ type: 'ROLL', player });
+    else if (action === 'skill') h.dispatch({ type: 'USE_SKILL', player });
     else if (action === 'end') h.dispatch({ type: 'END_TURN', player });
     else if (action === 'new') h.newGame();
     else if (action === 'menu') {
@@ -114,11 +116,11 @@ function progressTrack(state: GameState): string {
     </div>`;
 }
 
-/** 레벨: 코인 아이콘이 별 모양이라, 헷갈리지 않게 별 대신 Lv 배지 + 칸(pip)으로 표시한다 */
+/** 별(성): 코인 아이콘이 별 모양이라, 헷갈리지 않게 하늘색 "N성" 배지 + 칸(pip)으로 표시한다 */
 function levelBadge(level: number): string {
-  const max = Math.max(...Object.keys(RULES.levelUpCost).map(Number)) + 1;
+  const max = Object.keys(RULES.levelUpCost).length;
   const pips = Array.from({ length: max }, (_, i) => `<i class="${i < level ? 'on' : ''}"></i>`).join('');
-  return `<span class="lv-badge" title="레벨 ${level} / ${max}">Lv.<b>${level}</b><span class="pips">${pips}</span></span>`;
+  return `<span class="lv-badge" title="${level}성 / ${max}성"><b>${level}</b>성<span class="pips">${pips}</span></span>`;
 }
 
 function playerCard(state: GameState, p: Player): string {
@@ -126,7 +128,7 @@ function playerCard(state: GameState, p: Player): string {
   const cost = RULES.levelUpCost[p.level];
   return `
     <li class="${cls}" style="--c:${p.color}">
-      <div class="pc-avatar"><span>${p.id + 1}</span></div>
+      <div class="pc-avatar"><img src="${CHARACTER_ART[p.character].portrait}" alt="" draggable="false"><span>${p.id + 1}</span></div>
       <div class="pc-hp"><img class="hp-icon" src="${UI_ART.heart}" alt="HP"><b>${p.hp}</b>/${p.maxHp}</div>
       <div class="pc-body">
         <div class="pc-name">${esc(p.name)}${p.ko ? ` <span class="ko-tag">KO · ${p.reviveRound}R 부활</span>` : ''}</div>
@@ -139,33 +141,51 @@ function playerCard(state: GameState, p: Player): string {
     </li>`;
 }
 
-/** 지금 차례인 플레이어. 캐릭터 그림이 생기면 .me-art 자리에 전신 일러스트가 들어간다 */
+/** 지금 차례인 플레이어: 원작처럼 왼쪽 아래에 캐릭터 일러스트를 크게 + 공격력 · 방어력 */
 function currentCard(state: GameState): string {
   const p = currentPlayer(state);
+  const c = CHARACTERS[p.character];
   return `
     <div class="hud-me" style="--c:${p.color}">
-      <div class="me-art"><span>${p.id + 1}</span></div>
+      <div class="me-art"><img src="${CHARACTER_ART[p.character].main}" alt="${esc(c.name)}" draggable="false"></div>
       <div class="me-info">
         <div class="me-turn">지금 차례</div>
-        <div class="me-name">${esc(p.name)} <small>Lv.${p.level}</small></div>
+        <div class="me-name">${esc(p.name)} <small>${c.name} · ${p.level}성</small></div>
         <div class="me-stats">
-          <span>⚔ ${p.atk}</span><span>🛡 ${p.def}</span><span>💨 ${p.eva}</span>
+          <span title="공격력">⚔ ${p.atk}</span><span title="방어력">🛡 ${p.def}</span>
+          ${p.potential ? `<span class="me-pot" title="${esc(c.potential.description)}">잠재 해방</span>` : ''}
         </div>
       </div>
     </div>`;
+}
+
+/** 원작의 분홍 "스킬" 버튼. 재사용 대기 중이면 남은 라운드, 효과 중이면 표시 */
+function skillButton(state: GameState): string {
+  const p = currentPlayer(state);
+  const c = CHARACTERS[p.character];
+  const ready = state.phase.kind === 'preRoll' && !state.turn.skillUsed && p.skillCooldown === 0;
+  const status = p.skillActiveUntil !== null ? '효과 중' : p.skillCooldown > 0 ? `${p.skillCooldown}R` : '';
+  const tip = `액티브 「${c.active.name}」 (재사용 ${c.active.cooldown}라운드)\n${c.active.description}\n\n패시브 「${c.passive.name}」\n${c.passive.description}`;
+  return `
+    <button class="skill-btn ${p.skillActiveUntil !== null ? 'active' : status ? 'cooling' : ''}" data-action="skill" title="${esc(tip)}" ${ready ? '' : 'disabled'}>
+      <b>스킬</b>${status ? `<small>${status}</small>` : ''}
+    </button>`;
 }
 
 function handCards(state: GameState): string {
   const p = currentPlayer(state);
   if (p.hand.length === 0) return '<div class="hud-hand empty"><span>손패 없음</span></div>';
   const usable = state.phase.kind === 'preRoll' && !state.turn.cardPlayed;
+  // 원작처럼 부채꼴로 겹치고 화면 아래로 반쯤 잘린다. --o: 가운데에서 얼마나 떨어졌는지 (-1 ~ 1)
+  const mid = (p.hand.length - 1) / 2;
   return `
-    <div class="hud-hand">
+    <div class="hud-hand fan">
       ${p.hand
         .map((id, i) => {
           const c = CARDS[id];
+          const o = mid === 0 ? 0 : (i - mid) / Math.max(mid, 1);
           return `
-            <button class="hand-card" data-card="${i}" ${usable ? '' : 'disabled'}>
+            <button class="hand-card" data-card="${i}" style="--o:${o};--i:${i}" ${usable ? '' : 'disabled'}>
               <span class="hc-art"><img src="${CARD_ART[id]}" alt="" draggable="false"></span>
               <span class="hc-name">${c.name}</span>
               <span class="hc-desc">${c.description}</span>
@@ -187,7 +207,7 @@ function actionArea(state: GameState): string {
         state.turn.extraSteps > 0 ? `+${state.turn.extraSteps}칸` : '',
       ].filter(Boolean);
       return `
-        <div class="action-info">${mods.length ? `<span class="mods">${mods.join(' · ')}</span>` : ''}${cardInfo}</div>
+        <div class="action-info">${mods.length ? `<span class="mods">${mods.join(' · ')}</span>` : ''}${skillButton(state)}${cardInfo}</div>
         <button class="go-btn" data-action="roll" data-primary>
           <span class="go-dice">🎲</span><b>이동</b><small>GO GO GO</small>
         </button>`;

@@ -1,7 +1,7 @@
 import { TILE_INFO } from '../data/board';
 import type { Board, GameState } from '../engine/types';
 import { esc } from './html';
-import { ENEMY_ART, TILE_ART } from './assets';
+import { CHARACTER_ART, ENEMY_ART, TILE_ART } from './assets';
 import { campusLayout, campusScenery } from './campusMap';
 
 const TILE = 70; // 칸 크기(px)
@@ -54,7 +54,14 @@ export class BoardView {
       const tok = document.createElement('div');
       tok.className = 'token';
       tok.style.setProperty('--c', p.color);
-      tok.textContent = String(p.id + 1);
+      // 캐릭터 말 그림이 있으면 발판 위에 선 꼬마 캐릭터로, 없으면 번호 원
+      const art = CHARACTER_ART[p.character]?.token;
+      if (art) {
+        tok.classList.add('has-art');
+        tok.innerHTML = `<img class="token-art" src="${art}" alt="" draggable="false"><b>${p.id + 1}</b>`;
+      } else {
+        tok.textContent = String(p.id + 1);
+      }
       tok.title = p.name;
       this.el.append(tok);
       return tok;
@@ -119,7 +126,8 @@ export class BoardView {
         el = document.createElement('div');
         el.className = `enemy enemy-${enemy.kind}${enemy.isBoss ? ' boss' : ''}`;
         const art = ENEMY_ART[enemy.kind];
-        el.innerHTML = `${art ? `<span class="enemy-art-clip"><img class="enemy-art" src="${art}" alt="" draggable="false"></span>` : `<span class="face">${enemy.icon}</span>`}<i class="ehp"><b></b></i>`;
+        el.innerHTML = `${art ? `<span class="enemy-art-clip"><img class="enemy-art" src="${art}" alt="" draggable="false"></span>` : `<span class="face">${enemy.icon}</span>`}<i class="ehp"><b></b></i>
+          <span class="elabel"><b class="ename">${esc(enemy.name)}</b><span class="ehp-text"></span></span>`;
         this.el.append(el);
         this.enemyEls.set(enemy.id, el);
       }
@@ -130,6 +138,9 @@ export class BoardView {
       el.classList.toggle('counter', enemy.counter);
       el.title = `${enemy.name} HP ${enemy.hp}/${enemy.maxHp} · 공격 ${enemy.atk} 방어 ${enemy.def}${enemy.counter ? ' · 반격형' : ''}`;
       el.querySelector<HTMLElement>('.ehp b')!.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+      // 원작처럼 머리 위에 이름 · ⚔공격, 그 아래 HP 숫자
+      el.querySelector('.ename')!.innerHTML = `${esc(enemy.name)} <small>⚔${enemy.atk}</small>`;
+      el.querySelector('.ehp-text')!.textContent = `${enemy.hp}/${enemy.maxHp}`;
     }
   }
 
