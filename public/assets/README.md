@@ -58,5 +58,5 @@ enemies/slime/idle.webp는 과거 테마의 미사용 파일이며 현재 게임
 
 ## 아직 없는 그림
 
-- Soda · 모나 캐릭터 그림 — 게임에서는 임시 실루엣 (src/ui/placeholderArt.ts). 요청: docs/ASSETS.md 6-1
+- Soda · 모나 캐릭터 그림 — 사용자가 직접 뽑는다. 오기 전까지 임시 실루엣 (src/ui/placeholderArt.ts)
 - 카드 39장 · 상점 칸 — 게임에서는 아이콘. 요청: docs/ASSETS.md 6
