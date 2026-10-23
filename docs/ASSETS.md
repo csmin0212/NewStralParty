@@ -85,7 +85,8 @@ isolated on a plain solid #00FF00 green background, no ground shadow
 | **1차** | 배경 1장, 칸 3종(본부 · 코인+ · 균열) | ✅ 들어옴 |
 | **2차** | 나머지 칸 5종, 에너미 3종(경비 로봇 · 정찰 드론 · 불량배) 기본 그림 | ✅ 제작·적용 |
 | 3차 | 에너미 전투 포즈, UI 아이콘, 아이템, 로고 | ✅ 제작·적용 |
-| 캐릭터 때 | 캐릭터 메인 일러스트, 보드 말, 전투 포즈 | 캐릭터 시스템을 만들 때 |
+| 캐릭터 때 | 캐릭터 메인 일러스트, 보드 말, 전투 포즈 | ✅ 뭇별 제작·적용 |
+| **4차** | 로비 · 캐릭터 화면 배경, 스킬 아이콘 | ⏳ 지금 필요 |
 | 이후 | 보스, 에너미 추가, 유물 아이콘 | 보스 · 유물 시스템 |
 
 ### 2차 프롬프트
@@ -132,13 +133,30 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 
 - 인카운터 그림은 지금 있는 `idle`보다 **더 크고 박력 있게**, 화면을 향해 덤비는 구도로 뽑는다.
 - 무대(`stage`)는 위에 캐릭터 둘이 서야 하므로 **가운데는 비워 둔다.**
-- 플레이어 쪽 스티커는 캐릭터 그림(아래 3번)이 생기면 들어간다. 그 전에는 번호 동그라미로 둔다.
+- 플레이어 쪽 스티커에는 캐릭터 전투 포즈(아래 3번)가 들어간다.
+
+### 4차 요청 — 로비 · 캐릭터 화면 (⏳ 지금 필요)
+
+원작 로비 · 캐릭터 목록 · 캐릭터 상세 화면([docs/REFERENCE.md](REFERENCE.md) 7번)을 따라 만들기 위한 그림. 공통 프롬프트를 앞에 붙인다.
+캐릭터 일러스트 · 얼굴 카드는 이미 있는 `main` · `portrait`를 쓰므로 **배경과 아이콘만** 있으면 된다. 메뉴 카드 틀 · 탭 · 버튼은 코드로 그린다.
+
+| 파일 | 용도 | 크기 | 프롬프트 (공통 프롬프트 뒤에) |
+|---|---|---|---|
+| `lobby/background.png` | 로비 화면 가득 깔리는 배경. 왼쪽~가운데에 캐릭터 일러스트가 서고 오른쪽에 메뉴 카드가 올라간다 | 1920×1080 | `wide view of a futuristic academy city plaza on a bright clear day, white buildings with sky blue glass, floating sky blue platforms in the distance, big fluffy clouds, open empty space in the left and center foreground, calmer less detailed right side, no people, no characters` |
+| `lobby/room.png` | 캐릭터 목록 · 상세 화면 배경 (원작의 방 배경 자리) | 1920×1080 | `bright modern academy club room interior, large windows with sky and clouds, white and sky blue furniture, soft sunlight, slightly blurred, low detail on the right half, no people, no characters` |
+| `characters/mutbyeol/skill-active.png` | 상세 화면 · 스킬 버튼의 액티브 「피할만 한데?」 아이콘 | 256×256, 투명 | `game skill icon, two glowing dice with a swift sideways motion trail, sky blue and mint (#8EDBD9) glow, round icon, centered, simple bold shapes` |
+| `characters/mutbyeol/skill-passive.png` | 패시브 「기대값이 높다니까?」 아이콘 | 256×256, 투명 | `game skill icon, a rising bar chart with a small star on top and a circular arrow, mint (#8EDBD9) and sky blue glow, round icon, centered, simple bold shapes` |
+| `characters/mutbyeol/potential.png` | 잠재 능력 아이콘 | 256×256, 투명 | `game skill icon, a quick counter strike slash crossing a dodge motion trail, pink and mint glow, round icon, centered, simple bold shapes` |
+
+- 두 배경은 위에 UI가 많이 올라가므로 **밝고 덜 복잡하게**, 특히 오른쪽 절반은 차분하게 뽑는다.
+- 스킬 아이콘 3개는 **같은 틀 · 같은 크기 · 같은 굵기**로 맞춘다. 앞으로 캐릭터마다 이 3개를 같은 규칙으로 뽑는다.
+- 없어도 화면은 먼저 만들 수 있다. 배경은 지금 하늘 배경, 아이콘은 글자 아이콘으로 임시로 둔다.
 
 ---
 
 ## 3. 캐릭터 — 캐릭터 시스템을 만들 때
 
-**뭇별 (`mutbyeol`) 9종 제작 완료:** 승인된 기본 스탠딩, 보드 SD 토큰, 초상화, 전투 대기·공격·피격·방어·회피·쓰러짐. `public/assets/characters/mutbyeol/`에 투명 WebP로 저장했고 `CHARACTER_ART.mutbyeol`에 등록했습니다. 캐릭터 선택·플레이어 배정은 추후 연결합니다. 나머지 캐릭터와 보스는 별도 설정을 기다립니다.
+**뭇별 (`mutbyeol`) 9종 제작 완료:** 승인된 기본 스탠딩, 보드 SD 토큰, 초상화, 전투 대기·공격·피격·방어·회피·쓰러짐. `public/assets/characters/mutbyeol/`에 투명 WebP로 저장했고 `CHARACTER_ART.mutbyeol`에 등록했습니다. 시작 화면 · HUD · 보드 말 · 전투 · 스킬 컷인에 연결했습니다. 나머지 캐릭터와 보스는 별도 설정을 기다립니다.
 
 
 학원 도시의 학생들. 처음엔 **4명**(4인 플레이), 나중에 6~8명까지 늘린다.
