@@ -18,17 +18,47 @@ NewParty에 들어갈 그림 에셋 목록과 규격. 이 문서를 보면서 �
 
 ---
 
-## 1. 스타일 가이드
+## 1. 스타일 가이드 — ✅ 파스텔 우주 (A + B)
 
-> 정해지면 여기에 적어 두고, 모든 에셋을 이 기준으로 뽑는다.
+**캐릭터는 파스텔 애니메이션, 세계는 별빛 우주.** 솜사탕 같은 성운이 낀 밤하늘에 떠 있는 작은 행성 발판들, 그 위를 뛰어다니는 귀여운 SD 캐릭터.
 
 | 항목 | 정한 값 |
 |---|---|
-| 전체 분위기 | _(예: 밝은 애니메이션 풍 / 판타지 / 우주 / 파스텔)_ |
-| 그림체 | _(예: 셀 셰이딩 2D, 굵은 외곽선)_ |
-| 색감 | _(예: 채도 높은 원색 / 부드러운 파스텔)_ |
-| 조명 방향 | _(예: 왼쪽 위에서)_ |
-| 공통 프롬프트 | _(모든 프롬프트 앞에 붙일 스타일 문구)_ |
+| 전체 분위기 | 꿈꾸는 듯한 파스텔 우주. 무섭거나 차갑지 않고 **포근하고 반짝이는** 느낌 |
+| 그림체 | 애니메이션 SD(치비) 비율, **깔끔한 셀 셰이딩**, 깨끗하고 또렷한 외곽선 |
+| 색감 | 바탕은 **깊은 남보라**(검정 X), 그 위에 **파스텔**(라벤더 · 솜사탕 핑크 · 민트 하늘색 · 버터 노랑) |
+| 빛 | 주광은 **왼쪽 위**에서 부드럽게. 가장자리에 **파스텔 림라이트**(은은한 빛 테두리) |
+| 반짝임 | 별 · 빛은 **은은한 글로우**까지만. 네온처럼 쨍하게 번쩍이지 않는다 |
+| 하지 않는 것 | 사실적인 질감, 어두운 호러, 네온 사이버펑크, 거친 붓 터치 |
+
+### 팔레트
+
+| 역할 | 색 | 쓰는 곳 |
+|---|---|---|
+| 밤하늘 | `#1B1A3D` | 배경 바탕, 가장 어두운 곳 |
+| 성운 보라 | `#3A3470` | 배경 성운, 패널 |
+| 라벤더 | `#C9B8FF` | 주 강조색, 성운 하이라이트 |
+| 솜사탕 핑크 | `#FFB3D1` | 강조, 귀여운 포인트 |
+| 민트 하늘 | `#9FE6F5` | 림라이트, 빛, 회복 · 워프 |
+| 버터 별빛 | `#FFE29A` | 별, 코인, 레벨, 본부 |
+| 별 흰색 | `#F5F3FF` | 글자, 가장 밝은 별 |
+
+### 공통 프롬프트
+
+AI 그림 도구는 영어 프롬프트가 더 안정적이다. **모든 프롬프트 앞에 아래 문장을 그대로 붙인다.**
+
+```
+cute anime game art, chibi proportions, clean cel shading, clean crisp outlines,
+dreamy pastel space theme, soft pastel colors (lavender, cotton candy pink, mint cyan, butter yellow)
+against deep indigo night sky tones, soft top-left key light, gentle pastel rim light, subtle soft glow,
+high readability, polished mobile game asset, no text, no letters, no watermark
+```
+
+투명 배경이 안 되는 도구라면 끝에 이걸 붙인다. 대상에 초록이 많으면 `magenta`로 바꾼다.
+
+```
+isolated on a plain solid #00FF00 green background, no ground shadow
+```
 
 ### 통일 규칙
 
@@ -57,6 +87,42 @@ NewParty에 들어갈 그림 에셋 목록과 규격. 이 문서를 보면서 �
 | 이후 | 보스, 에너미 추가, 유물 아이콘 | 보스 · 유물 시스템 |
 
 > 지금 화면에 실제로 쓰이는 건 **배경 · 칸 · 에너미**다. 이것부터 뽑으면 바로 바꿔 끼울 수 있다.
+
+### 1차 프롬프트
+
+각 프롬프트 앞에 [공통 프롬프트](#공통-프롬프트)를 붙인다. 마음에 드는 결과가 나올 때까지 여러 장 뽑고, 그중 가장 좋은 것을 고른다.
+
+**배경** — `board/background.jpg`, 16:9
+
+```
+wide 16:9 game board background, dreamy pastel nebula clouds in lavender and cotton candy pink,
+scattered twinkling stars, a few small cute pastel planets near the edges and corners,
+the center area is calm, darker deep indigo and low detail so a game board can sit on top,
+no characters, no platforms
+```
+
+**칸 공통** — 칸 프롬프트는 전부 이 문장으로 시작하고, 뒤에 칸마다 윗면만 바꾼다. 같은 모양 · 같은 두께로 나오게 하기 위해서다.
+
+```
+game board tile, one small round floating platform like a tiny planetoid, seen from a 30-degree top-down angle,
+moon rock base with a soft glowing pastel rim, flat top surface, same shape and thickness as a matching tile set,
+top surface shows:
+```
+
+| 칸 | 칸 공통 뒤에 붙일 내용 |
+|---|---|
+| 본부 `tiles/base.png` | `a tiny cozy space station home with a little flag, butter yellow and gold accents, slightly grander than other tiles` |
+| 코인+ `tiles/coin-plus.png` | `a small pile of shiny star-shaped golden coins, butter yellow glow` |
+| 둥지 `tiles/spawn.png` | `a swirling dark purple wormhole crater with a faint pink glow, simple and uncluttered in the center` |
+
+**슬라임** — `enemies/slime/idle.png`
+
+```
+cute cosmic slime monster, round translucent lavender jelly body with tiny twinkling stars inside,
+big glossy eyes, mischievous little smile, facing left, full body, centered, simple silhouette
+```
+
+> 에너미는 우주풍으로 살짝 바꿔도 된다. 슬라임 → 별가루 젤리, 박쥐 → 우주 박쥐, 고블린 → 광선총을 든 외계 고블린. 이름과 능력은 그대로 둔다.
 
 ---
 
