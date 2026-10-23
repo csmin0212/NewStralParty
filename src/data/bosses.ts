@@ -15,19 +15,19 @@ export const PLACEHOLDER_BOSS: BossDef = {
   defense: 'block',
   defeatAt: 16,
   timeline: [
-    { at: 1, actions: [{ type: 'summon', enemies: ['slime', 'slime', 'bat', 'goblin'] }] },
+    { at: 1, actions: [{ type: 'summon', enemies: ['robot', 'robot', 'drone', 'delinquent'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
     {
       at: 6,
       actions: [
-        { type: 'summon', enemies: ['slime', 'bat', 'goblin'] },
+        { type: 'summon', enemies: ['robot', 'drone', 'delinquent'] },
         { type: 'buffEnemies', atk: 1, def: 1 },
       ],
     },
     {
       at: 9,
       actions: [
-        { type: 'summon', enemies: ['bat', 'goblin', 'goblin'] },
+        { type: 'summon', enemies: ['drone', 'delinquent', 'delinquent'] },
         { type: 'buffEnemies', atk: 1, def: 1 },
       ],
     },

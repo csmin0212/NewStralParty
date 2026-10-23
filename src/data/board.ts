@@ -5,9 +5,9 @@ export const TILE_INFO: Record<TileKind, { name: string; icon: string }> = {
   coinPlus: { name: '코인+', icon: '🪙' },
   coinMinus: { name: '코인-', icon: '💸' },
   card: { name: '카드', icon: '🃏' },
-  spawn: { name: '둥지', icon: '🕳️' },
+  spawn: { name: '균열', icon: '🌀' },
   heal: { name: '회복', icon: '❤️' },
-  warp: { name: '워프', icon: '🌀' },
+  warp: { name: '워프', icon: '🚪' },
   base: { name: '본부', icon: '🏠' },
 };
 
@@ -27,7 +27,7 @@ export const TILE_INFO: Record<TileKind, { name: string; icon: string }> = {
  * 지름길(22~24)은 짧지만 에너미가 많다. 12번 워프는 20번으로 날아간다.
  */
 export const DEFAULT_BOARD: Board = {
-  name: '첫 번째 섬',
+  name: '중앙 학원가',
   baseTile: 0,
   tiles: [
     { id: 0, kind: 'base', x: 0, y: 0, next: [1] },

@@ -110,9 +110,9 @@ describe('createGame', () => {
   });
 
   it('진행도 1의 기믹은 시작하자마자 발동한다', () => {
-    const boss = withTimeline([{ at: 1, actions: [{ type: 'summon', enemies: ['slime', 'goblin'] }] }]);
+    const boss = withTimeline([{ at: 1, actions: [{ type: 'summon', enemies: ['robot', 'delinquent'] }] }]);
     const s = newGame(ring(empties(6), { spawnTiles: [2, 4] }), { boss });
-    expect(s.enemies.map((e) => e.kind).sort()).toEqual(['goblin', 'slime']);
+    expect(s.enemies.map((e) => e.kind).sort()).toEqual(['delinquent', 'robot']);
     expect(s.enemies.map((e) => e.tile).sort()).toEqual([2, 4]);
     expect(s.notices).toHaveLength(1);
   });
@@ -260,7 +260,7 @@ describe('칸 효과', () => {
 
 describe('인카운터', () => {
   /** 0 본부 → 1 → 2(에너미) → 3 … 9 */
-  const enemyRing = (kind: EnemyKind = 'slime') => withEnemy(newGame(ring(empties(9))), kind, 2);
+  const enemyRing = (kind: EnemyKind = 'robot') => withEnemy(newGame(ring(empties(9))), kind, 2);
 
   it('에너미가 있는 칸을 지나가면 멈추고 인카운터가 시작된다', () => {
     const s0 = enemyRing();
@@ -268,7 +268,7 @@ describe('인카운터', () => {
     expect(s.phase).toEqual({ kind: 'encounter', enemy: s0.enemies[0].id, stepsLeft: 2 });
     expect(s.players[0].tile).toBe(2);
     expect(s.lastMove?.path).toEqual([0, 1, 2]);
-    expect(s.battles.at(-1)).toMatchObject({ player: 0, enemy: { kind: 'slime' }, events: [], done: false });
+    expect(s.battles.at(-1)).toMatchObject({ player: 0, enemy: { kind: 'robot' }, events: [], done: false });
   });
 
   it('놓아주면 아무 일 없이 남은 칸을 마저 간다', () => {
@@ -281,7 +281,7 @@ describe('인카운터', () => {
   });
 
   it('비반격형은 공격해도 반격하지 않고, 남은 칸을 마저 간다', () => {
-    const s0 = rollExactly(enemyRing('slime'), 4);
+    const s0 = rollExactly(enemyRing('robot'), 4);
     s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
     const s = attack(s0);
     expect(s.enemies[0].hp).toBeLessThan(100);
@@ -302,7 +302,7 @@ describe('인카운터', () => {
   });
 
   it('반격형이 살아남으면 반격하고, 플레이어가 방어/회피를 고른다', () => {
-    const s0 = rollExactly(enemyRing('goblin'), 4);
+    const s0 = rollExactly(enemyRing('delinquent'), 4);
     s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
     const s1 = attack(s0);
     expect(s1.phase).toEqual({ kind: 'defend', enemy: s0.enemies[0].id, stepsLeft: 2 });
@@ -321,7 +321,7 @@ describe('인카운터', () => {
   });
 
   it('회피에 성공하면 피해가 0이다', () => {
-    const s0 = rollExactly(enemyRing('goblin'), 4);
+    const s0 = rollExactly(enemyRing('delinquent'), 4);
     s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
     s0.players[0].eva = 100;
     const s = defend(attack(s0), 'evade');
@@ -337,13 +337,13 @@ describe('인카운터', () => {
   });
 
   it('한 번 이동에 인카운터가 여러 번 일어날 수 있다', () => {
-    const s0 = withEnemy(withEnemy(newGame(ring(empties(6))), 'slime', 2), 'bat', 4);
+    const s0 = withEnemy(withEnemy(newGame(ring(empties(6))), 'robot', 2), 'drone', 4);
     const s1 = release(rollExactly(s0, 5));
     expect(s1.phase).toMatchObject({ kind: 'encounter', stepsLeft: 1 });
     expect(s1.players[0].tile).toBe(4);
     expect(s1.battles.map((b) => [b.enemy.kind, b.done])).toEqual([
-      ['slime', true],
-      ['bat', false],
+      ['robot', true],
+      ['drone', false],
     ]);
   });
 
@@ -360,16 +360,16 @@ describe('인카운터', () => {
       spawnTiles: [2],
       bossTile: 3,
     };
-    const s0 = withEnemy(newGame(board), 'slime', 2);
+    const s0 = withEnemy(newGame(board), 'robot', 2);
     const s = applyAction(rollExactly(s0, 2), { type: 'CHOOSE_PATH', player: 0, to: 2 });
     expect(s.phase).toMatchObject({ kind: 'encounter', stepsLeft: 1 });
   });
 });
 
 describe('KO', () => {
-  /** 고블린 반격에 KO 당하는 상황까지 만든다 */
+  /** 불량배 반격에 KO 당하는 상황까지 만든다 */
   function knockedOut(boss: BossDef = TEST_BOSS): GameState {
-    let s = withEnemy(newGame(ring(empties(9)), { boss }), 'goblin', 2);
+    let s = withEnemy(newGame(ring(empties(9)), { boss }), 'delinquent', 2);
     s = rollExactly(s, 4);
     s.enemies[0].hp = s.enemies[0].maxHp = 100;
     s.players[0].hp = 1;
@@ -387,16 +387,16 @@ describe('KO', () => {
   });
 
   it('KO로 진행도가 기믹 시점에 닿으면 기믹이 바로 발동한다', () => {
-    const boss = withTimeline([{ at: 2, actions: [{ type: 'summon', enemies: ['slime'] }] }]);
+    const boss = withTimeline([{ at: 2, actions: [{ type: 'summon', enemies: ['robot'] }] }]);
     const s = knockedOut(boss);
     expect(s.progress).toBe(2);
-    expect(s.enemies.map((e) => e.kind)).toContain('slime');
+    expect(s.enemies.map((e) => e.kind)).toContain('robot');
     expect(s.gimmicksDone).toBe(2);
   });
 
   it('다음 라운드는 쉬고, 그다음 라운드 자기 차례에 쓰러진 자리에서 HP 가득으로 부활', () => {
     let s = knockedOut();
-    s.enemies = []; // 다른 플레이어가 고블린과 마주치지 않게
+    s.enemies = []; // 다른 플레이어가 불량배과 마주치지 않게
     s = applyAction(s, { type: 'END_TURN', player: 0 });
     expect([s.current, s.round]).toEqual([1, 1]);
 
@@ -429,7 +429,7 @@ describe('진행도와 보스', () => {
 
   it('보스 칸에 있던 에너미는 보스에게 자리를 내준다', () => {
     const boss = withTimeline([
-      { at: 1, actions: [{ type: 'summon', enemies: ['slime'] }] },
+      { at: 1, actions: [{ type: 'summon', enemies: ['robot'] }] },
       { at: 2, actions: [{ type: 'bossAppear' }] },
     ]);
     let s = newGame(ring(empties(12), { spawnTiles: [10], bossTile: 10 }), { boss });
@@ -450,21 +450,21 @@ describe('진행도와 보스', () => {
 
   it('에너미 강화는 지금 있는 에너미와 이후 소환되는 에너미에 모두 적용된다', () => {
     const boss = withTimeline([
-      { at: 1, actions: [{ type: 'summon', enemies: ['slime'] }] },
+      { at: 1, actions: [{ type: 'summon', enemies: ['robot'] }] },
       { at: 2, actions: [{ type: 'buffEnemies', atk: 1, def: 2 }] },
-      { at: 3, actions: [{ type: 'summon', enemies: ['slime'] }] },
+      { at: 3, actions: [{ type: 'summon', enemies: ['robot'] }] },
     ]);
     let s = newGame(ring(empties(14), { spawnTiles: [12, 13] }), { boss });
     for (let i = 0; i < 4; i++) s = finishTurn(s);
     expect(s.progress).toBe(3);
     expect(s.enemies).toHaveLength(2);
     for (const e of s.enemies) {
-      expect([e.atk, e.def]).toEqual([ENEMIES.slime.atk + 1, ENEMIES.slime.def + 2]);
+      expect([e.atk, e.def]).toEqual([ENEMIES.robot.atk + 1, ENEMIES.robot.def + 2]);
     }
   });
 
   it('소환 칸이 다 차면 본부 · 보스 칸이 아닌 빈 칸에 나온다', () => {
-    const boss = withTimeline([{ at: 1, actions: [{ type: 'summon', enemies: ['slime', 'slime', 'slime'] }] }]);
+    const boss = withTimeline([{ at: 1, actions: [{ type: 'summon', enemies: ['robot', 'robot', 'robot'] }] }]);
     const s = newGame(ring(empties(6), { spawnTiles: [2], bossTile: 5 }), { boss });
     const tiles = s.enemies.map((e) => e.tile);
     expect(tiles).toHaveLength(3);

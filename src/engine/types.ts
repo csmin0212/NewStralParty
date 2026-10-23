@@ -54,7 +54,7 @@ export interface Player {
   reviveRound: number | null;
 }
 
-export type EnemyKind = 'slime' | 'goblin' | 'bat';
+export type EnemyKind = 'robot' | 'delinquent' | 'drone';
 
 export type DefenseMode = 'block' | 'evade';
 

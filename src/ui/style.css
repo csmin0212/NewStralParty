@@ -1,31 +1,28 @@
-/* 파스텔 우주 테마 — 색은 docs/ASSETS.md 팔레트와 같다 */
+/* 학원 도시 테마 — 밝은 화이트 + 하늘색. 색은 docs/ASSETS.md 팔레트와 같다 */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* 팔레트 */
-  --night: #1b1a3d;
-  --nebula: #3a3470;
-  --lavender: #c9b8ff;
-  --pink: #ffb3d1;
-  --mint: #9fe6f5;
-  --butter: #ffe29a;
-  --star: #f5f3ff;
+  --sky: #4a9bef;
+  --sky-deep: #2f86e6;
+  --sky-light: #a9d6fa;
+  --sky-pale: #e8f4ff;
+  --white: #ffffff;
+  --platform: #3f78e0;
+  --navy: #1f3a68;
+  --navy-2: #4667a8;
+  --yellow: #ffd34d;
+  --violet: #6b5bd6;
+  --danger: #ff5c7a;
 
   /* 역할 */
-  --bg: var(--night);
-  --surface: rgba(36, 34, 78, 0.82);
-  --surface-2: #2e2b60;
-  --surface-3: #39357a;
-  --border: rgba(201, 184, 255, 0.22);
-  --text: var(--star);
-  --muted: #aaa4d8;
-  --ink: #1b1a3d;
-  --accent: var(--lavender);
-  --gold: var(--butter);
-  --danger: #ff8fa3;
-  --glow: rgba(201, 184, 255, 0.35);
-
-  --font-display: 'Jua', 'Pretendard Variable', sans-serif;
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-2: #f4faff;
+  --surface-3: #e3f1fe;
+  --border: #cfe4fb;
+  --text: var(--navy);
+  --muted: #6b84ad;
+  --shadow: 0 6px 20px rgba(31, 58, 104, 0.14);
 
   font-family: 'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   font-size: 15px;
@@ -36,62 +33,29 @@
   box-sizing: border-box;
 }
 
-/* 밤하늘: 성운 세 덩어리 + 별 두 겹(반짝임) */
+/* 하늘 배경 그림 (--sky-art는 main.ts에서 넣는다). 그림이 늦게 와도 하늘색으로 보이게 */
 body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
   background:
-    radial-gradient(ellipse 55% 45% at 12% 18%, rgba(201, 184, 255, 0.2), transparent 70%),
-    radial-gradient(ellipse 50% 45% at 88% 85%, rgba(255, 179, 209, 0.16), transparent 70%),
-    radial-gradient(ellipse 40% 35% at 75% 12%, rgba(159, 230, 245, 0.1), transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
-}
-body::before,
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-}
-body::before {
-  background-image:
-    radial-gradient(1.5px 1.5px at 23px 41px, var(--star), transparent),
-    radial-gradient(1px 1px at 97px 13px, var(--star), transparent),
-    radial-gradient(1px 1px at 151px 88px, var(--mint), transparent),
-    radial-gradient(1.5px 1.5px at 61px 141px, var(--star), transparent),
-    radial-gradient(1px 1px at 183px 167px, var(--pink), transparent);
-  background-size: 210px 210px;
-  opacity: 0.55;
-}
-body::after {
-  background-image:
-    radial-gradient(2px 2px at 41px 77px, var(--butter), transparent),
-    radial-gradient(1.5px 1.5px at 213px 29px, var(--star), transparent),
-    radial-gradient(2px 2px at 131px 241px, var(--lavender), transparent),
-    radial-gradient(1.5px 1.5px at 281px 173px, var(--star), transparent);
-  background-size: 330px 330px;
-  animation: twinkle 4s ease-in-out infinite alternate;
-}
-@keyframes twinkle {
-  from { opacity: 0.25; }
-  to { opacity: 0.85; }
+    var(--sky-art, none) center / cover no-repeat fixed,
+    linear-gradient(180deg, #5aa8f2, #bfe0fb 70%, #eef7ff);
 }
 
 button {
   font: inherit;
   color: inherit;
-  background: var(--surface-2);
+  background: var(--white);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: background 0.15s, transform 0.1s, border-color 0.15s;
 }
 button:hover:not(:disabled) {
-  background: var(--surface-3);
+  background: var(--sky-pale);
+  border-color: var(--sky-light);
 }
 button:active:not(:disabled) {
   transform: scale(0.97);
@@ -100,32 +64,38 @@ button:disabled {
   opacity: 0.45;
   cursor: default;
 }
+
+/* 주 버튼: 하늘색 띠에 양 끝을 비스듬히 자른 모양 */
 button.primary {
   width: 100%;
-  padding: 12px;
-  background: linear-gradient(135deg, var(--lavender), var(--pink));
-  border-color: transparent;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 17px;
-  box-shadow: 0 4px 0 #8e7bd6, 0 6px 18px var(--glow);
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  background: linear-gradient(90deg, var(--sky-deep), var(--sky));
+  color: var(--white);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.5px;
 }
 button.primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #d8cbff, #ffc4dc);
-  box-shadow: 0 4px 0 #8e7bd6, 0 6px 24px rgba(255, 179, 209, 0.45);
+  background: linear-gradient(90deg, #3b92ee, #63adf3);
 }
 button.primary:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #8e7bd6, 0 4px 12px var(--glow);
+  transform: translateY(1px);
 }
 
 kbd {
-  font-family: 'Pretendard Variable', sans-serif;
+  font-family: inherit;
   font-size: 11px;
+  font-weight: 600;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(27, 26, 61, 0.18);
+  background: rgba(31, 58, 104, 0.1);
   margin-left: 4px;
+}
+button.primary kbd {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .muted {
@@ -138,32 +108,39 @@ kbd {
   height: 14px;
   border-radius: 50%;
   background: var(--c);
-  box-shadow: 0 0 8px var(--c);
+  border: 2px solid var(--white);
+  box-shadow: 0 0 0 1px var(--border);
   flex-shrink: 0;
 }
 
 /* ───────── 설정 화면 ───────── */
 
 .setup {
-  max-width: 380px;
+  max-width: 400px;
   margin: 10vh auto 0;
-  padding: 0 16px;
+  padding: 28px 24px 24px;
   text-align: center;
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--white);
+  border-top: 4px solid var(--sky);
+  border-radius: 4px 4px 18px 18px;
+  box-shadow: var(--shadow);
 }
 .setup h1 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 56px;
+  font-size: 48px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -1px;
   margin: 0;
-  background: linear-gradient(135deg, var(--mint), var(--lavender) 45%, var(--pink));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 0 18px rgba(201, 184, 255, 0.45));
+  color: var(--navy);
+}
+.setup h1::first-letter {
+  color: var(--sky);
 }
 .subtitle {
   color: var(--muted);
-  margin: 4px 0 28px;
+  margin: 4px 0 24px;
 }
 .count {
   display: flex;
@@ -172,13 +149,12 @@ kbd {
 }
 .count button {
   flex: 1;
-  font-family: var(--font-display);
-  font-size: 16px;
+  font-weight: 700;
 }
 .count button.selected {
-  border-color: var(--lavender);
-  background: var(--surface-3);
-  box-shadow: 0 0 14px var(--glow);
+  border-color: var(--sky);
+  background: var(--sky-pale);
+  color: var(--sky-deep);
 }
 .names {
   list-style: none;
@@ -196,29 +172,31 @@ kbd {
   flex: 1;
   font: inherit;
   color: inherit;
-  background: var(--surface);
+  background: var(--white);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 9px 12px;
 }
 .names input:focus {
-  outline: 2px solid var(--lavender);
+  outline: 2px solid var(--sky);
   outline-offset: -1px;
 }
 
 /* ───────── 게임 화면 ───────── */
 
+/* 맵이 화면을 꽉 채우는 무대. HUD · 배너 · 전투 화면은 그 위에 겹친다 */
 .game {
-  display: grid;
-  grid-template-columns: 1fr 330px;
+  position: relative;
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 .board-area {
-  position: relative;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   display: grid;
   place-items: center;
-  padding: 16px;
   min-width: 0;
 }
 
@@ -227,7 +205,36 @@ kbd {
   transform-origin: top left;
 }
 
-/* 칸 사이 길: 별자리처럼 점선 */
+/* 연결된 학원 도시를 위에서 비스듬히 내려다보는 고정 시점. padding = HUD가 덮는 위 · 아래 여백 */
+.board-area {
+  padding: 84px 24px 40px;
+  isolation: isolate;
+}
+.campus-scenery {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 22px 18px #336f9d35);
+}
+.campus-island { isolation: isolate; }
+.board .edges line {
+  stroke-width: 1.8;
+  stroke-dasharray: 2 6;
+  opacity: .65;
+}
+.board .warp-link { opacity: .28; }
+.board .dice-pop { z-index: 5000; }
+.board .board-overlay { z-index: 6000; }
+.board .tile:focus-visible {
+  outline: 3px solid var(--sky-deep);
+  outline-offset: 5px;
+}
+
+
+/* 칸 사이 길: 남색 점선 */
 .edges {
   position: absolute;
   inset: 0;
@@ -235,40 +242,38 @@ kbd {
   height: 100%;
   pointer-events: none;
   /* 화살표(marker)는 선이 아니라 svg의 색을 따라간다 */
-  color: rgba(201, 184, 255, 0.75);
+  color: var(--navy-2);
 }
 .edges line {
   stroke: currentColor;
   stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 0.1 7;
-  color: rgba(201, 184, 255, 0.7);
+  color: var(--navy-2);
 }
 .edges line.fork {
-  color: var(--butter);
+  color: #a36b1c;
 }
 .warp-link {
   fill: none;
-  stroke: var(--mint);
+  stroke: #5f77bf;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-dasharray: 2 8;
   opacity: 0.5;
 }
 
-/* 칸: 밤하늘에 떠 있는 작은 행성 발판 */
+/* 칸: 그림이 없는 칸은 그림과 같은 흰 발판 + 하늘색 테두리로 그린다. --mark는 칸 종류 색 */
 .tile {
-  --fill: #5a5596;
-  --edge: #3b3770;
-  --ink: #e6e2ff;
+  --mark: var(--sky-light);
   position: absolute;
   width: 70px;
   height: 70px;
   padding: 0;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--fill) 55%, white), var(--fill) 62%);
-  color: var(--ink);
+  border: 3px solid var(--sky-light);
+  background: radial-gradient(circle at 50% 40%, var(--white) 55%, var(--sky-pale));
+  color: var(--navy);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -276,13 +281,13 @@ kbd {
   gap: 1px;
   cursor: default;
   box-shadow:
-    0 5px 0 var(--edge),
-    0 8px 16px rgba(10, 8, 30, 0.55),
-    0 0 18px color-mix(in srgb, var(--fill) 35%, transparent);
+    0 5px 0 var(--platform),
+    inset 0 0 0 4px color-mix(in srgb, var(--mark) 45%, transparent),
+    0 8px 14px rgba(31, 58, 104, 0.25);
 }
 .tile:hover:not(:disabled) {
-  filter: brightness(1.08);
-  background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--fill) 55%, white), var(--fill) 62%);
+  background: radial-gradient(circle at 50% 40%, var(--white) 55%, var(--sky-pale));
+  filter: brightness(1.04);
 }
 .tile:active:not(:disabled) {
   transform: none;
@@ -290,29 +295,66 @@ kbd {
 .tile .icon {
   font-size: 22px;
   line-height: 1;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
 }
 .tile .label {
-  font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
 }
-.tile.kind-empty { --fill: #5a5596; --edge: #3b3770; --ink: #e6e2ff; }
-.tile.kind-coinPlus { --fill: #a8ebc4; --edge: #5fb58a; --ink: #12422c; }
-.tile.kind-coinMinus { --fill: #f7a6a0; --edge: #c46a66; --ink: #4e1a18; }
-.tile.kind-card { --fill: #c9b8ff; --edge: #8e7bd6; --ink: #2a2160; }
-.tile.kind-spawn { --fill: #3a3470; --edge: #241f4c; --ink: var(--pink); border-color: rgba(255, 179, 209, 0.6); }
-.tile.kind-heal { --fill: #ffb3d1; --edge: #d27a9e; --ink: #5a1a36; }
-.tile.kind-warp { --fill: #9fe6f5; --edge: #5db3c6; --ink: #0d3f4a; }
-.tile.kind-base { --fill: #ffe29a; --edge: #c9a24e; --ink: #4a3410; border-color: #fff6d6; }
+/* 그림 없는 칸도 그림 칸(비스듬히 내려다본 발판)처럼 납작한 타원으로. 중심은 말 위치와 맞춘다 */
+.tile:not(.has-art) {
+  height: 50px;
+  translate: 0 9px;
+  flex-direction: row;
+  gap: 4px;
+}
+.tile.kind-empty { --mark: var(--sky-light); }
+.tile.kind-coinPlus { --mark: var(--yellow); }
+.tile.kind-coinMinus { --mark: var(--danger); }
+.tile.kind-card { --mark: var(--sky); }
+.tile.kind-spawn { --mark: var(--violet); }
+.tile.kind-heal { --mark: #ff8fbf; }
+.tile.kind-warp { --mark: #38d0e6; }
+.tile.kind-base { --mark: var(--yellow); }
+
+/* 그림이 준비된 칸만 교체하고, 칸 이름과 선택 영역은 유지한다. */
+.tile.has-art,
+.tile.has-art:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.tile-art {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  left: -9px;
+  top: -17px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.tile.has-art .label {
+  position: absolute;
+  bottom: -8px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #edf7ff;
+  color: #233b62;
+  box-shadow: 0 1px 3px #4667a833;
+}
+.tile.has-art.choice {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+  animation: none;
+}
 
 .tile.choice {
   cursor: pointer;
-  border-color: var(--butter);
+  border-color: var(--yellow);
   animation: glow 0.9s ease-in-out infinite alternate;
 }
 @keyframes glow {
-  from { box-shadow: 0 5px 0 var(--edge), 0 0 0 0 rgba(255, 226, 154, 0.8); }
-  to { box-shadow: 0 5px 0 var(--edge), 0 0 0 10px rgba(255, 226, 154, 0); }
+  from { box-shadow: 0 5px 0 var(--platform), 0 0 0 0 rgba(255, 211, 77, 0.9); }
+  to { box-shadow: 0 5px 0 var(--platform), 0 0 0 10px rgba(255, 211, 77, 0); }
 }
 
 .token {
@@ -322,22 +364,23 @@ kbd {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 55%, white), var(--c));
-  border: 3px solid var(--star);
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 15px;
+  background: var(--c);
+  border: 3px solid var(--white);
+  color: var(--white);
+  font-weight: 900;
+  font-size: 14px;
+  text-shadow: 0 1px 1px rgba(31, 58, 104, 0.45);
   display: grid;
   place-items: center;
-  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6);
+  box-shadow: 0 3px 6px rgba(31, 58, 104, 0.4);
   transition: transform 0.16s ease-out;
   pointer-events: none;
 }
 .token.current {
   width: 34px;
   height: 34px;
-  border-color: var(--butter);
-  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6), 0 0 14px rgba(255, 226, 154, 0.8);
+  border-color: var(--yellow);
+  box-shadow: 0 3px 6px rgba(31, 58, 104, 0.4), 0 0 0 3px rgba(255, 211, 77, 0.45);
 }
 .token.ko {
   filter: grayscale(1);
@@ -351,23 +394,29 @@ kbd {
   height: 38px;
   translate: -50% -50%;
   border-radius: 50%;
-  background: var(--night);
-  border: 2px solid var(--lavender);
+  background: var(--white);
+  border: 2px solid var(--navy-2);
   display: grid;
   place-items: center;
   z-index: 4;
-  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6), 0 0 10px rgba(201, 184, 255, 0.35);
+  box-shadow: 0 3px 6px rgba(31, 58, 104, 0.35);
   pointer-events: none;
   animation: enemy-in 0.35s ease-out;
   transition: opacity 0.35s, scale 0.35s;
 }
 .enemy.counter {
-  border-color: var(--pink);
-  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6), 0 0 10px rgba(255, 179, 209, 0.5);
+  border-color: var(--danger);
 }
 .enemy .face {
   font-size: 21px;
   line-height: 1;
+}
+.enemy-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
 }
 .enemy .ehp {
   position: absolute;
@@ -376,20 +425,20 @@ kbd {
   bottom: -7px;
   height: 4px;
   border-radius: 2px;
-  background: var(--night);
+  background: var(--surface-3);
   overflow: hidden;
 }
 .enemy .ehp b {
   display: block;
   height: 100%;
-  background: var(--pink);
+  background: var(--danger);
   transition: width 0.3s;
 }
 .enemy.boss {
   width: 52px;
   height: 52px;
-  border: 3px solid var(--butter);
-  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6), 0 0 18px rgba(255, 226, 154, 0.6);
+  border: 3px solid var(--yellow);
+  box-shadow: 0 3px 6px rgba(31, 58, 104, 0.35), 0 0 0 4px rgba(255, 211, 77, 0.35);
   z-index: 5;
   animation: enemy-in 0.5s ease-out, boss-float 2.4s ease-in-out 0.5s infinite alternate;
 }
@@ -397,7 +446,7 @@ kbd {
   font-size: 30px;
 }
 .enemy.boss .ehp b {
-  background: var(--butter);
+  background: #f2a900;
 }
 @keyframes boss-float {
   to { translate: -50% calc(-50% - 4px); }
@@ -415,24 +464,25 @@ kbd {
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  font-family: var(--font-display);
-  font-size: 32px;
+  font-size: 30px;
+  font-weight: 900;
   padding: 10px 22px;
-  border-radius: 18px;
-  background: rgba(27, 26, 61, 0.92);
-  border: 1px solid var(--border);
-  box-shadow: 0 0 30px var(--glow);
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--white);
+  box-shadow: var(--shadow);
   pointer-events: none;
   opacity: 0;
   z-index: 10;
 }
 .dice-pop b {
-  color: var(--butter);
+  color: var(--sky-deep);
+  font-style: italic;
 }
 .dice-pop small {
-  font-size: 22px;
+  font-size: 20px;
   margin-left: 6px;
-  color: var(--mint);
+  color: var(--muted);
 }
 .dice-pop.pop {
   animation: dice-pop 1.4s ease-out;
@@ -451,37 +501,38 @@ kbd {
   display: grid;
   place-content: center;
   text-align: center;
-  font-family: var(--font-display);
-  font-size: 38px;
-  background: rgba(27, 26, 61, 0.75);
+  font-size: 34px;
+  font-weight: 900;
+  color: var(--navy);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(4px);
   border-radius: 20px;
   z-index: 20;
 }
 .board-overlay div {
-  font-size: 68px;
-  filter: drop-shadow(0 0 20px rgba(255, 226, 154, 0.7));
+  font-size: 64px;
 }
 .board-overlay small {
   display: block;
-  font-size: 20px;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--muted);
   margin-top: 6px;
 }
 
-/* 기믹 발동 알림 배너 */
+/* 기믹 발동 알림: 하늘색 띠 */
 .banner {
   position: absolute;
-  top: 20px;
+  top: 96px;
   left: 50%;
   translate: -50% 0;
   max-width: calc(100% - 32px);
-  padding: 10px 22px;
-  border-radius: 999px;
-  background: rgba(27, 26, 61, 0.92);
-  border: 1px solid rgba(255, 179, 209, 0.6);
-  box-shadow: 0 0 24px rgba(255, 179, 209, 0.35);
-  font-family: var(--font-display);
-  font-size: 18px;
+  padding: 10px 34px;
+  clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  background: linear-gradient(90deg, var(--sky-deep), var(--sky));
+  color: var(--white);
+  font-size: 17px;
+  font-weight: 800;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -508,7 +559,7 @@ kbd {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(20, 18, 48, 0.7);
+  background: rgba(31, 58, 104, 0.32);
   backdrop-filter: blur(4px);
   z-index: 30;
   opacity: 0;
@@ -521,27 +572,30 @@ kbd {
 }
 .battle-card {
   width: min(560px, 100%);
-  padding: 18px 20px 20px;
-  border-radius: 24px;
-  background:
-    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(201, 184, 255, 0.18), transparent 70%),
-    linear-gradient(180deg, #312d68, #23214e);
-  border: 1px solid var(--border);
-  box-shadow: 0 20px 50px rgba(10, 8, 30, 0.6), 0 0 40px rgba(201, 184, 255, 0.15);
+  padding: 0 20px 20px;
+  border-radius: 4px 4px 20px 20px;
+  background: var(--white);
+  border-top: 4px solid var(--sky);
+  box-shadow: 0 20px 50px rgba(31, 58, 104, 0.35);
   display: grid;
   gap: 14px;
   scale: 0.92;
   transition: scale 0.25s ease-out;
+  overflow: hidden;
 }
 .battle.open .battle-card {
   scale: 1;
 }
 .battle-title {
+  margin: 0 -20px;
+  padding: 8px 20px;
+  background: var(--sky-pale);
+  border-bottom: 1px solid var(--border);
   text-align: center;
-  font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 800;
   letter-spacing: 3px;
-  color: var(--pink);
+  color: var(--sky-deep);
 }
 
 .fighters {
@@ -551,10 +605,10 @@ kbd {
   gap: 8px;
 }
 .vs {
-  font-family: var(--font-display);
-  font-size: 28px;
-  color: var(--butter);
-  text-shadow: 0 0 14px rgba(255, 226, 154, 0.6);
+  font-size: 30px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--sky);
 }
 .fighter {
   position: relative;
@@ -569,22 +623,29 @@ kbd {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 55%, white), var(--c));
-  border: 4px solid var(--star);
-  box-shadow: 0 6px 16px rgba(10, 8, 30, 0.5), 0 0 22px color-mix(in srgb, var(--c) 50%, transparent);
-  font-family: var(--font-display);
+  background: var(--c);
+  border: 4px solid var(--white);
+  box-shadow: 0 0 0 2px var(--border), 0 6px 14px rgba(31, 58, 104, 0.25);
   font-size: 42px;
-  color: var(--ink);
+  font-weight: 900;
+  color: var(--white);
+  text-shadow: 0 2px 2px rgba(31, 58, 104, 0.35);
 }
 .fighter .enemy-avatar {
-  background: radial-gradient(circle at 35% 30%, #4d4590, var(--night));
-  border-color: var(--pink);
-  box-shadow: 0 6px 16px rgba(10, 8, 30, 0.5), 0 0 22px rgba(255, 179, 209, 0.4);
+  background: radial-gradient(circle at 50% 40%, var(--white) 55%, var(--sky-pale));
+  box-shadow: 0 0 0 2px var(--navy-2), 0 6px 14px rgba(31, 58, 104, 0.25);
   font-size: 54px;
 }
+.fighter .enemy-avatar.has-art {
+  width: 132px;
+  height: 132px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
 .fname {
-  font-family: var(--font-display);
   font-size: 18px;
+  font-weight: 800;
   margin-top: 4px;
 }
 .fstats {
@@ -597,45 +658,52 @@ kbd {
 }
 .tag {
   font-size: 11px;
+  font-weight: 600;
   padding: 1px 7px;
   border-radius: 999px;
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
 .tag.warn {
-  color: var(--pink);
-  border-color: rgba(255, 179, 209, 0.55);
+  color: #d63a5a;
+  background: #fff0f3;
+  border-color: #ffc2cf;
 }
 .tag.boss {
-  color: var(--butter);
-  border-color: rgba(255, 226, 154, 0.6);
+  color: #9a6a00;
+  background: #fff8db;
+  border-color: #ffe08a;
 }
 .boss-fight {
-  border-color: rgba(255, 226, 154, 0.5);
-  box-shadow: 0 20px 50px rgba(10, 8, 30, 0.6), 0 0 40px rgba(255, 226, 154, 0.2);
+  border-top-color: var(--yellow);
 }
 .boss-fight .battle-title {
-  color: var(--butter);
+  color: #9a6a00;
+  background: #fff8db;
+  border-color: #ffe08a;
 }
-.boss-fight .enemy-avatar {
-  border-color: var(--butter);
-  box-shadow: 0 6px 16px rgba(10, 8, 30, 0.5), 0 0 26px rgba(255, 226, 154, 0.5);
+.boss-fight .enemy-avatar:not(.has-art) {
+  box-shadow: 0 0 0 3px var(--yellow), 0 6px 14px rgba(31, 58, 104, 0.25);
 }
 .fighter .bar {
   width: 120px;
   height: 8px;
   border-radius: 4px;
-  background: var(--night);
+  background: var(--surface-3);
   overflow: hidden;
 }
 .fighter .bar i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--pink), var(--lavender));
+  background: linear-gradient(90deg, var(--sky), #38d0e6);
   transition: width 0.45s ease-out;
+}
+.fighter[data-side='enemy'] .bar i {
+  background: linear-gradient(90deg, var(--danger), #ff9a6b);
 }
 .hptext {
   font-size: 12px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -653,7 +721,7 @@ kbd {
   animation: dodge 0.5s ease-out;
 }
 .fighter.down .avatar {
-  filter: grayscale(1) brightness(0.6);
+  filter: grayscale(1) brightness(0.8);
   scale: 0.85;
   transition: filter 0.4s, scale 0.4s;
 }
@@ -664,7 +732,7 @@ kbd {
   40% { translate: -36px 0; scale: 1.08; }
 }
 @keyframes hit {
-  0% { filter: brightness(2.2) saturate(0); }
+  0% { filter: brightness(2) saturate(0); }
   20% { translate: -7px 0; }
   40% { translate: 6px 0; }
   60% { translate: -4px 0; }
@@ -679,17 +747,19 @@ kbd {
   top: 18px;
   left: 50%;
   translate: -50% 0;
-  font-family: var(--font-display);
   font-size: 34px;
+  font-weight: 900;
+  font-style: italic;
   pointer-events: none;
   opacity: 0;
-  text-shadow: 0 3px 0 rgba(27, 26, 61, 0.7);
+  -webkit-text-stroke: 1.5px var(--white);
+  paint-order: stroke fill;
 }
 .pop.dmg {
   color: var(--danger);
 }
 .pop.miss {
-  color: var(--mint);
+  color: var(--sky);
   font-size: 26px;
 }
 .pop.show {
@@ -717,19 +787,21 @@ kbd {
 }
 .die-box label {
   font-size: 12px;
+  font-weight: 600;
   color: var(--muted);
 }
 .die {
   width: 46px;
   height: 46px;
-  border-radius: 12px;
-  background: #fff8e7;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 26px;
+  border-radius: 10px;
+  background: var(--white);
+  border: 2px solid var(--navy);
+  color: var(--navy);
+  font-size: 24px;
+  font-weight: 900;
   display: grid;
   place-items: center;
-  box-shadow: inset 0 -4px 0 rgba(201, 162, 78, 0.35), 0 4px 10px rgba(10, 8, 30, 0.5), 0 0 14px rgba(255, 226, 154, 0.3);
+  box-shadow: 0 4px 0 var(--navy-2);
 }
 .die.rolling {
   animation: shake-die 0.12s linear infinite;
@@ -747,10 +819,10 @@ kbd {
   opacity: 1;
 }
 .die-box .sum b {
-  font-family: var(--font-display);
-  font-weight: 400;
-  color: var(--butter);
+  color: var(--sky-deep);
   font-size: 18px;
+  font-weight: 900;
+  font-style: italic;
 }
 .dice-row.settled .die {
   animation: die-land 0.3s ease-out;
@@ -765,8 +837,8 @@ kbd {
 
 .battle-msg {
   text-align: center;
-  font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 18px;
+  font-weight: 800;
   min-height: 1.5em;
 }
 .battle-actions {
@@ -781,7 +853,7 @@ kbd {
   color: var(--muted);
 }
 .battle-actions .hint b {
-  color: var(--pink);
+  color: var(--danger);
 }
 .choice-row {
   display: grid;
@@ -792,8 +864,7 @@ kbd {
   width: auto;
 }
 .choice-row button:not(.primary) {
-  font-family: var(--font-display);
-  font-size: 16px;
+  font-weight: 700;
 }
 .defense {
   display: grid;
@@ -801,246 +872,746 @@ kbd {
   padding: 12px;
 }
 .defense b {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 800;
 }
 .defense small {
-  font-family: 'Pretendard Variable', sans-serif;
   color: var(--muted);
   font-size: 12px;
+  font-weight: 400;
 }
 .defense:hover:not(:disabled) {
-  border-color: var(--mint);
-  box-shadow: 0 0 14px rgba(159, 230, 245, 0.3);
+  border-color: var(--sky);
 }
 
-/* ───────── 패널 ───────── */
 
-.panel {
+/* ───────── HUD (맵 위에 떠 있는 정보) ───────── */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+.hud > * {
+  pointer-events: auto;
+}
+
+/* 흰 유리 판: HUD 조각들의 공통 바탕 */
+.hud-round,
+.hud-progress,
+.hud-player,
+.hud-me .me-info,
+.hud-log,
+.icon-btn {
   background: var(--surface);
-  backdrop-filter: blur(8px);
-  border-left: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 14px;
-  gap: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--white);
+  box-shadow: var(--shadow);
 }
-/* 진행도: 다 차면 패배. 기믹 시점마다 마커 */
-.progress {
-  display: grid;
-  gap: 8px;
-  padding: 12px 14px 10px;
-  border-radius: 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-}
-.progress-head,
-.progress-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 13px;
-}
-.progress-foot .muted {
-  font-size: 12px;
-  text-align: right;
-}
-.boss-name {
-  font-family: var(--font-display);
-  font-size: 16px;
-  color: var(--butter);
-}
-.progress-foot b {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 18px;
-  color: var(--lavender);
-}
-.progress-track {
-  position: relative;
-  height: 10px;
-  margin: 10px 8px 4px;
-  border-radius: 5px;
-  background: var(--night);
-}
-.progress-track .fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: 5px;
-  background: linear-gradient(90deg, var(--mint), var(--lavender), var(--pink));
-  box-shadow: 0 0 10px var(--glow);
-  transition: width 0.6s ease-out;
-}
-.marker {
-  position: absolute;
-  top: 50%;
-  translate: -50% -50%;
-  width: 22px;
-  height: 22px;
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border-radius: 50%;
+  font-size: 19px;
   display: grid;
   place-items: center;
-  font-size: 11px;
-  background: var(--surface-3);
-  border: 2px solid var(--lavender);
-  cursor: help;
 }
-.marker.boss {
-  width: 26px;
-  height: 26px;
-  font-size: 14px;
-  border-color: var(--butter);
-}
-.marker.done {
-  opacity: 0.45;
-  filter: grayscale(0.6);
-}
-.marker.end {
-  border-color: var(--danger);
-}
-.progress.danger {
-  border-color: rgba(255, 143, 163, 0.6);
-  box-shadow: 0 0 16px rgba(255, 143, 163, 0.25);
-}
-.progress.danger .progress-foot b {
-  color: var(--danger);
-}
-.players {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-.player {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 10px;
-  border-radius: 14px;
-  border: 1px solid transparent;
-  transition: background 0.2s, border-color 0.2s;
-}
-.player.current {
-  background: var(--surface-2);
-  border-color: var(--c);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--c) 30%, transparent);
-}
-.player.ko {
-  opacity: 0.6;
-}
-.pinfo {
-  flex: 1;
-  min-width: 0;
-}
-.pname {
-  font-family: var(--font-display);
-  font-size: 16px;
-}
-.lv {
-  color: var(--butter);
-  font-size: 14px;
-}
-.ko-tag {
-  font-family: 'Pretendard Variable', sans-serif;
-  font-size: 11px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: #8a3a5a;
-}
-.stats {
-  display: flex;
-  gap: 10px;
-  font-size: 13px;
-}
-.hpbar {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--night);
-  margin-top: 4px;
-  overflow: hidden;
-}
-.hpbar i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--pink), var(--lavender));
-  transition: width 0.3s;
+.icon-btn.on {
+  border-color: var(--sky);
+  background: var(--sky-pale);
 }
 
-.actions {
+/* ── 위 줄 ── */
+.hud-top {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 12px;
+  pointer-events: none;
 }
-.actions h2 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 20px;
-  margin: 0;
+.hud-top > * {
+  pointer-events: auto;
 }
-.actions p {
-  margin: 0;
-}
-.who {
-  font-family: var(--font-display);
-}
-.hand,
-.paths {
-  display: grid;
-  gap: 6px;
-}
-.card {
-  text-align: left;
+.hud-round {
+  justify-self: start;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  padding: 6px 18px 6px 6px;
+  border-radius: 999px;
 }
-.card small {
+.hud-round .icon-btn {
+  box-shadow: none;
+  border-color: var(--border);
+}
+.round-box {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.round-box b {
+  font-size: 30px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  color: var(--sky-deep);
+}
+.round-box span {
+  font-size: 12px;
+  font-weight: 700;
   color: var(--muted);
 }
-.mods {
-  color: var(--mint);
-  font-size: 13px;
+.map-name {
+  display: grid;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.2;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+.map-name small {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #3675b3;
+}
+.hud-tools {
+  justify-self: end;
+  display: flex;
+  gap: 8px;
 }
 
-.log {
+/* 진행도 트랙 (원작의 임무 · 라운드 트랙 자리) */
+.hud-progress {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px 8px 6px;
+  border-radius: 16px;
+}
+.track {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.track-label {
+  padding: 0 12px 0 8px;
+  margin-right: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--white);
+  background: linear-gradient(90deg, var(--sky-deep), var(--sky));
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  line-height: 34px;
+  border-radius: 10px 0 0 10px;
+}
+.track-label b {
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 900;
+}
+.cell {
+  width: 38px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 800;
+  font-style: italic;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  cursor: help;
+}
+.cell.past {
+  background: var(--sky-light);
+  color: var(--white);
+  border-color: var(--sky-light);
+}
+.cell.now {
+  background: var(--sky);
+  color: var(--white);
+  border-color: var(--sky);
+  font-size: 17px;
+}
+.cell.gimmick {
+  font-style: normal;
+  color: #d63a5a;
+  background: #fff0f3;
+  border-color: #ffc2cf;
+}
+.cell.boss {
+  background: #fff8db;
+  border-color: #ffe08a;
+  font-size: 18px;
+}
+.cell.end {
+  background: #ffe3e9;
+  border-color: var(--danger);
+}
+.cell.past.gimmick {
+  opacity: 0.5;
+}
+.track-caption {
+  font-size: 12px;
+  color: var(--muted);
+}
+.track-caption b {
+  color: var(--sky-deep);
+}
+.hud-progress.danger {
+  border-color: var(--danger);
+}
+.hud-progress.danger .track-label {
+  background: linear-gradient(90deg, #e8405f, var(--danger));
+}
+
+/* ── 왼쪽: 플레이어 카드 ── */
+.hud-players {
+  position: absolute;
+  top: 92px;
+  left: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  width: 236px;
+}
+.hud-player {
+  position: relative;
+  min-height: 62px;
+  padding: 8px 10px 8px 76px;
+  border-radius: 14px 30px 30px 14px;
+  transition: translate 0.25s, border-color 0.25s;
+}
+.hud-player.current {
+  translate: 8px 0;
+  border-color: var(--c);
+  box-shadow: var(--shadow), 0 0 0 2px var(--c);
+}
+.hud-player.ko {
+  filter: grayscale(0.8);
+  opacity: 0.75;
+}
+.pc-avatar {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: var(--c);
+  border: 3px solid var(--white);
+  box-shadow: 0 3px 8px rgba(31, 58, 104, 0.3);
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--white);
+  text-shadow: 0 1px 2px rgba(31, 58, 104, 0.4);
+}
+/* 원작처럼 HP를 아바타 위에 큼직하게 */
+.pc-hp {
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  font-size: 13px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--navy);
+  -webkit-text-stroke: 3px var(--white);
+  paint-order: stroke fill;
+}
+.pc-hp b {
+  font-size: 26px;
+  color: var(--c);
+}
+.pc-name {
+  font-weight: 800;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-top: 2px;
+}
+.coin b {
+  font-size: 16px;
+  font-style: italic;
+}
+.coin small {
+  color: var(--muted);
+}
+.stars {
+  letter-spacing: -1px;
+}
+.stars i {
+  font-style: normal;
+  color: var(--border);
+}
+.stars i.on {
+  color: #ffbf1f;
+}
+.hand-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ko-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #d63a5a;
+  background: #fff0f3;
+  border: 1px solid #ffc2cf;
+  vertical-align: 2px;
+}
+
+/* ── 왼쪽 아래: 지금 차례인 플레이어 (캐릭터 일러스트 자리) ── */
+.hud-me {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.me-art {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--c) 70%, white), var(--c));
+  border: 5px solid var(--white);
+  box-shadow: 0 8px 24px rgba(31, 58, 104, 0.3);
+  display: grid;
+  place-items: center;
+  font-size: 64px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--white);
+  text-shadow: 0 3px 6px rgba(31, 58, 104, 0.35);
+  position: relative;
+  z-index: 1;
+}
+.hud-me .me-info {
+  margin-left: -26px;
+  padding: 8px 18px 10px 38px;
+  border-radius: 0 16px 16px 0;
+  border-left: 0;
+}
+.me-turn {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--white);
+  background: var(--c);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.me-name {
+  font-size: 20px;
+  font-weight: 900;
+}
+.me-name small {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--sky-deep);
+}
+.me-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* ── 아래 가운데: 손패 ── */
+.hud-hand {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  translate: -50% 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.hud-hand.empty {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  pointer-events: none;
+}
+.hand-card {
+  width: 104px;
+  height: 146px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 3px solid var(--white);
+  background: linear-gradient(170deg, var(--sky-pale) 0%, var(--white) 55%);
+  box-shadow: 0 6px 16px rgba(31, 58, 104, 0.25), inset 0 0 0 1px var(--border);
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  justify-items: center;
+  gap: 2px;
+  transition: translate 0.15s, box-shadow 0.15s;
+}
+.hand-card:hover:not(:disabled) {
+  translate: 0 -10px;
+  background: linear-gradient(170deg, var(--sky-pale) 0%, var(--white) 55%);
+  border-color: var(--yellow);
+}
+.hand-card:disabled {
+  opacity: 0.6;
+}
+.hc-art {
+  font-size: 40px;
+  align-self: center;
+}
+.hc-name {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--white);
+  background: var(--sky);
+  padding: 1px 8px;
+  border-radius: 6px;
+}
+.hc-desc {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+/* ── 오른쪽 아래: 큰 행동 버튼 ── */
+.hud-action {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.action-info {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.action-info > span {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--white);
+}
+.action-info .mods {
+  background: var(--sky-deep);
+}
+.go-btn {
+  width: 132px;
+  height: 132px;
+  padding: 0;
+  border-radius: 50%;
+  border: 6px solid var(--white);
+  background: radial-gradient(circle at 50% 30%, #6cb8f5, var(--sky-deep));
+  color: var(--white);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0;
+  box-shadow: 0 0 0 3px var(--sky-light), 0 10px 24px rgba(31, 58, 104, 0.35);
+  transition: transform 0.12s, filter 0.15s;
+}
+.go-btn:hover:not(:disabled) {
+  background: radial-gradient(circle at 50% 30%, #7cc2f7, var(--sky-deep));
+  filter: brightness(1.05);
+  transform: scale(1.04);
+}
+.go-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.go-btn b {
+  font-size: 30px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1.05;
+}
+.go-btn small {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  opacity: 0.85;
+}
+.go-dice {
+  font-size: 22px;
+}
+.go-btn.end {
+  background: radial-gradient(circle at 50% 30%, #ffd978, #f2a900);
+  box-shadow: 0 0 0 3px #ffe08a, 0 10px 24px rgba(31, 58, 104, 0.35);
+}
+.go-btn.end:hover:not(:disabled) {
+  background: radial-gradient(circle at 50% 30%, #ffe08f, #f2a900);
+}
+.go-btn.wait,
+.go-btn.wait:disabled {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 30%, #c9dbee, #8fa9c8);
+  box-shadow: 0 0 0 3px var(--border), 0 10px 24px rgba(31, 58, 104, 0.25);
+}
+.go-btn[data-primary]:not(:disabled) {
+  animation: go-pulse 1.6s ease-in-out infinite;
+}
+@keyframes go-pulse {
+  50% { box-shadow: 0 0 0 9px rgba(169, 214, 250, 0.55), 0 10px 24px rgba(31, 58, 104, 0.35); }
+}
+
+/* 갈림길 선택: 큰 버튼 옆에 세로로 */
+.path-pick {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--white);
+  box-shadow: var(--shadow);
+}
+.path-title {
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+.path-title b {
+  color: var(--sky-deep);
+  font-size: 17px;
+  font-style: italic;
+}
+.path-btn {
+  display: grid;
+  text-align: left;
+  font-weight: 800;
+  padding: 8px 14px;
+}
+.path-btn small {
+  font-weight: 500;
+  color: var(--muted);
+}
+.path-hint {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── 기록 (오른쪽, 열고 닫기) ── */
+.hud-log {
+  position: absolute;
+  top: 74px;
+  right: 14px;
+  width: 300px;
+  max-height: calc(100% - 260px);
+  padding: 12px 14px;
+  border-radius: 16px;
+  display: none;
+  flex-direction: column;
+}
+.hud-log.open {
+  display: flex;
+}
+.hud-log h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.hud-log ol {
   list-style: none;
   margin: 0;
   padding: 0;
-  flex: 1;
-  min-height: 80px;
   overflow-y: auto;
   font-size: 13px;
   color: var(--muted);
   scrollbar-width: thin;
-  scrollbar-color: var(--nebula) transparent;
+  scrollbar-color: var(--sky-light) transparent;
 }
-.log li {
+.hud-log li {
   padding: 2px 0;
 }
-.log li:last-child {
+.hud-log li:last-child {
   color: var(--text);
+  font-weight: 600;
 }
 
+/* 이동 · 연출 중에는 행동 버튼을 누를 수 없음을 흐리게 보여 준다 */
+.hud-action.busy .go-btn {
+  animation: none;
+}
+
+/* ───────── 좁은 화면 (휴대폰) ───────── */
 @media (max-width: 900px) {
-  .game {
-    grid-template-columns: 1fr;
-    height: auto;
+  .board-area {
+    padding: 220px 8px 150px;
   }
-  .panel {
-    border-left: none;
-    border-top: 1px solid var(--border);
+  .hud-top {
+    grid-template-columns: auto 1fr auto;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    gap: 6px;
   }
-  .log {
-    max-height: 220px;
+  .map-name {
+    display: none;
   }
-  /* 좁은 화면에서는 보드 영역이 작아서 전투 화면을 화면 전체에 띄운다 */
+  .hud-round {
+    padding-right: 12px;
+    gap: 6px;
+  }
+  .round-box b {
+    font-size: 24px;
+  }
+  .hud-progress {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+  }
+  .cell {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  .track-label {
+    line-height: 28px;
+  }
+  .hud-players {
+    top: 146px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+    gap: 6px;
+  }
+  .hud-player {
+    min-height: 0;
+    padding: 6px 6px 6px 40px;
+    border-radius: 12px;
+  }
+  .hud-player.current {
+    translate: 0 -3px;
+  }
+  .pc-avatar {
+    left: 4px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    border-width: 2px;
+  }
+  .pc-hp {
+    left: 6px;
+    bottom: -4px;
+    font-size: 10px;
+  }
+  .pc-hp b {
+    font-size: 15px;
+  }
+  .pc-name {
+    font-size: 12px;
+  }
+  .pc-row {
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    font-size: 11px;
+  }
+  .coin b {
+    font-size: 12px;
+  }
+  .stars,
+  .hand-count,
+  .ko-tag {
+    display: none;
+  }
+  .hud-me {
+    left: 8px;
+    bottom: 8px;
+  }
+  .me-art {
+    width: 64px;
+    height: 64px;
+    font-size: 28px;
+    border-width: 3px;
+  }
+  .hud-me .me-info {
+    display: none;
+  }
+  .hud-hand {
+    left: 80px;
+    right: 152px;
+    bottom: 10px;
+    translate: none;
+    justify-content: center;
+    gap: 6px;
+  }
+  .hand-card {
+    width: 66px;
+    height: 92px;
+    padding: 4px;
+  }
+  .hc-art {
+    font-size: 24px;
+  }
+  .hc-name {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+  .hc-desc {
+    display: none;
+  }
+  .hud-action {
+    right: 8px;
+    bottom: 8px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .action-info {
+    margin-bottom: 0;
+  }
+  .go-btn {
+    width: 96px;
+    height: 96px;
+    border-width: 4px;
+  }
+  .go-btn b {
+    font-size: 21px;
+  }
+  .go-dice {
+    font-size: 16px;
+  }
+  .hud-log {
+    top: 104px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: 50%;
+    z-index: 2;
+  }
+  /* 좁은 화면에서는 전투 화면을 화면 전체에 띄운다 */
   .battle {
     position: fixed;
   }
@@ -1052,6 +1623,10 @@ kbd {
   .fighter .enemy-avatar {
     font-size: 40px;
   }
+  .fighter .enemy-avatar.has-art {
+    width: 96px;
+    height: 96px;
+  }
   .fighter .bar {
     width: 96px;
   }
@@ -1059,9 +1634,8 @@ kbd {
     min-width: 90px;
   }
   .banner {
-    position: fixed;
+    top: 222px;
     font-size: 15px;
     white-space: normal;
-    border-radius: 16px;
   }
 }

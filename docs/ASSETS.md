@@ -4,7 +4,7 @@ NewParty에 들어갈 그림 에셋 목록과 규격. 이 문서를 보면서 �
 
 - 규격은 **최소 크기** 기준이다. 더 크게 뽑아도 되고, 최종 크기·포맷 변환은 넣을 때 처리한다.
 - 정확히 맞추기 어려우면 비슷하게만 맞춰도 된다. 크기 조정, 배경 제거, 여백 정리는 넣을 때 할 수 있다.
-- **제일 중요한 건 스타일 통일**이다. 아래 [스타일 가이드](#1-스타일-가이드)부터 정하고 시작하자.
+- **제일 중요한 건 스타일 통일**이다. 아래 [스타일 가이드](#1-스타일-가이드)를 기준으로 뽑는다.
 
 ---
 
@@ -13,45 +13,54 @@ NewParty에 들어갈 그림 에셋 목록과 규격. 이 문서를 보면서 �
 1. 뽑은 원본은 프로젝트의 **`assets-raw/`** 폴더에 넣는다. 파일 이름은 대충이어도 된다.
    - 이 폴더는 git에 올라가지 않는다 (원본은 용량이 크므로).
 2. 어떤 파일이 무엇인지 알려 주면 정리해서 `public/assets/`에 아래 이름으로 넣는다.
-   배경 제거, 크기 조정, WebP 변환도 이때 한다.
-3. 화면에 올려 보고 같이 확인한다.
+   배경 제거, 크기 조정, **WebP 변환**도 이때 한다 (아래 표의 `.png`는 최종적으로 `.webp`가 된다).
+3. 그림을 넣으면 [src/ui/assets.ts](../src/ui/assets.ts)에 등록한다. 등록된 그림만 화면에 쓰이고, 없는 건 임시 아이콘으로 보인다.
+4. 화면에 올려 보고 같이 확인한다.
 
 ---
 
-## 1. 스타일 가이드 — ✅ 파스텔 우주 (A + B)
+## 1. 스타일 가이드 — ✅ 블루 아카이브 풍 학원 도시
 
-**캐릭터는 파스텔 애니메이션, 세계는 별빛 우주.** 솜사탕 같은 성운이 낀 밤하늘에 떠 있는 작은 행성 발판들, 그 위를 뛰어다니는 귀여운 SD 캐릭터.
+**밝고 산뜻한 미래형 학원 도시.** 맑은 하늘 아래 흰색 · 하늘색 하이테크 발판들이 떠 있고, 그 위를 학생들이 뛰어다닌다.
+블루 아카이브의 **분위기**를 참고한다: 깨끗한 흰 바탕, 하늘색 포인트, 얇고 또렷한 선, 밝은 낮.
+
+> 1차 에셋(배경, 본부 · 코인+ · 균열 칸)이 이 기준의 **견본**이다. 새 그림은 이것들과 나란히 놓았을 때 어울리게 뽑는다.
 
 | 항목 | 정한 값 |
 |---|---|
-| 전체 분위기 | 꿈꾸는 듯한 파스텔 우주. 무섭거나 차갑지 않고 **포근하고 반짝이는** 느낌 |
-| 그림체 | 애니메이션 SD(치비) 비율, **깔끔한 셀 셰이딩**, 깨끗하고 또렷한 외곽선 |
-| 색감 | 바탕은 **깊은 남보라**(검정 X), 그 위에 **파스텔**(라벤더 · 솜사탕 핑크 · 민트 하늘색 · 버터 노랑) |
-| 빛 | 주광은 **왼쪽 위**에서 부드럽게. 가장자리에 **파스텔 림라이트**(은은한 빛 테두리) |
-| 반짝임 | 별 · 빛은 **은은한 글로우**까지만. 네온처럼 쨍하게 번쩍이지 않는다 |
-| 하지 않는 것 | 사실적인 질감, 어두운 호러, 네온 사이버펑크, 거친 붓 터치 |
+| 전체 분위기 | 맑고 산뜻한 낮. **청량하고 밝은** 학원물 |
+| 세계 | 여러 학교와 거리가 있는 **학원 도시**. 보드는 도시의 한 구역 |
+| 그림체 | 요즘 모바일 가챠 게임 애니메이션 풍. **얇고 깔끔한 선**, 밝고 부드러운 셀 셰이딩 |
+| 색감 | **흰색 + 하늘색**이 바탕, **노랑**은 작은 포인트로만. 칸마다 다른 색은 윗면 소품에서 낸다 |
+| 빛 | 밝은 낮빛, 그림자는 연하게. 빛나는 부분은 **얇은 하늘색 라인** |
+| 메카 · 소품 | 둥근 모서리의 흰 패널, 하늘색 유리, 얇은 발광 라인 (견본 칸의 발판 참고) |
+| 하지 않는 것 | 어둡고 무거운 분위기, 사실적인 질감, 거친 붓 터치, 네온 사이버펑크 |
+
+> ⚠ 블루 아카이브는 **분위기 참고용**이다. 원작 캐릭터, 로고, 학교 문장, 헤일로 디자인을 그대로 가져오지 않는다.
+> 프롬프트에 게임 이름을 넣기보다 아래 공통 프롬프트처럼 특징을 말로 쓰는 게 결과도 더 안정적이다.
 
 ### 팔레트
 
 | 역할 | 색 | 쓰는 곳 |
 |---|---|---|
-| 밤하늘 | `#1B1A3D` | 배경 바탕, 가장 어두운 곳 |
-| 성운 보라 | `#3A3470` | 배경 성운, 패널 |
-| 라벤더 | `#C9B8FF` | 주 강조색, 성운 하이라이트 |
-| 솜사탕 핑크 | `#FFB3D1` | 강조, 귀여운 포인트 |
-| 민트 하늘 | `#9FE6F5` | 림라이트, 빛, 회복 · 워프 |
-| 버터 별빛 | `#FFE29A` | 별, 코인, 레벨, 본부 |
-| 별 흰색 | `#F5F3FF` | 글자, 가장 밝은 별 |
+| 하늘 파랑 | `#4A9BEF` | 주 강조색, 배경 하늘 |
+| 연한 하늘 | `#A9D6FA` | 테두리, 하이라이트 |
+| 흰색 | `#FFFFFF` | 패널, 발판 윗면 |
+| 발판 파랑 | `#3F78E0` | 발판 테두리, 진한 강조 |
+| 남색 | `#1F3A68` | 글자, 외곽선 |
+| 노랑 포인트 | `#FFD34D` | 코인, 별, 중요 표시 (조금만) |
+| 균열 보라 | `#6B5BD6` | 에너미 · 위험 요소 |
+| 경고 빨강 | `#FF5C7A` | 피해, 반격형 |
 
 ### 공통 프롬프트
 
 AI 그림 도구는 영어 프롬프트가 더 안정적이다. **모든 프롬프트 앞에 아래 문장을 그대로 붙인다.**
 
 ```
-cute anime game art, chibi proportions, clean cel shading, clean crisp outlines,
-dreamy pastel space theme, soft pastel colors (lavender, cotton candy pink, mint cyan, butter yellow)
-against deep indigo night sky tones, soft top-left key light, gentle pastel rim light, subtle soft glow,
-high readability, polished mobile game asset, no text, no letters, no watermark
+modern anime mobile game art, clean thin crisp lineart, bright soft cel shading,
+futuristic academy city theme, clean white and sky blue color scheme with small yellow accents,
+bright clear daylight, airy and cheerful mood, high readability, polished gacha game asset,
+no text, no letters, no logo, no watermark
 ```
 
 투명 배경이 안 되는 도구라면 끝에 이걸 붙인다. 대상에 초록이 많으면 `magenta`로 바꾼다.
@@ -67,69 +76,52 @@ isolated on a plain solid #00FF00 green background, no ground shadow
 - **조명 방향과 시점을 통일한다.** 그림자가 드는 방향이 서로 다르면 판이 어색해 보인다.
 - 대상을 **가운데에** 두고, 가장자리에 **여백을 10% 정도** 남긴다. 잘린 그림은 쓸 수 없다.
 
-### 배경
-
-- 투명 배경 표시가 있는 것은 **투명 PNG**로 받는 게 가장 좋다.
-- 투명이 안 되면 **단색 배경**으로 뽑는다. 대상에 없는 색이 좋다 (예: 초록 캐릭터면 마젠타 배경). 그림자나 바닥은 그리지 않는다.
-
 ---
 
 ## 2. 우선순위
 
-한 번에 다 뽑지 말고, **1차분**으로 분위기를 먼저 맞춘 다음 나머지를 뽑자.
-
-| 차수 | 무엇을 | 왜 |
+| 차수 | 무엇을 | 상태 |
 |---|---|---|
-| **1차** | 배경 1장, 칸 3종(본부·코인+·둥지), 에너미 1종(슬라임 기본 그림) | 판 위에 올려 보고 스타일 확정 |
-| **2차** | 나머지 칸 5종, 에너미 2종(박쥐·고블린) + 에너미 전투 포즈 | 지금 화면에 있는 이모지를 전부 실제 그림으로 교체 |
-| 3차 | UI 아이콘, 카드(→ 아이템), 로고 | 패널 · 시작 화면 |
+| **1차** | 배경 1장, 칸 3종(본부 · 코인+ · 균열) | ✅ 들어옴 |
+| **2차** | 나머지 칸 5종, 에너미 3종(경비 로봇 · 정찰 드론 · 불량배) 기본 그림 | ⬅ 지금 |
+| 3차 | 에너미 전투 포즈, UI 아이콘, 아이템, 로고 | 패널 · 시작 화면 · 전투 연출 |
 | 캐릭터 때 | 캐릭터 메인 일러스트, 보드 말, 전투 포즈 | 캐릭터 시스템을 만들 때 |
 | 이후 | 보스, 에너미 추가, 유물 아이콘 | 보스 · 유물 시스템 |
 
-> 지금 화면에 실제로 쓰이는 건 **배경 · 칸 · 에너미**다. 이것부터 뽑으면 바로 바꿔 끼울 수 있다.
-
-### 1차 프롬프트
+### 2차 프롬프트
 
 각 프롬프트 앞에 [공통 프롬프트](#공통-프롬프트)를 붙인다. 마음에 드는 결과가 나올 때까지 여러 장 뽑고, 그중 가장 좋은 것을 고른다.
 
-**배경** — `board/background.jpg`, 16:9
+**칸 공통** — 칸 프롬프트는 전부 이 문장으로 시작하고, 뒤에 칸마다 윗면만 바꾼다. 1차 칸들과 같은 발판이 나오게 하기 위해서다.
 
 ```
-wide 16:9 game board background, dreamy pastel nebula clouds in lavender and cotton candy pink,
-scattered twinkling stars, a few small cute pastel planets near the edges and corners,
-the center area is calm, darker deep indigo and low detail so a game board can sit on top,
-no characters, no platforms
-```
-
-**칸 공통** — 칸 프롬프트는 전부 이 문장으로 시작하고, 뒤에 칸마다 윗면만 바꾼다. 같은 모양 · 같은 두께로 나오게 하기 위해서다.
-
-```
-game board tile, one small round floating platform like a tiny planetoid, seen from a 30-degree top-down angle,
-moon rock base with a soft glowing pastel rim, flat top surface, same shape and thickness as a matching tile set,
-top surface shows:
+isometric game board tile, one round floating platform seen from a 30-degree top-down angle,
+white and sky blue sci-fi panel base with a thin glowing blue rim and small yellow details,
+clean flat top surface, same shape and thickness as a matching tile set, top surface shows:
 ```
 
 | 칸 | 칸 공통 뒤에 붙일 내용 |
 |---|---|
-| 본부 `tiles/base.png` | `a tiny cozy space station home with a little flag, butter yellow and gold accents, slightly grander than other tiles` |
-| 코인+ `tiles/coin-plus.png` | `a small pile of shiny star-shaped golden coins, butter yellow glow` |
-| 둥지 `tiles/spawn.png` | `a swirling dark purple wormhole crater with a faint pink glow, simple and uncluttered in the center` |
+| 코인- `tiles/coin-minus.png` | `a tipped-over broken vending machine with a few coins spilling out, small red warning light` |
+| 아이템 `tiles/card.png` | `a small white supply crate with a sky blue emblem, lid slightly open` |
+| 회복 `tiles/heal.png` | `a compact first aid station, white medical kit with a soft pink cross` |
+| 워프 `tiles/warp.png` | `an upright glowing cyan teleport gate ring` |
+| 빈 칸 `tiles/empty.png` | `nothing on top, just the clean empty platform surface with subtle panel lines` |
 
-**슬라임** — `enemies/slime/idle.png`
+**에너미** — 에너미 프롬프트 공통으로 뒤에 `full body, centered, facing left, simple readable silhouette`를 붙인다.
 
-```
-cute cosmic slime monster, round translucent lavender jelly body with tiny twinkling stars inside,
-big glossy eyes, mischievous little smile, facing left, full body, centered, simple silhouette
-```
-
-> 에너미는 우주풍으로 살짝 바꿔도 된다. 슬라임 → 별가루 젤리, 박쥐 → 우주 박쥐, 고블린 → 광선총을 든 외계 고블린. 이름과 능력은 그대로 둔다.
+| 에너미 | 프롬프트 |
+|---|---|
+| 경비 로봇 `enemies/robot/idle.png` | `small cute security robot, round white and blue body, one big glowing visor eye, stubby arms` |
+| 정찰 드론 `enemies/drone/idle.png` | `small agile patrol drone with four propellers, sleek white and blue shell, red sensor eye, hovering` |
+| 불량배 `enemies/delinquent/idle.png` | `delinquent student thug in a messy school uniform, cap and face mask, holding a toy-like blaster, cocky stance` |
 
 ---
 
 ## 3. 캐릭터 — 캐릭터 시스템을 만들 때
 
-플레이어가 고르는 캐릭터. 처음엔 **4명**(4인 플레이), 나중에 6~8명까지 늘린다.
-**같은 캐릭터로 보여야** 하니, 의상·머리색·소품을 프롬프트에 똑같이 적는다.
+학원 도시의 학생들. 처음엔 **4명**(4인 플레이), 나중에 6~8명까지 늘린다.
+**같은 캐릭터로 보여야** 하니, 교복 · 머리색 · 소품(무기, 가방 등)을 프롬프트에 똑같이 적는다.
 
 ### 기본
 
@@ -146,7 +138,7 @@ big glossy eyes, mischievous little smile, facing left, full body, centered, sim
 | 파일 | 언제 | 메모 |
 |---|---|---|
 | `characters/<id>/battle-idle.png` | 기본 (대기) | 필수. 다른 포즈가 없으면 이걸로 대신한다 |
-| `characters/<id>/battle-attack.png` | 공격할 때 | 무기를 휘두르거나 앞으로 뛰어드는 동작 |
+| `characters/<id>/battle-attack.png` | 공격할 때 | 사격하거나 앞으로 뛰어드는 동작 |
 | `characters/<id>/battle-hit.png` | 맞을 때 (피격) | 움찔하거나 뒤로 밀리는 동작 |
 | `characters/<id>/battle-block.png` | 방어할 때 | 막는 자세 |
 | `characters/<id>/battle-evade.png` | 회피할 때 | 옆으로 피하는 동작 |
@@ -167,31 +159,29 @@ big glossy eyes, mischievous little smile, facing left, full body, centered, sim
 
 ### 칸 (8종)
 
-| 파일 | 칸 | 분위기 예시 |
-|---|---|---|
-| `tiles/base.png` | 본부 | 성, 깃발, 캠프. **다른 칸보다 눈에 띄게** |
-| `tiles/coin-plus.png` | 코인+ | 금화 더미, 보물 |
-| `tiles/coin-minus.png` | 코인- | 깨진 항아리, 구멍 난 주머니 |
-| `tiles/card.png` | 카드 | 카드 더미, 마법진 |
-| `tiles/spawn.png` | 둥지 (에너미가 나타나는 곳) | 동굴 입구, 갈라진 땅, 어두운 구멍. 위에 에너미가 올라서므로 **가운데는 단순하게** |
-| `tiles/heal.png` | 회복 | 샘물, 약초 |
-| `tiles/warp.png` | 워프 | 포털, 소용돌이 |
-| `tiles/empty.png` | 빈 칸 | 평범한 발판 |
+| 파일 | 칸 | 윗면 | 상태 |
+|---|---|---|---|
+| `tiles/base.png` | 본부 | 작은 하이테크 본부 건물과 깃발. **다른 칸보다 눈에 띄게** | ✅ |
+| `tiles/coin-plus.png` | 코인+ | 별 모양 코인 더미 | ✅ |
+| `tiles/spawn.png` | 균열 (에너미가 나타나는 곳) | 보라색 소용돌이 구멍. 위에 에너미가 올라서므로 **가운데는 단순하게** | ✅ |
+| `tiles/coin-minus.png` | 코인- | 쓰러진 자판기 | |
+| `tiles/card.png` | 아이템 | 보급 상자 | |
+| `tiles/heal.png` | 회복 | 응급 키트 | |
+| `tiles/warp.png` | 워프 | 전송 게이트 | |
+| `tiles/empty.png` | 빈 칸 | 아무것도 없는 발판 | |
 
 - 크기 **512×512**, **투명 PNG**.
-- **모양과 시점을 전부 통일한다.** 추천: 둥근 발판(원형 또는 둥근 사각형)을 **약 30° 위에서 내려다본** 모습. 마리오 파티 같은 느낌.
-- 발판 **테두리와 바닥 두께는 모든 칸이 같게**, 윗면 그림과 색만 다르게 하면 통일감이 좋다.
-- 판 위에서는 70~90px 정도로 작게 보인다. 칸 종류를 **색만 보고도 구분할 수 있게** 칸마다 대표 색을 다르게 한다.
+- **발판 모양 · 두께 · 테두리는 모든 칸이 같게**, 윗면 소품만 다르게 한다. 1차 칸 3종이 기준이다.
+- 판 위에서는 80px 정도로 작게 보인다. 윗면 소품은 **크고 단순하게**.
 
 ### 배경
 
-| 파일 | 용도 | 크기 | 포맷 |
-|---|---|---|---|
-| `board/background.jpg` | 보드 뒤 배경 | 2560×1440 (16:9) | JPG/PNG (투명 필요 없음) |
+| 파일 | 용도 | 크기 | 포맷 | 상태 |
+|---|---|---|---|---|
+| `board/background.jpg` | 보드 뒤 배경 | 2560×1440 (16:9) | JPG/PNG (투명 필요 없음) | ✅ |
 
-- 보드 판(가로로 긴 직사각형, 약 16:10)이 **가운데에 올라간다.** 가운데는 칸이 잘 보이도록 **단순하고 어둡거나 흐리게**, 볼거리는 가장자리에 둔다.
-- 칸보다 **채도와 대비가 낮아야** 칸이 묻히지 않는다.
-- 나중에 보드 맵을 여러 개 만들면 맵마다 배경 1장씩 필요하다.
+- 보드 판이 **가운데에 올라간다.** 가운데는 칸이 잘 보이도록 **단순하게**, 볼거리는 가장자리에 둔다.
+- 나중에 보드 맵을 여러 개 만들면 맵(도시 구역)마다 배경 1장씩 필요하다.
 
 ### 길 (선택)
 
@@ -209,21 +199,21 @@ big glossy eyes, mischievous little smile, facing left, full body, centered, sim
 
 | id | 이름 | 특징 (그림에 드러나면 좋은 것) |
 |---|---|---|
-| `slime` | 슬라임 | 약한 잡몹. 말랑하고 귀여운 느낌 |
-| `bat` | 박쥐 | 반격은 안 하지만 **회피가 높음**. 날렵해 보이게 |
-| `goblin` | 고블린 | **반격형**. 무기를 들고 있어 덤빌 것 같은 느낌 |
+| `robot` | 경비 로봇 | 약한 잡몹. 동글동글하고 귀여운 느낌 |
+| `drone` | 정찰 드론 | 반격은 안 하지만 **회피가 높음**. 작고 날렵해 보이게 |
+| `delinquent` | 불량배 | **반격형**. 무기를 들고 덤빌 것 같은 느낌 |
 
 | 파일 | 언제 | 메모 |
 |---|---|---|
 | `enemies/<id>/idle.png` | 기본: 보드 위 배지, 전투 대기 | **필수** |
-| `enemies/<id>/attack.png` | 반격할 때 | 반격형(고블린)만 필요 |
+| `enemies/<id>/attack.png` | 반격할 때 | 반격형(불량배)만 필요 |
 | `enemies/<id>/hit.png` | 맞을 때 | 선택. 없으면 기본 그림을 흔드는 연출 |
-| `enemies/<id>/evade.png` | 회피할 때 | 회피형(박쥐)만, 선택 |
+| `enemies/<id>/evade.png` | 회피할 때 | 회피형(드론)만, 선택 |
 
 - 크기 **768×768**, **투명 PNG**.
 - 전투 화면 오른쪽에 서므로 **왼쪽(플레이어 쪽)을 보는 방향**으로 뽑는다.
-- 보드 위에서는 40px 정도의 동그란 배지로 줄어든다. **얼굴·실루엣이 가운데에 크게** 있어야 작게 봐도 알아볼 수 있다.
-- 캐릭터와 **같은 그림체**로, 무섭기보다 귀여운 쪽이 파티 게임에 어울린다.
+- 보드 위에서는 40px 정도의 동그란 배지로 줄어든다. **얼굴 · 실루엣이 가운데에 크게** 있어야 작게 봐도 알아볼 수 있다.
+- 무섭기보다 귀엽고 만만한 쪽이 파티 게임에 어울린다.
 
 ### 이후
 
@@ -234,9 +224,9 @@ big glossy eyes, mischievous little smile, facing left, full body, centered, sim
 
 ---
 
-## 6. 카드 (→ 아이템으로 바뀔 예정)
+## 6. 아이템 (지금의 카드)
 
-| 파일 | 카드 | 효과 |
+| 파일 | 아이템 | 효과 |
 |---|---|---|
 | `cards/dash.png` | 질주 | 이번 이동 +2칸 |
 | `cards/double-dice.png` | 더블 주사위 | 주사위 2개 |
@@ -244,7 +234,6 @@ big glossy eyes, mischievous little smile, facing left, full body, centered, sim
 
 - 크기 **512×720** (세로 5:7), PNG.
 - **카드 안쪽 그림만** 뽑는다. 카드 테두리, 이름, 효과 글씨는 화면에서 그린다.
-- 카드가 늘어나도 같은 구도·같은 톤을 유지한다.
 
 ---
 
@@ -261,7 +250,6 @@ big glossy eyes, mischievous little smile, facing left, full body, centered, sim
 - 전부 **투명 PNG**.
 - 아이콘은 20~32px로 작게 쓰인다. **디테일보다 또렷한 모양**이 중요하다.
 - 로고는 글자가 들어가는 유일한 에셋이다. AI 글자가 깨지면 그림 부분만 뽑아 오면 된다. 글자는 폰트로 얹을 수 있다.
-- 주사위는 코드(3D CSS)로 만들 예정이라 그림이 필요 없다. 원하는 디자인이 있으면 참고 이미지만 줘도 된다.
 
 ---
 
@@ -269,14 +257,13 @@ big glossy eyes, mischievous little smile, facing left, full body, centered, sim
 
 | 에셋 | 상태 |
 |---|---|
-| 스타일 가이드 확정 | ☐ |
-| **1차** 배경 | ☐ |
-| **1차** 칸 — base / coin-plus / spawn | ☐ ☐ ☐ |
-| **1차** 에너미 — slime idle | ☐ |
-| 2차 칸 — coin-minus / card / heal / warp / empty | ☐ ☐ ☐ ☐ ☐ |
-| 2차 에너미 — bat idle / goblin idle | ☐ ☐ |
-| 2차 에너미 포즈 — goblin attack / hit, bat evade, slime hit | ☐ ☐ ☐ ☐ |
+| 스타일 가이드 확정 | ✅ |
+| **1차** 배경 | ✅ |
+| **1차** 칸 — base / coin-plus / spawn | ✅ ✅ ✅ |
+| **2차** 칸 — coin-minus / card / heal / warp / empty | ☐ ☐ ☐ ☐ ☐ |
+| **2차** 에너미 — robot / drone / delinquent idle | ☐ ☐ ☐ |
+| 3차 에너미 포즈 — delinquent attack / hit, drone evade, robot hit | ☐ ☐ ☐ ☐ |
 | 3차 UI — coin / heart / star / card-back / logo | ☐ ☐ ☐ ☐ ☐ |
-| 3차 카드 — dash / double-dice / bandage | ☐ ☐ ☐ |
+| 3차 아이템 — dash / double-dice / bandage | ☐ ☐ ☐ |
 | 캐릭터 1~4 — main / token / portrait | ☐ ☐ ☐ ☐ |
 | 캐릭터 1~4 — 전투 포즈 (idle / attack / hit / block / evade) | ☐ ☐ ☐ ☐ |

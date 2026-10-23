@@ -3,5 +3,5 @@ export function esc(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-/** 파스텔 우주 팔레트에 맞춘 플레이어 색: 핑크, 하늘, 민트, 버터 */
-export const PLAYER_COLORS = ['#ff8fb8', '#7fb2ff', '#6ee0b5', '#ffd66b'];
+/** 밝은 화면에서도 또렷한 플레이어 색: 핑크, 파랑, 민트, 노랑 */
+export const PLAYER_COLORS = ['#ff6fa8', '#3d9cf5', '#2fcf9a', '#ffb627'];

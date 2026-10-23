@@ -1,5 +1,6 @@
 import type { AttackResult, Battle, BattleEvent, DefenseMode, GameState } from '../engine/types';
 import { esc } from './html';
+import { ENEMY_ART } from './assets';
 
 export type BattleChoice =
   | { type: 'ENCOUNTER'; choice: 'attack' | 'release' }
@@ -65,6 +66,7 @@ export class BattleView {
 
     const p = state.players[record.player];
     const e = record.enemy;
+    const enemyArt = ENEMY_ART[e.kind];
     this.playerMaxHp = p.maxHp;
 
     this.el.innerHTML = `
@@ -81,7 +83,7 @@ export class BattleView {
           </div>
           <div class="vs">VS</div>
           <div class="fighter" data-side="enemy">
-            <div class="avatar enemy-avatar"><span>${e.icon}</span></div>
+            <div class="avatar enemy-avatar${enemyArt ? ' has-art' : ''}">${enemyArt ? `<img class="enemy-art" src="${enemyArt}" alt="${esc(e.name)}" draggable="false">` : `<span>${e.icon}</span>`}</div>
             <div class="fname">${esc(e.name)}</div>
             <div class="ftags">
               ${e.isBoss ? '<span class="tag boss">보스</span>' : ''}

@@ -1,10 +1,10 @@
 import { TILE_INFO } from '../data/board';
 import type { Board, GameState } from '../engine/types';
 import { esc } from './html';
+import { ENEMY_ART, TILE_ART } from './assets';
+import { campusLayout, campusScenery } from './campusMap';
 
-const UNIT = 88; // 격자 한 칸 간격(px)
 const TILE = 70; // 칸 크기(px)
-const PAD = 16;
 const STEP_MS = 180;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -19,30 +19,32 @@ export class BoardView {
   private readonly tokenEls: HTMLElement[];
   private readonly diceEl: HTMLElement;
   private readonly enemyEls = new Map<number, HTMLElement>();
+  private readonly layout: ReturnType<typeof campusLayout>;
   /** 화면에 표시 중인 각 플레이어의 칸 */
   private shown: number[];
   private lastSeq = 0;
 
   constructor(root: HTMLElement, private readonly board: Board, state: GameState) {
-    const cols = Math.max(...board.tiles.map((t) => t.x)) + 1;
-    const rows = Math.max(...board.tiles.map((t) => t.y)) + 1;
-
-    const width = (cols - 1) * UNIT + TILE + PAD * 2;
-    const height = (rows - 1) * UNIT + TILE + PAD * 2;
+    this.layout = campusLayout(board);
+    const { width, height } = this.layout;
     this.el = document.createElement('div');
     this.el.className = 'board';
     this.el.style.width = `${width}px`;
     this.el.style.height = `${height}px`;
-    this.el.append(this.drawEdges());
+    this.el.append(campusScenery(board, this.layout), this.drawEdges());
 
     this.tileEls = board.tiles.map((tile) => {
       const info = TILE_INFO[tile.kind];
       const t = document.createElement('button');
       t.className = `tile kind-${tile.kind}`;
-      t.style.left = `${PAD + tile.x * UNIT}px`;
-      t.style.top = `${PAD + tile.y * UNIT}px`;
+      const center = this.layout.centers[tile.id];
+      t.style.left = `${center.x - TILE / 2}px`;
+      t.style.top = `${center.y - TILE / 2}px`;
+      t.style.zIndex = String(Math.round(center.y));
       t.title = `${tile.id}번 · ${info.name}`;
-      t.innerHTML = `<span class="icon">${info.icon}</span><span class="label">${info.name}</span>`;
+      const art = TILE_ART[tile.kind];
+      t.classList.toggle('has-art', !!art);
+      t.innerHTML = `${art ? `<img class="tile-art" src="${art}" alt="" draggable="false">` : `<span class="icon">${info.icon}</span>`}<span class="label">${info.name}</span>`;
       t.onclick = () => this.onTileClick(tile.id);
       this.el.append(t);
       return t;
@@ -62,18 +64,16 @@ export class BoardView {
     this.diceEl.className = 'dice-pop';
     this.el.append(this.diceEl);
 
-    // 화면 크기에 맞춰 보드 전체를 확대/축소한다
+    // 화면 크기에 맞춰 보드 전체를 확대/축소한다. HUD가 차지할 여백은 .board-area의 padding으로 CSS가 정한다
     const fit = document.createElement('div');
     fit.className = 'board-fit';
     fit.append(this.el);
     root.append(fit);
-    // 좁은 화면에서는 패널이 아래로 내려가고 높이가 보드를 따라가므로 너비만 본다 (style.css와 같은 기준)
-    const stacked = matchMedia('(max-width: 900px)');
     new ResizeObserver(() => {
       const style = getComputedStyle(root);
       const availW = root.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       const availH = root.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-      const scale = Math.min(1.5, availW / width, stacked.matches ? Infinity : availH / height);
+      const scale = Math.min(1.6, availW / width, availH / height);
       this.el.style.transform = `scale(${scale})`;
       fit.style.width = `${width * scale}px`;
       fit.style.height = `${height * scale}px`;
@@ -118,13 +118,15 @@ export class BoardView {
       if (!el) {
         el = document.createElement('div');
         el.className = `enemy${enemy.isBoss ? ' boss' : ''}`;
-        el.innerHTML = `<span class="face">${enemy.icon}</span><i class="ehp"><b></b></i>`;
+        const art = ENEMY_ART[enemy.kind];
+        el.innerHTML = `${art ? `<img class="enemy-art" src="${art}" alt="" draggable="false">` : `<span class="face">${enemy.icon}</span>`}<i class="ehp"><b></b></i>`;
         this.el.append(el);
         this.enemyEls.set(enemy.id, el);
       }
-      const tile = this.board.tiles[enemy.tile];
-      el.style.left = `${PAD + tile.x * UNIT + TILE - 8}px`;
-      el.style.top = `${PAD + tile.y * UNIT + 8}px`;
+      const center = this.layout.centers[enemy.tile];
+      el.style.left = `${center.x + 25}px`;
+      el.style.top = `${center.y - 29}px`;
+      el.style.zIndex = String(1000 + Math.round(center.y));
       el.classList.toggle('counter', enemy.counter);
       el.title = `${enemy.name} HP ${enemy.hp}/${enemy.maxHp} · 공격 ${enemy.atk} 방어 ${enemy.def}${enemy.counter ? ' · 반격형' : ''}`;
       el.querySelector<HTMLElement>('.ehp b')!.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
@@ -163,14 +165,12 @@ export class BoardView {
     });
 
     for (const [tileId, players] of byTile) {
-      const tile = this.board.tiles[tileId];
-      const cx = PAD + tile.x * UNIT + TILE / 2;
-      const cy = PAD + tile.y * UNIT + TILE / 2;
+      const { x: cx, y: cy } = this.layout.centers[tileId];
       players.forEach((player, i) => {
         const [dx, dy] = players.length === 1 ? [0, 0] : [(i % 2 ? 1 : -1) * 15, (i < 2 ? -1 : 1) * 15];
         const tok = this.tokenEls[player];
         tok.style.transform = `translate(${cx + dx}px, ${cy + dy}px) translate(-50%, -50%)`;
-        tok.style.zIndex = player === front ? '6' : '5';
+        tok.style.zIndex = String(2000 + Math.round(cy) + (player === front ? 1 : 0));
       });
     }
   }
@@ -185,13 +185,9 @@ export class BoardView {
         </marker>
       </defs>`;
 
-    const center = (id: number) => {
-      const t = this.board.tiles[id];
-      return { x: PAD + t.x * UNIT + TILE / 2, y: PAD + t.y * UNIT + TILE / 2 };
-    };
-
-    const midX = PAD + (Math.max(...this.board.tiles.map((t) => t.x)) * UNIT + TILE) / 2;
-    const midY = PAD + (Math.max(...this.board.tiles.map((t) => t.y)) * UNIT + TILE) / 2;
+    const center = (id: number) => this.layout.centers[id];
+    const midX = this.layout.width / 2;
+    const midY = this.layout.height / 2;
 
     for (const tile of this.board.tiles) {
       const a = center(tile.id);

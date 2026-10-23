@@ -5,13 +5,14 @@ import type { Action, GameState } from '../engine/types';
 import { BattleView } from './battleView';
 import { BoardView } from './boardView';
 import { esc } from './html';
-import { renderPanel, type PanelHandlers } from './panel';
+import { renderHud, type HudHandlers } from './hud';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * 핫시트: 한 화면에서 모두가 돌아가며 조작한다.
  * 상태는 여기 하나뿐이고, 행동은 전부 applyAction을 거친다 (온라인 모드에서는 이 자리에 네트워크가 들어간다).
+ * 화면: 맵이 화면을 꽉 채우고, 그 위에 HUD → 배너 → 전투 화면 순으로 겹친다.
  */
 export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: () => void) {
   let state: GameState = createGame({
@@ -21,19 +22,20 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     seed: (Math.random() * 2 ** 32) >>> 0,
   });
   let busy = false;
+  let logOpen = false;
   const cleanup = new AbortController();
 
-  root.innerHTML = `<div class="game"><main class="board-area"></main><aside class="panel"></aside></div>`;
-  const panel = root.querySelector<HTMLElement>('.panel')!;
-  const boardArea = root.querySelector<HTMLElement>('.board-area')!;
-  const board = new BoardView(boardArea, state.board, state);
-  const battle = new BattleView(boardArea);
+  root.innerHTML = `<div class="game"><main class="board-area"></main><div class="hud"></div></div>`;
+  const gameEl = root.querySelector<HTMLElement>('.game')!;
+  const hud = root.querySelector<HTMLElement>('.hud')!;
+  const board = new BoardView(root.querySelector<HTMLElement>('.board-area')!, state.board, state);
+  const battle = new BattleView(gameEl);
   battle.onChoice = (choice) => dispatch({ ...choice, player: state.current });
 
-  // 기믹 발동 같은 큰 알림은 보드 위 배너로 하나씩 띄운다
+  // 기믹 발동 같은 큰 알림은 화면 위쪽 배너로 하나씩 띄운다
   const banner = document.createElement('div');
   banner.className = 'banner';
-  boardArea.append(banner);
+  gameEl.append(banner);
   let lastNotice = 0;
   async function showNotices(s: GameState) {
     for (const n of s.notices) {
@@ -47,11 +49,22 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     }
   }
 
-  const handlers: PanelHandlers = {
+  // 말이 도착할 때까지는 이전 상태를 보여 준다 (결과 스포 방지)
+  let shownState = state;
+  const draw = (s: GameState, isBusy: boolean) => {
+    shownState = s;
+    renderHud(hud, s, isBusy, logOpen, handlers);
+  };
+
+  const handlers: HudHandlers = {
     dispatch,
     newGame() {
       cleanup.abort();
       onExit();
+    },
+    toggleLog() {
+      logOpen = !logOpen;
+      draw(shownState, busy);
     },
   };
 
@@ -68,11 +81,10 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
       throw e;
     }
 
-    // 말이 도착할 때까지는 이전 정보를 보여 준다 (결과 스포 방지)
     const prev = state;
     state = next;
     busy = true;
-    renderPanel(panel, prev, true, handlers);
+    draw(prev, true);
     battle.renderChoices(state, true);
     if (action.type === 'ROLL') board.showDice(state.turn.dice, state.turn.extraSteps);
 
@@ -83,7 +95,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     await battle.openIfNew(state);
 
     busy = false;
-    renderPanel(panel, state, false, handlers);
+    draw(state, false);
     battle.renderChoices(state, false);
 
     if (state.phase.kind === 'gameOver') {
@@ -113,9 +125,9 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
 
   // 시작하자마자 발동한 기믹(진행도 1)도 보여 준다
   busy = true;
-  renderPanel(panel, state, true, handlers);
+  draw(state, true);
   showNotices(state).then(() => {
     busy = false;
-    renderPanel(panel, state, false, handlers);
+    draw(state, false);
   });
 }

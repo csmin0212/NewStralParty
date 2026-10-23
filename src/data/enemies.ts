@@ -13,8 +13,9 @@ export interface EnemyInfo {
   reward: number;
 }
 
+/** 학원 도시의 에너미. icon은 그림이 없을 때 쓰는 임시 아이콘 */
 export const ENEMIES: Record<EnemyKind, EnemyInfo> = {
-  slime: { name: '슬라임', icon: '🦠', hp: 3, atk: 1, def: 0, eva: 0, counter: false, defense: 'block', reward: 4 },
-  bat: { name: '박쥐', icon: '🦇', hp: 2, atk: 1, def: 0, eva: 2, counter: false, defense: 'evade', reward: 5 },
-  goblin: { name: '고블린', icon: '👺', hp: 5, atk: 2, def: 1, eva: 0, counter: true, defense: 'block', reward: 8 },
+  robot: { name: '경비 로봇', icon: '🤖', hp: 3, atk: 1, def: 0, eva: 0, counter: false, defense: 'block', reward: 4 },
+  drone: { name: '정찰 드론', icon: '🛸', hp: 2, atk: 1, def: 0, eva: 2, counter: false, defense: 'evade', reward: 5 },
+  delinquent: { name: '불량배', icon: '😼', hp: 5, atk: 2, def: 1, eva: 0, counter: true, defense: 'block', reward: 8 },
 };
