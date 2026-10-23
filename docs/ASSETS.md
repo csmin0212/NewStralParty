@@ -116,6 +116,24 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 | 정찰 드론 `enemies/drone/idle.png` | `small agile patrol drone with four propellers, sleek white and blue shell, red sensor eye, hovering` |
 | 불량배 `enemies/delinquent/idle.png` | `delinquent student thug in a messy school uniform, cap and face mask, holding a toy-like blaster, cocky stance` |
 
+### 3차 요청 — 인카운터 · 전투 화면 (⬅ 지금)
+
+원작 인카운터 · 전투 화면([docs/REFERENCE.md](REFERENCE.md) 2 · 3번)을 따라 만들기 위한 그림. 공통 프롬프트를 앞에 붙인다.
+
+| 파일 | 용도 | 크기 | 프롬프트 (공통 프롬프트 뒤에) |
+|---|---|---|---|
+| `enemies/robot/encounter.png` | 인카운터 화면 가득 나오는 큰 그림 | 1024×1024, 투명 | `small cute security robot leaning toward the viewer in a dramatic ready-to-fight pose, big glowing visor eye, dynamic low angle, full body, centered` |
+| `enemies/drone/encounter.png` | 〃 | 1024×1024, 투명 | `small patrol drone swooping toward the viewer, propellers blurred with motion, red sensor eye glaring, dynamic angle, centered` |
+| `enemies/delinquent/encounter.png` | 〃 | 1024×1024, 투명 | `delinquent student thug pointing a toy-like blaster at the viewer, cocky grin under the face mask, cap tilted, dynamic low angle, full body, centered` |
+| `battle/stage.png` | 전투 화면 가운데 둥근 무대 바닥 | 1920×640, 투명 | `wide oval battle arena floor seen from a low side angle, white and sky blue sci-fi panels with a glowing cyan ring, yellow hazard markings at the edge, empty, no characters` |
+| `battle/background.png` | 전투 화면 뒤 배경 | 1920×1080 | `blurred futuristic school rooftop at dusk, sky blue and lavender tones, soft bokeh city lights, calm and low detail in the center` |
+| `fx/impact.png` | 공격이 맞을 때 터지는 충격 | 512×512, 투명 | `comic style impact burst, white and sky blue jagged starburst with yellow sparks, no text` |
+| `fx/smoke.png` | 전투 시작 · 회피 때 연기 | 512×512, 투명 | `comic style puff of white smoke clouds with soft blue shading, no text` |
+
+- 인카운터 그림은 지금 있는 `idle`보다 **더 크고 박력 있게**, 화면을 향해 덤비는 구도로 뽑는다.
+- 무대(`stage`)는 위에 캐릭터 둘이 서야 하므로 **가운데는 비워 둔다.**
+- 플레이어 쪽 스티커는 캐릭터 그림(아래 3번)이 생기면 들어간다. 그 전에는 번호 동그라미로 둔다.
+
 ---
 
 ## 3. 캐릭터 — 캐릭터 시스템을 만들 때
@@ -266,6 +284,8 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 | 추가 에너미 포즈 — drone hit | ✅ |
 | 3차 UI — coin / heart / star / card-back / logo | ✅ ✅ ✅ ✅ ✅ |
 | 3차 아이템 — dash / double-dice / bandage | ✅ ✅ ✅ |
+| **요청** 인카운터 그림 — robot / drone / delinquent `encounter` | ☐ ☐ ☐ |
+| **요청** 전투 — stage / background, 이펙트 — impact / smoke | ☐ ☐ ☐ ☐ |
 | 선택용 길 — board/path | ✅ (현재 맵은 SVG 보행로 사용) |
 | 캐릭터 1~4 — main / token / portrait | ☐ ☐ ☐ ☐ |
 | 캐릭터 1~4 — 전투 포즈 (idle / attack / hit / block / evade) | ☐ ☐ ☐ ☐ |
