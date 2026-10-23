@@ -1,17 +1,20 @@
-import { CARDS } from '../data/cards';
+import { CARD_IDS, CARDS } from '../data/cards';
+import { canAddToDeck, canEditDeck, cardBlocker } from '../engine/cards';
 import { currentPlayer, describeGimmick } from '../engine/game';
 import { RULES } from '../engine/rules';
-import type { Action, GameState, Player } from '../engine/types';
+import type { Action, CardId, GameState, Player } from '../engine/types';
 import { tileLabel } from './boardView';
 import { campusVector } from './campusMap';
 import { esc } from './html';
 import { CHARACTERS } from '../data/characters';
-import { CARD_ART, CHARACTER_ART, UI_ART } from './assets';
+import { CHARACTER_ART, UI_ART } from './assets';
+import { cardFace } from './cardView';
 
 export interface HudHandlers {
   dispatch(action: Action): void;
   newGame(): void;
   toggleLog(): void;
+  toggleDeck(): void;
 }
 
 /**
@@ -23,7 +26,14 @@ export interface HudHandlers {
  *   오른쪽 아래: 큰 행동 버튼 (+ 갈림길 선택)
  * 기본 행동 버튼에는 data-primary를 붙인다 (스페이스바).
  */
-export function renderHud(el: HTMLElement, state: GameState, busy: boolean, logOpen: boolean, h: HudHandlers) {
+export function renderHud(
+  el: HTMLElement,
+  state: GameState,
+  busy: boolean,
+  logOpen: boolean,
+  deckOpen: boolean,
+  h: HudHandlers,
+) {
   el.innerHTML = `
     <div class="hud-top">
       ${roundBadge(state)}
@@ -36,6 +46,7 @@ export function renderHud(el: HTMLElement, state: GameState, busy: boolean, logO
     ${currentCard(state)}
     ${handCards(state)}
     <div class="hud-action ${busy ? 'busy' : ''}">${actionArea(state)}</div>
+    ${deckOpen && canEditDeck(state, currentPlayer(state)) ? deckEditor(state) : ''}
     <aside class="hud-log ${logOpen ? 'open' : ''}">
       <h3>기록</h3>
       <ol>${state.log.map((line) => `<li>${esc(line)}</li>`).join('')}</ol>
@@ -51,7 +62,7 @@ export function renderHud(el: HTMLElement, state: GameState, busy: boolean, logO
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!btn || btn.disabled) return;
     const player = state.current;
-    const { action, card, path } = btn.dataset;
+    const { action, card, path, add, remove } = btn.dataset;
     if (action === 'roll') h.dispatch({ type: 'ROLL', player });
     else if (action === 'skill') h.dispatch({ type: 'USE_SKILL', player });
     else if (action === 'end') h.dispatch({ type: 'END_TURN', player });
@@ -59,6 +70,9 @@ export function renderHud(el: HTMLElement, state: GameState, busy: boolean, logO
     else if (action === 'menu') {
       if (confirm('지금 게임을 그만두고 새 게임을 시작할까요?')) h.newGame();
     } else if (action === 'log') h.toggleLog();
+    else if (action === 'deck') h.toggleDeck();
+    else if (add) h.dispatch({ type: 'EDIT_DECK', player, add: add as CardId });
+    else if (remove) h.dispatch({ type: 'EDIT_DECK', player, remove: remove as CardId });
     else if (card !== undefined) h.dispatch({ type: 'PLAY_CARD', player, handIndex: Number(card) });
     else if (path !== undefined) h.dispatch({ type: 'CHOOSE_PATH', player, to: Number(path) });
   };
@@ -152,7 +166,7 @@ function currentCard(state: GameState): string {
         <div class="me-turn">지금 차례</div>
         <div class="me-name">${esc(p.name)} <small>${c.name} · ${p.level}성</small></div>
         <div class="me-stats">
-          <span title="공격력">⚔ ${p.atk}</span><span title="방어력">🛡 ${p.def}</span>
+          <span title="공격력">⚔ ${p.atk}</span><span title="방어력">🛡 ${p.def}</span>${p.move ? `<span title="이동거리">👟 +${p.move}</span>` : ''}
           ${p.potential ? `<span class="me-pot" title="${esc(c.potential.description)}">잠재 해방</span>` : ''}
         </div>
       </div>
@@ -174,25 +188,58 @@ function skillButton(state: GameState): string {
 
 function handCards(state: GameState): string {
   const p = currentPlayer(state);
-  if (p.hand.length === 0) return '<div class="hud-hand empty"><span>손패 없음</span></div>';
-  const usable = state.phase.kind === 'preRoll' && !state.turn.cardPlayed;
+  const pile = `<span class="pile-count" title="뽑을 카드 · 버린 카드"><img src="${UI_ART.cardBack}" alt="">${p.drawPile.length}<i>${p.discard.length}</i></span>`;
+  if (p.hand.length === 0) return `<div class="hud-hand empty">${pile}</div>`;
   // 원작처럼 부채꼴로 겹치고 화면 아래로 반쯤 잘린다. --o: 가운데에서 얼마나 떨어졌는지 (-1 ~ 1)
+  // 전투 카드는 전투 화면에서 쓴다
   const mid = (p.hand.length - 1) / 2;
   return `
     <div class="hud-hand fan">
+      ${pile}
       ${p.hand
-        .map((id, i) => {
-          const c = CARDS[id];
+        .map((h, i) => {
           const o = mid === 0 ? 0 : (i - mid) / Math.max(mid, 1);
+          const blocker = cardBlocker(state, p, h);
           return `
-            <button class="hand-card" data-card="${i}" style="--o:${o};--i:${i}" ${usable ? '' : 'disabled'}>
-              <span class="hc-art"><img src="${CARD_ART[id]}" alt="" draggable="false"></span>
-              <span class="hc-name">${c.name}</span>
-              <span class="hc-desc">${c.description}</span>
+            <button class="hand-card" data-card="${i}" style="--o:${o}" title="${blocker ?? ''}" ${blocker ? 'disabled' : ''}>
+              ${cardFace(h.card, { tag: h.shop ? '상점' : undefined })}
             </button>`;
         })
         .join('')}
     </div>`;
+}
+
+/** 본부에서 덱 정비: 지금 덱(뽑을 · 버린 더미에 있는 카드만 뺄 수 있다)과 넣을 수 있는 카드 */
+function deckEditor(state: GameState): string {
+  const p = currentPlayer(state);
+  const counts = new Map<CardId, number>();
+  for (const id of p.deck) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const mine = CARD_IDS.filter((id) => counts.has(id))
+    .map((id) => {
+      const removable = (p.drawPile.includes(id) || p.discard.includes(id)) && p.deck.length > RULES.deckMin;
+      return `<button class="deck-card" data-remove="${id}" ${removable ? '' : 'disabled'}>${cardFace(id, { count: counts.get(id) })}</button>`;
+    })
+    .join('');
+  const pool = CARD_IDS.map((id) => {
+    const ok = canAddToDeck(p.deck, id);
+    const maxed = p.deck.filter((c) => c === id).length >= CARDS[id].limit;
+    return `<button class="deck-card ${maxed ? 'off' : ''}" data-add="${id}" ${ok ? '' : 'disabled'}>${cardFace(id)}</button>`;
+  }).join('');
+  return `
+    <div class="deck-edit">
+      <div class="deck-edit-panel">
+        <div class="ba-band">덱 <b>${p.deck.length}</b> / ${RULES.deckSize}</div>
+        <div class="deck-grid deck-grid--edit">${mine}</div>
+        <div class="ba-band">카드 넣기</div>
+        <div class="deck-grid deck-grid--edit">${pool}</div>
+        <div class="panel-foot"><button class="ba-btn ba-btn--sky" data-action="deck">닫기</button></div>
+      </div>
+    </div>`;
+}
+
+function deckButton(state: GameState): string {
+  if (!canEditDeck(state, currentPlayer(state))) return '';
+  return `<button class="ba-btn ba-btn--sky deck-btn" data-action="deck">덱 정비</button>`;
 }
 
 function actionArea(state: GameState): string {
@@ -207,7 +254,7 @@ function actionArea(state: GameState): string {
         state.turn.extraSteps > 0 ? `+${state.turn.extraSteps}칸` : '',
       ].filter(Boolean);
       return `
-        <div class="action-info">${mods.length ? `<span class="mods">${mods.join(' · ')}</span>` : ''}${skillButton(state)}${cardInfo}</div>
+        <div class="action-info">${mods.length ? `<span class="mods">${mods.join(' · ')}</span>` : ''}${deckButton(state)}${skillButton(state)}${cardInfo}</div>
         <button class="go-btn" data-action="roll" data-primary>
           <span class="go-dice">🎲</span><b>이동</b><small>GO GO GO</small>
         </button>`;
@@ -223,9 +270,8 @@ function actionArea(state: GameState): string {
         .join('');
       return `
         <div class="path-pick">
-          <div class="path-title">갈림길! 남은 <b>${phase.stepsLeft}</b>칸</div>
+          <div class="path-title">남은 <b>${phase.stepsLeft}</b>칸</div>
           ${options}
-          <div class="path-hint">빛나는 칸을 눌러도 돼요</div>
         </div>
         <button class="go-btn wait" disabled><b>선택</b><small>WHICH WAY</small></button>`;
     }
@@ -236,10 +282,10 @@ function actionArea(state: GameState): string {
 
     case 'endTurn': {
       const result = p.ko
-        ? `💀 쓰러졌다… ${p.reviveRound}라운드에 부활`
+        ? `K.O. · ${p.reviveRound}R 부활`
         : `${tileLabel(state.board, p.tile)} 도착`;
       return `
-        <div class="action-info"><span class="result">${result}</span></div>
+        <div class="action-info">${deckButton(state)}<span class="result">${result}</span></div>
         <button class="go-btn end" data-action="end" data-primary><b>턴 종료</b><small>NEXT</small></button>`;
     }
 

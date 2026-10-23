@@ -33,7 +33,52 @@ export interface Board {
   bossTile: number;
 }
 
-export type CardId = 'dash' | 'doubleDice' | 'bandage';
+/** 카드 목록과 효과 글은 data/cards.ts, 효과는 engine/cards.ts */
+export type CardId =
+  | 'dash'
+  | 'doubleDice'
+  | 'tripleDice'
+  | 'sprint'
+  | 'stroll'
+  | 'luckyDice'
+  | 'recall'
+  | 'adrenaline'
+  | 'guard'
+  | 'focus'
+  | 'bandage'
+  | 'energyDrink'
+  | 'allowance'
+  | 'notes'
+  | 'refresh'
+  | 'powerStrike'
+  | 'fullPower'
+  | 'critical'
+  | 'pierce'
+  | 'stun'
+  | 'lifeSteal'
+  | 'bounty'
+  | 'ironWall'
+  | 'sidestep'
+  | 'perfectDodge'
+  | 'counterShot'
+  | 'smokeBomb'
+  | 'firstAid'
+  | 'groupMeal'
+  | 'clubFund'
+  | 'emergencyCall'
+  | 'batonTouch'
+  | 'cheer'
+  | 'airStrike'
+  | 'bossBreak'
+  | 'curfew'
+  | 'overtime'
+  | 'expel';
+
+export interface HandCard {
+  card: CardId;
+  /** 상점에서 산 카드: 쓰면 사라지고 덱으로 돌아가지 않는다 */
+  shop?: boolean;
+}
 
 export type CharacterId = 'mutbyeol';
 
@@ -52,7 +97,13 @@ export interface Player {
   maxHp: number;
   atk: number;
   def: number;
-  hand: CardId[];
+  /** 주사위를 굴릴 때마다 더 가는 칸 수 (이동거리) */
+  move: number;
+  /** 내 덱 구성 (최대 10장). 뽑을 더미 · 버린 더미 · 손패를 오가며 내 덱 안에서만 돈다 */
+  deck: CardId[];
+  drawPile: CardId[];
+  discard: CardId[];
+  hand: HandCard[];
   /** 액티브 스킬 재사용 대기 (라운드). 0이면 쓸 수 있다 */
   skillCooldown: number;
   /** 액티브 스킬 효과가 이 라운드의 자기 차례 시작까지 유지된다 (뭇별: 회피 주사위 2개) */
@@ -134,7 +185,11 @@ export type BattleEvent =
   | { type: 'playerKO' }
   | { type: 'release' }
   /** 회피에 성공해서 발동한 캐릭터 효과 (뭇별 패시브 · 잠재 능력) */
-  | { type: 'skill'; name: string; damage?: number; targetHp?: number };
+  | { type: 'skill'; name: string; damage?: number; targetHp?: number }
+  /** 전투 카드 사용. damage가 있으면 그 카드로 에너미가 피해를 입었다 (맞받아치기) */
+  | { type: 'card'; card: CardId; damage?: number; targetHp?: number }
+  /** 연막탄으로 반격을 받지 않고 빠졌다 */
+  | { type: 'escape' };
 
 /** 인카운터 한 번의 기록. 화면은 events를 순서대로 연출한다 */
 export interface Battle {
@@ -154,13 +209,46 @@ export type Phase =
   | { kind: 'endTurn' }
   | { kind: 'gameOver'; result: 'victory' | 'defeat' };
 
+/** 인카운터 한 번 동안만 가는 전투 카드 효과 */
+export interface BattleMods {
+  atk: number;
+  def: number;
+  evadeDice: number;
+  /** 공격 주사위 수 (높은 눈) */
+  attackDice: number;
+  pierce: boolean;
+  noCounter: boolean;
+  lifeSteal: boolean;
+  bounty: boolean;
+  autoEvade: boolean;
+  reflect: boolean;
+  /** 공격 때 · 반격 때 카드를 이미 썼는지 */
+  attackCard: boolean;
+  defendCard: boolean;
+}
+
 /** 현재 턴의 임시 값 */
 export interface TurnInfo {
+  /** 주사위 전 카드(부스트 · 지원 · 이벤트)를 썼는지 */
   cardPlayed: boolean;
   skillUsed: boolean;
   diceCount: number;
   extraSteps: number;
+  /** best: 2번 굴려 높은 눈 · cap3: 눈 최대 3 */
+  diceMode: 'normal' | 'best' | 'cap3';
   dice: number[];
+  /** 이번 턴 동안 붙는 능력치 (부스트 카드) */
+  atk: number;
+  def: number;
+  evadeDice: number;
+  battle: BattleMods;
+}
+
+/** 화면 연출용: 마지막으로 쓴 카드 */
+export interface CardPlay {
+  seq: number;
+  player: number;
+  card: CardId;
 }
 
 /** 화면 연출용: 마지막으로 말이 지나간 칸들 (시작 칸 포함) */
@@ -194,6 +282,7 @@ export interface GameState {
   phase: Phase;
   turn: TurnInfo;
   lastMove: Move | null;
+  lastCard: CardPlay | null;
   /** 최근 인카운터 기록 (한 행동 안에서 전투가 끝나고 다음 전투가 시작될 수 있어서 몇 개 남겨 둔다) */
   battles: Battle[];
   notices: Notice[];
@@ -210,4 +299,6 @@ export type Action =
   | { type: 'ENCOUNTER'; player: number; choice: 'attack' | 'release' }
   | { type: 'DEFEND'; player: number; mode: DefenseMode }
   | { type: 'USE_SKILL'; player: number }
+  /** 본부에서 덱 정비: 카드 1장 넣기 또는 빼기 */
+  | { type: 'EDIT_DECK'; player: number; add?: CardId; remove?: CardId }
   | { type: 'END_TURN'; player: number };

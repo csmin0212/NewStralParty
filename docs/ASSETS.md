@@ -86,7 +86,8 @@ isolated on a plain solid #00FF00 green background, no ground shadow
 | **2차** | 나머지 칸 5종, 에너미 3종(경비 로봇 · 정찰 드론 · 불량배) 기본 그림 | ✅ 제작·적용 |
 | 3차 | 에너미 전투 포즈, UI 아이콘, 아이템, 로고 | ✅ 제작·적용 |
 | 캐릭터 때 | 캐릭터 메인 일러스트, 보드 말, 전투 포즈 | ✅ 뭇별 제작·적용 |
-| **4차** | 로비 · 캐릭터 화면 배경, 스킬 아이콘 | ⏳ 지금 필요 |
+| **4차** | 로비 · 캐릭터 화면 배경, 스킬 아이콘 | ✅ 5종 제작·등록 |
+| **5차** | 카드 35장 | ⏳ 지금 필요 |
 | 이후 | 보스, 에너미 추가, 유물 아이콘 | 보스 · 유물 시스템 |
 
 ### 2차 프롬프트
@@ -135,7 +136,7 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 - 무대(`stage`)는 위에 캐릭터 둘이 서야 하므로 **가운데는 비워 둔다.**
 - 플레이어 쪽 스티커에는 캐릭터 전투 포즈(아래 3번)가 들어간다.
 
-### 4차 요청 — 로비 · 캐릭터 화면 (⏳ 지금 필요)
+### 4차 요청 — 로비 · 캐릭터 화면 (✅ 5종 제작·등록)
 
 원작 로비 · 캐릭터 목록 · 캐릭터 상세 화면([docs/REFERENCE.md](REFERENCE.md) 7번)을 따라 만들기 위한 그림. 공통 프롬프트를 앞에 붙인다.
 캐릭터 일러스트 · 얼굴 카드는 이미 있는 `main` · `portrait`를 쓰므로 **배경과 아이콘만** 있으면 된다. 메뉴 카드 틀 · 탭 · 버튼은 코드로 그린다.
@@ -263,16 +264,79 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 
 ---
 
-## 6. 아이템 (지금의 카드)
+## 6. 카드 — 5차 요청 (⏳ 지금 필요, 35장)
 
-| 파일 | 아이템 | 효과 |
+덱 시스템([DESIGN.md](DESIGN.md) 11번)의 카드 그림. 질주 · 더블 주사위 · 붕대는 이미 있으니 그 3장과 나란히 놓았을 때 어울리게 뽑는다.
+
+- 크기 **512×720** (세로 5:7), **투명 PNG**. 화면에서 위 · 아래가 조금 잘려도 되게 대상은 가운데 70% 안에.
+- **카드 안쪽 그림만** 뽑는다. 테두리 · 이름 · 효과 글씨 · 비용은 화면에서 그린다.
+- 사람 없이 **물건 · 상징 하나**가 주인공. 기존 3장처럼 흰색 + 하늘색 바탕에 종류 색 빛을 조금 섞는다.
+- 종류 색: 부스트 = 하늘 `#33AEF3`, 전투 = 분홍 `#F2558B`, 지원 = 민트 `#22B892`, 이벤트 = 보라 `#8A6CF0`.
+
+**카드 공통** — 공통 프롬프트 뒤, 카드마다 내용 앞에 붙인다.
+
+```
+single collectible card illustration, one object as the hero, centered with empty margin,
+dynamic three-quarter view, glossy white and sky blue materials, soft glow effects,
+isolated on transparent background, no text, no letters, no frame, no border
+```
+
+### 부스트 (하늘색 빛)
+
+| 파일 | 카드 | 내용 (카드 공통 뒤에) |
 |---|---|---|
-| `cards/dash.png` | 질주 | 이번 이동 +2칸 |
-| `cards/double-dice.png` | 더블 주사위 | 주사위 2개 |
-| `cards/bandage.png` | 붕대 | HP +4 |
+| `cards/triple-dice.png` | 트리플 주사위 | `three white dice with sky blue pips tumbling in the air, sparkling trail, sky blue glow` |
+| `cards/sprint.png` | 전력 질주 | `a sleek running spike shoe bursting forward with speed lines and a small sweat drop, sky blue glow` |
+| `cards/stroll.png` | 산책 | `a small potted sprout and a folded walking map with a gentle breeze of leaves, calm sky blue glow` |
+| `cards/lucky-dice.png` | 행운의 주사위 | `a white die with a four leaf clover charm tied by a ribbon, golden sparkles, sky blue glow` |
+| `cards/recall.png` | 귀환 신호 | `a futuristic school building badge emitting a homing signal beam, circular radar waves, sky blue glow` |
+| `cards/adrenaline.png` | 아드레날린 | `a glowing syringe-shaped energy capsule with fiery orange red energy swirling, sky blue rim light` |
+| `cards/guard.png` | 수비 태세 | `a round white riot shield with a sky blue emblem, standing upright, sturdy, soft glow` |
+| `cards/focus.png` | 집중 | `a crosshair scope lens floating with concentric focus rings, sky blue glow` |
+| `cards/energy-drink.png` | 에너지 드링크 | `a cold canned energy drink with condensation drops and lightning sparks, sky blue and yellow` |
+| `cards/allowance.png` | 용돈 | `a cute white envelope stuffed with gold coins spilling out, sky blue ribbon` |
+| `cards/notes.png` | 수업 노트 | `an open school notebook with sticky notes and a pen, pages fluttering, sky blue glow` |
+| `cards/refresh.png` | 리프레시 | `a stopwatch with a circular refresh arrow around it, ticking backward, sky blue glow` |
 
-- 크기 **512×720** (세로 5:7), PNG.
-- **카드 안쪽 그림만** 뽑는다. 카드 테두리, 이름, 효과 글씨는 화면에서 그린다.
+### 전투 (분홍 빛)
+
+| 파일 | 카드 | 내용 (카드 공통 뒤에) |
+|---|---|---|
+| `cards/power-strike.png` | 강타 | `a white armored gauntlet fist punching forward with impact shockwave, pink glow` |
+| `cards/full-power.png` | 혼신의 일격 | `a huge charged energy fist with cracking aura and flying debris, intense pink and white glow` |
+| `cards/critical.png` | 급소 노리기 | `a sniper crosshair locked on a glowing weak point marker, red pink highlight` |
+| `cards/pierce.png` | 관통탄 | `a single sharp glowing bullet piercing through a shattered shield plate, pink energy trail` |
+| `cards/stun.png` | 기절탄 | `a round flashbang grenade bursting with spinning stars and electric sparks, pink glow` |
+| `cards/life-steal.png` | 흡혈 탄환 | `a crimson glowing bullet trailing a heart shaped energy wisp, pink and red glow` |
+| `cards/bounty.png` | 현상금 | `a wanted poster pinned with a gold coin bag and a shining gem, pink glow, no readable text` |
+| `cards/iron-wall.png` | 철벽 | `a stack of white high tech barrier blocks forming a wall with a hexagon energy shield, pink rim light` |
+| `cards/sidestep.png` | 사이드 스텝 | `a sneaker mid sidestep leaving afterimage copies and a swirl of wind, pink glow` |
+| `cards/perfect-dodge.png` | 완벽한 회피 | `a feather drifting through a bullet path, the bullet missing by a hair, sparkling pink and white` |
+| `cards/counter-shot.png` | 맞받아치기 | `a mirror shield bouncing an energy bolt back, curved return arrow trail, pink glow` |
+| `cards/smoke-bomb.png` | 연막탄 | `a small canister bursting into a puffy white smoke cloud, a few sparkles, pink tint` |
+
+### 지원 (민트 빛)
+
+| 파일 | 카드 | 내용 (카드 공통 뒤에) |
+|---|---|---|
+| `cards/first-aid.png` | 구급상자 | `a white first aid kit with a mint cross, slightly open with bandages, mint glow` |
+| `cards/group-meal.png` | 단체 급식 | `a school lunch tray set with rice, side dishes and milk carton, steam rising, mint glow` |
+| `cards/club-fund.png` | 동아리 회비 | `a clear coin jar labeled with a club emblem sticker, overflowing gold coins, mint glow` |
+| `cards/emergency-call.png` | 긴급 호출 | `a smartphone showing an emergency call icon with glowing alert rings, mint and white` |
+| `cards/baton-touch.png` | 바톤 터치 | `a relay baton being passed between two gloved hands, motion streaks, mint glow` |
+| `cards/cheer.png` | 응원 | `a megaphone with confetti and cheering pom poms, mint and sky blue sparkles` |
+
+### 이벤트 (보라 빛)
+
+| 파일 | 카드 | 내용 (카드 공통 뒤에) |
+|---|---|---|
+| `cards/air-strike.png` | 지원 사격 | `a white support helicopter drone firing a volley of light bolts downward, violet glow` |
+| `cards/boss-break.png` | 보스 공략 | `a tactical tablet showing a boss silhouette weak point diagram, holographic violet glow` |
+| `cards/curfew.png` | 통금 | `a school alarm siren light spinning with a clock showing late night, violet glow` |
+| `cards/overtime.png` | 방과 후 연장 | `a crescent moon over a clock tower with clock hands turning backward, violet starry glow` |
+| `cards/expel.png` | 정학 처분 | `an official document stamped with a big seal and a red tag, flying papers, violet glow, no readable text` |
+
+- 다 오면 [src/ui/assets.ts](../src/ui/assets.ts)의 `CARD_ART`에 등록한다. 등록 전까지는 카드에 아이콘이 들어간다.
 
 ---
 
@@ -314,3 +378,5 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 2026-10-23: 사용자 요청에 따라 캐릭터와 보스를 제외한 남은 22종을 제작했습니다. 원본 PNG·프롬프트·검증 기록은 `assets-raw/remaining-assets/`, 게임용 WebP는 `public/assets/`에 있습니다. 전체 목록은 `public/assets/gallery.html`에서 볼 수 있습니다. 전투 포즈 5종은 전투 이벤트에 연결했고, 아이템·UI·로고도 해당 화면에 적용했습니다.
 
 2026-10-23 추가 요청: 인카운터 에너미 3장·전투 무대·옥상 배경·충격·연기 7종을 제작해 기존 인카운터/아레나 화면에 등록했습니다. 원본·프롬프트·변환 스크립트·검증 기록은 `assets-raw/battle-assets/`에 보관합니다. 배경 원본은 1672×941이며 최종 적용 크기 1920×1080으로 변환했습니다.
+
+2026-10-23 로비 추가분: 광장·동아리방 배경 2장과 뭇별 스킬 아이콘 3종을 제작했습니다. `LOBBY_ART`와 `CHARACTER_ART.mutbyeol`에 등록했으며 원본·프롬프트·검증 기록은 `assets-raw/lobby-assets/`에 있습니다. 신규 로비·캐릭터 상세 화면은 별도 구현 대상입니다.

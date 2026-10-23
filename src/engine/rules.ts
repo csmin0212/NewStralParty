@@ -11,9 +11,12 @@ export const RULES = {
   /** 현재 별(성) → 다음 별로 올리는 비용. 0성에서 시작해 3성까지. 원작 참고값 (밸런스 때 조정) */
   levelUpCost: { 0: 15, 1: 20, 2: 25 } as Record<number, number>,
 
-  handLimit: 3,
-  dashSteps: 2,
-  bandageHeal: 4,
+  /** 덱 장수 상한 · 하한 */
+  deckSize: 10,
+  deckMin: 5,
+  /** 시작 손패. 이후 자기 차례 시작마다 1장, 카드 칸에서 1장 */
+  startHand: 2,
+  handLimit: 4,
 
   /** KO 되면 다음 라운드를 쉬고 그다음 라운드에 부활: 쓰러진 라운드 + 2 */
   reviveAfterRounds: 2,

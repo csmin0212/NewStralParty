@@ -40,3 +40,12 @@ enemies/slime/idle.webp는 과거 테마의 미사용 파일이며 현재 게임
 - characters/mutbyeol/battle-{idle,attack,hit,block,evade,down}.webp — 오른쪽을 보는 SD 전투 6종, 각 768×768
 
 모든 파일은 투명 배경이며, 전투 그림은 공통 배율과 발 기준선으로 정렬했습니다. CHARACTER_ART.mutbyeol에 이름·경로를 등록했습니다. 캐릭터 선택이나 플레이어 배정은 아직 연결하지 않았습니다. 생성 원본·전체 프롬프트·변환 스크립트·검증 결과는 assets-raw/characters/mutbyeol/에 있습니다.
+
+## 로비 · 스킬 추가분 (5종)
+
+- lobby/{background,room}.webp — 학원 도시 광장·동아리방 배경, 각 1920×1080
+- characters/mutbyeol/{skill-active,skill-passive,potential}.webp — 뭇별의 액티브·패시브·잠재 능력 아이콘, 각 256×256, 투명
+
+내장 image_gen으로 제작했습니다. 스킬 아이콘은 액티브 원본을 공통 디자인 참고로 사용하고 같은 원형 틀·배율로 정리했습니다. 배경 원본은 1672×941이며 최종 크기로 변환했습니다. LOBBY_ART 및 CHARACTER_ART.mutbyeol에 경로를 등록했습니다. 신규 로비·캐릭터 상세 화면 구현은 별도이며, 준비된 배경·아이콘을 해당 화면에서 참조하면 됩니다.
+
+생성 PNG·전체 프롬프트·변환 스크립트·검증 기록: assets-raw/lobby-assets/.

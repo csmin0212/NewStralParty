@@ -44,7 +44,8 @@ export const ENEMY_POSES: Partial<Record<Enemy['kind'], Partial<Record<EnemyPose
   delinquent: { idle: ENEMY_ART.delinquent, attack: `${root}enemies/delinquent/attack.webp`, hit: `${root}enemies/delinquent/hit.webp` },
 };
 
-export const CARD_ART: Record<CardId, string> = {
+/** 카드 그림 (docs/ASSETS.md 5차 요청). 없는 카드는 아이콘으로 그린다 */
+export const CARD_ART: Partial<Record<CardId, string>> = {
   dash: `${root}cards/dash.webp`,
   doubleDice: `${root}cards/double-dice.webp`,
   bandage: `${root}cards/bandage.webp`,
@@ -61,6 +62,12 @@ export const UI_ART = {
 /** 현재 보행로는 SVG로 이어 그린다. 이 그림은 다른 맵에서 사용할 수 있다. */
 export const PATH_ART = `${root}board/path.webp`;
 
+/** 로비와 캐릭터 목록·상세 화면 배경. */
+export const LOBBY_ART = {
+  background: `${root}lobby/background.webp`,
+  room: `${root}lobby/room.webp`,
+};
+
 /** 제작된 캐릭터 그림. 캐릭터 선택·플레이어 배정 시스템에서 id로 참조한다. */
 export type CharacterPose = 'idle' | 'attack' | 'hit' | 'block' | 'evade' | 'down';
 export const CHARACTER_ART = {
@@ -70,6 +77,9 @@ export const CHARACTER_ART = {
     main: `${root}characters/mutbyeol/main.webp`,
     token: `${root}characters/mutbyeol/token.webp`,
     portrait: `${root}characters/mutbyeol/portrait.webp`,
+    skillActive: `${root}characters/mutbyeol/skill-active.webp`,
+    skillPassive: `${root}characters/mutbyeol/skill-passive.webp`,
+    potential: `${root}characters/mutbyeol/potential.webp`,
     poses: {
       idle: `${root}characters/mutbyeol/battle-idle.webp`,
       attack: `${root}characters/mutbyeol/battle-attack.webp`,

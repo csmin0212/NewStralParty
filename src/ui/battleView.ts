@@ -1,5 +1,8 @@
+import { CARDS } from '../data/cards';
+import { cardBlocker } from '../engine/cards';
 import { evadeDice } from '../engine/skills';
 import type { AttackResult, Battle, BattleEvent, CharacterId, DefenseMode, GameState } from '../engine/types';
+import { cardFace } from './cardView';
 import { esc } from './html';
 import {
   BATTLE_ART,
@@ -14,7 +17,8 @@ import {
 
 export type BattleChoice =
   | { type: 'ENCOUNTER'; choice: 'attack' | 'release' }
-  | { type: 'DEFEND'; mode: DefenseMode };
+  | { type: 'DEFEND'; mode: DefenseMode }
+  | { type: 'PLAY_CARD'; handIndex: number };
 
 type Side = 'player' | 'enemy';
 
@@ -56,6 +60,8 @@ export class BattleView {
     root.append(this.el);
 
     this.el.onclick = (e) => {
+      const cardBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-card]');
+      if (cardBtn && !cardBtn.disabled) return this.onChoice({ type: 'PLAY_CARD', handIndex: Number(cardBtn.dataset.card) });
       const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-choice]');
       if (!btn || btn.disabled) return;
       const choice = btn.dataset.choice!;
@@ -162,23 +168,33 @@ export class BattleView {
     const phase = state.phase;
 
     if (phase.kind === 'encounter') {
-      const enemy = state.enemies.find((e) => e.id === phase.enemy)!;
       this.choices.innerHTML = `
         <button class="rbtn rbtn--blue" data-choice="release"><b>놓아주기</b><small>LET GO</small></button>
-        <button class="rbtn rbtn--green" data-choice="attack" data-primary><b>ATTACK</b><small>d6 + ${p.atk}</small></button>
-        <p class="choice-hint">${enemy.counter ? '살아남으면 <em>반격</em>해 와요' : '반격하지 않아요'} · <kbd>Space</kbd> 공격</p>`;
+        <button class="rbtn rbtn--green" data-choice="attack" data-primary><b>ATTACK</b><small>d6 + ${p.atk}</small></button>`;
     } else if (phase.kind === 'defend') {
       this.showArena();
-      this.message(`${this.battle.enemy.name}의 반격이 온다!`);
+      this.message(`${this.battle.enemy.name} 반격`);
       const dice = evadeDice(p);
       this.choices.innerHTML = `
         <button class="rbtn rbtn--blue" data-choice="block"><b>방어</b><small>d6 + ${p.def}</small></button>
-        <button class="rbtn rbtn--pink${dice > 1 ? ' boosted' : ''}" data-choice="evade"><b>회피</b><small>${dice > 1 ? `d6 ×${dice} 높은 눈` : 'd6'}</small></button>
-        <p class="choice-hint">방어: 피해 = 공격값 − (방어력 + 주사위), 최소 1 · 회피: 상대 주사위 눈보다 크면 0, 아니면 전부${dice > 1 ? ' · <em>피할만 한데?</em> 주사위 2개' : ''}</p>`;
+        <button class="rbtn rbtn--pink${dice > 1 ? ' boosted' : ''}" data-choice="evade"><b>회피</b><small>${dice > 1 ? `d6 ×${dice}` : 'd6'}</small></button>`;
     } else {
       this.choices.innerHTML = '';
     }
-    this.choices.querySelectorAll('button').forEach((b) => (b.disabled = busy));
+    // 이번 장면에 쓸 수 있는 전투 카드 (공격 카드 / 반격 카드)
+    if (phase.kind === 'encounter' || phase.kind === 'defend') {
+      const timing = phase.kind === 'encounter' ? 'attack' : 'defend';
+      const cards = p.hand
+        .map((h, i) => ({ h, i }))
+        .filter(({ h }) => CARDS[h.card].type === 'battle' && CARDS[h.card].timing === timing)
+        .map(({ h, i }) => {
+          const blocker = cardBlocker(state, p, h);
+          return `<button class="battle-card" data-card="${i}" title="${blocker ?? ''}" ${blocker ? 'disabled' : ''}>${cardFace(h.card)}</button>`;
+        })
+        .join('');
+      if (cards) this.choices.insertAdjacentHTML('afterbegin', `<div class="battle-cards">${cards}</div>`);
+    }
+    this.choices.querySelectorAll('button').forEach((b) => (b.disabled ||= busy));
   }
 
   // ───────── 연출 ─────────
@@ -200,7 +216,7 @@ export class BattleView {
           this.pose(defender, 'dodge');
           this.burst(defender, 'smoke');
           this.pop(defender, 'MISS', 'miss');
-          this.message('회피 성공! 피해 0');
+          this.message('회피 성공');
         } else {
           // 막았으면 방어 자세로 버틴다
           this.pose(defender, r.mode === 'block' ? 'block' : 'hit');
@@ -220,12 +236,12 @@ export class BattleView {
         break;
       case 'playerKO':
         this.pose('player', 'down');
-        this.message('쓰러졌다… 진행도 +1');
+        this.message('K.O. · 진행도 +1');
         await sleep(1200);
         break;
       case 'skill':
         this.skillFlash(event.name);
-        this.message(event.damage ? `${event.name} — ${enemyName}에게 ${event.damage} 피해!` : `${event.name}`);
+        this.message(event.damage ? `${event.name} · ${event.damage} 피해` : event.name);
         if (event.damage) {
           await sleep(250);
           this.pose('player', 'lunge');
@@ -236,8 +252,29 @@ export class BattleView {
         }
         await sleep(event.damage ? 1000 : 800);
         break;
+      case 'card': {
+        const name = CARDS[event.card].name;
+        this.skillFlash(name, 'CARD');
+        this.message(event.damage ? `${name} · ${event.damage} 피해` : name);
+        if (event.damage) {
+          await sleep(250);
+          this.pose('enemy', 'hit');
+          this.burst('enemy', 'impact');
+          this.pop('enemy', `-${event.damage}`, 'dmg');
+          if (event.targetHp !== undefined) this.setHp('enemy', event.targetHp, record.enemy.maxHp);
+        }
+        await sleep(event.damage ? 1000 : 700);
+        break;
+      }
+      case 'escape':
+        this.burst('player', 'smoke');
+        this.pose('player', 'dodge');
+        this.message('이탈');
+        this.el.classList.add('leaving');
+        await sleep(700);
+        break;
       case 'release':
-        this.message('놓아주고 지나간다');
+        this.message('놓아주기');
         this.el.classList.add('leaving');
         await sleep(700);
         break;
@@ -340,12 +377,12 @@ export class BattleView {
   }
 
   /** 스킬이 발동하면 플레이어 쪽에 스킬 이름 띠가 번쩍인다 */
-  private skillFlash(name: string) {
+  private skillFlash(name: string, label = 'SKILL') {
     const unit = this.unit('player');
     unit.querySelector('.skill-flash')?.remove();
     const el = document.createElement('div');
     el.className = 'skill-flash';
-    el.innerHTML = `<small>SKILL</small><b>${esc(name)}</b>`;
+    el.innerHTML = `<small>${label}</small><b>${esc(name)}</b>`;
     unit.append(el);
     setTimeout(() => el.remove(), 1600);
   }

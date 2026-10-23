@@ -2,9 +2,11 @@ import { DEFAULT_BOARD } from '../data/board';
 import { PLACEHOLDER_BOSS } from '../data/bosses';
 import { applyAction, createGame, RuleError, type PlayerSetup } from '../engine/game';
 import type { Action, GameState } from '../engine/types';
+import { CARDS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
 import { CHARACTER_ART } from './assets';
 import { BattleView } from './battleView';
+import { cardFace } from './cardView';
 import { BoardView } from './boardView';
 import { FxLayer } from './fx';
 import { deltaEvents, resultEvents, turnEvents, type FxEvent } from './fxEvents';
@@ -25,6 +27,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   });
   let busy = false;
   let logOpen = false;
+  let deckOpen = false;
   const cleanup = new AbortController();
 
   root.innerHTML = `<div class="game"><main class="board-area"></main><div class="hud"></div></div>`;
@@ -70,7 +73,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
         await fx.play({
           kind: 'turn',
           text: p!.name,
-          sub: `${s.round}라운드 · 지금 차례`,
+          sub: `ROUND ${String(s.round).padStart(2, '0')}`,
           color: p!.color,
           face: { label: String(ev.player + 1), image: CHARACTER_ART[p!.character].portrait },
         });
@@ -91,13 +94,13 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
         await fx.play({ kind: 'levelup', text: 'LEVEL UP!', sub: `${p!.name} · ${CHARACTERS[p!.character].name} ${ev.level}성` });
         break;
       case 'ko':
-        await fx.play({ kind: 'ko', text: 'K.O.', sub: `${p!.name} · 다음 라운드는 쉰다 · 진행도 +1` });
+        await fx.play({ kind: 'ko', text: 'K.O.', sub: `${p!.name} · 진행도 +1` });
         break;
       case 'gameOver':
         await fx.play(
           ev.result === 'victory'
-            ? { kind: 'victory', text: 'VICTORY', sub: `${s.boss.name} 처치 · 모두의 승리` }
-            : { kind: 'defeat', text: 'DEFEATED', sub: '진행도가 다 찼다…' },
+            ? { kind: 'victory', text: 'VICTORY', sub: `${s.boss.name} 처치` }
+            : { kind: 'defeat', text: 'DEFEATED', sub: `진행도 ${s.progress} / ${s.boss.defeatAt}` },
         );
         break;
       case 'coins':
@@ -134,7 +137,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   let shownState = state;
   const draw = (s: GameState, isBusy: boolean) => {
     shownState = s;
-    renderHud(hud, s, isBusy, logOpen, handlers);
+    renderHud(hud, s, isBusy, logOpen, deckOpen, handlers);
   };
 
   const handlers: HudHandlers = {
@@ -142,6 +145,10 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     newGame() {
       cleanup.abort();
       onExit();
+    },
+    toggleDeck() {
+      deckOpen = !deckOpen;
+      draw(shownState, busy);
     },
     toggleLog() {
       logOpen = !logOpen;
@@ -169,6 +176,11 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     battle.renderChoices(state, true);
     if (action.type === 'ROLL') board.showDice(state.turn.dice, state.turn.extraSteps);
     if (action.type === 'USE_SKILL') await present(state, { type: 'skill', player: action.player });
+    // 주사위 전 카드는 가운데에 크게 보여 준다 (전투 카드는 전투 화면에서)
+    const played = state.lastCard;
+    if (played && played.seq !== prev.lastCard?.seq && CARDS[played.card].type !== 'battle') {
+      await fx.play({ kind: 'card', text: CARDS[played.card].name, html: cardFace(played.card) });
+    }
 
     // 연출 순서: 진행 중이던 전투 마무리 → 말 이동 → 숫자 · 레벨업 · KO → 기믹 알림
     //          → 승패 → 라운드 · 차례 컷인 → 새로 만난 에너미와 전투 시작
@@ -193,8 +205,8 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     if (state.phase.kind === 'gameOver') {
       board.showMessage(
         state.phase.result === 'victory'
-          ? `<div>🎉</div>${esc(state.boss.name)} 처치!<small>모두의 승리</small>`
-          : `<div>💫</div>진행도가 다 찼다…<small>패배</small>`,
+          ? `<div>🎉</div>VICTORY<small>${esc(state.boss.name)} 처치</small>`
+          : `<div>💫</div>DEFEATED<small>진행도 ${state.progress} / ${state.boss.defeatAt}</small>`,
       );
     }
   }

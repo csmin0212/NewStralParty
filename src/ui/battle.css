@@ -639,23 +639,6 @@
 .battle.scene-encounter .battle-choices {
   bottom: 40px;
 }
-.choice-hint {
-  grid-column: 1 / -1;
-  margin: 0;
-  padding: 4px 14px;
-  border-radius: 999px;
-  background: rgba(5, 7, 15, 0.6);
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.choice-hint em {
-  font-style: normal;
-  color: #ff8fa8;
-}
-.choice-hint kbd {
-  background: rgba(255, 255, 255, 0.2);
-}
 .battle-choices .rbtn {
   animation: rbtn-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
@@ -727,10 +710,5 @@
   }
   .battle-choices {
     gap: 10px 26px;
-  }
-  .choice-hint {
-    font-size: 11px;
-    white-space: normal;
-    text-align: center;
   }
 }

@@ -13,6 +13,8 @@ export interface Fighter {
  * - 회피: 내 주사위 > 상대 공격 주사위(공격력 빼고 눈만)이면 피해 0, 아니면 공격값 그대로
  *   예) 공격력 2 + 주사위 3 → 4 · 5 · 6이 나오면 회피 성공
  * evadeDice: 회피할 때 굴릴 주사위 수. 여러 개면 가장 높은 눈을 쓴다 (뭇별 액티브)
+ * opts.attackDice: 공격 주사위 수, 높은 눈을 쓴다 (급소 노리기)
+ * opts.pierce: 방어 · 회피 판정 없이 공격값 그대로 피해 (관통탄)
  */
 export function resolveAttack(
   attacker: Fighter,
@@ -20,9 +22,14 @@ export function resolveAttack(
   mode: DefenseMode,
   rng: Rng,
   evadeDice = 1,
+  opts: { attackDice?: number; pierce?: boolean } = {},
 ): AttackResult {
-  const attackRoll = rng.d6();
+  const attackRoll = Math.max(...Array.from({ length: Math.max(1, opts.attackDice ?? 1) }, () => rng.d6()));
   const attackValue = attackRoll + attacker.atk;
+
+  if (opts.pierce) {
+    return { mode, attackRoll, attackValue, defenseRoll: 0, defenseRolls: [], defenseValue: 0, damage: attackValue };
+  }
 
   if (mode === 'block') {
     const defenseRoll = rng.d6();

@@ -1,21 +1,26 @@
 import { CHARACTER_IDS, CHARACTERS } from '../data/characters';
 import type { PlayerSetup } from '../engine/game';
 import type { CharacterId } from '../engine/types';
-import { CHARACTER_ART, UI_ART } from './assets';
+import { CHARACTER_ART, LOBBY_ART, UI_ART } from './assets';
+import { loadPresets } from './deckStore';
 import { esc, PLAYER_COLORS } from './html';
 
 interface Seat {
   name: string;
   character: CharacterId;
   potential: boolean;
+  /** 덱 프리셋 번호 */
+  deck: number;
 }
 
-export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[]) => void) {
+export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[]) => void, onBack: () => void) {
   let count = 4;
+  const presets = loadPresets();
   const seats: Seat[] = PLAYER_COLORS.map((_, i) => ({
     name: `플레이어 ${i + 1}`,
     character: CHARACTER_IDS[0],
     potential: false,
+    deck: 0,
   }));
 
   const seatRow = (seat: Seat, i: number) => {
@@ -31,6 +36,7 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
         <span class="dot"></span>
         <input data-name="${i}" maxlength="10" value="${esc(seat.name)}" />
         ${pick}
+        <button class="seat-deck" data-deck="${i}" title="덱 바꾸기">${esc(presets[seat.deck].name)}</button>
         <label class="seat-potential" title="${esc(c.potential.description)}">
           <input type="checkbox" data-potential="${i}" ${seat.potential ? 'checked' : ''} />
           <span>잠재 능력</span>
@@ -40,9 +46,12 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
 
   const render = () => {
     root.innerHTML = `
+      <div class="setup-screen">
+      <img class="chars-bg" src="${LOBBY_ART.background}" alt="" draggable="false">
+      <div class="stage">
+      <button class="ba-back" data-back title="로비로"><i></i></button>
       <div class="setup">
         <h1><img class="game-logo" src="${UI_ART.logo}" alt="NewParty"></h1>
-        <p class="subtitle">한 화면에서 돌아가며 하는 핫시트 모드</p>
         <div class="count">
           ${[2, 3, 4]
             .map((n) => `<button data-count="${n}" class="${n === count ? 'selected' : ''}">${n}명</button>`)
@@ -50,6 +59,8 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
         </div>
         <ol class="names">${seats.slice(0, count).map(seatRow).join('')}</ol>
         <button class="primary start">게임 시작</button>
+      </div>
+      </div>
       </div>`;
   };
 
@@ -57,8 +68,17 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
     const target = e.target as HTMLElement;
     const countBtn = target.closest<HTMLElement>('[data-count]');
     const cycle = target.closest<HTMLElement>('[data-cycle]');
-    if (countBtn) {
+    const deckBtn = target.closest<HTMLElement>('[data-deck]');
+    if (target.closest('[data-back]')) {
+      root.onclick = null;
+      root.oninput = null;
+      onBack();
+    } else if (countBtn) {
       count = Number(countBtn.dataset.count);
+      render();
+    } else if (deckBtn) {
+      const seat = seats[Number(deckBtn.dataset.deck)];
+      seat.deck = (seat.deck + 1) % presets.length;
       render();
     } else if (cycle) {
       const seat = seats[Number(cycle.dataset.cycle)];
@@ -73,6 +93,7 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
           color: PLAYER_COLORS[i],
           character: seat.character,
           potential: seat.potential,
+          deck: presets[seat.deck].cards,
         })),
       );
     }

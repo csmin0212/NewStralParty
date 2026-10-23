@@ -4,6 +4,8 @@ export interface StatGrowth {
   maxHp?: number;
   atk?: number;
   def?: number;
+  /** 이동거리: 주사위를 굴릴 때마다 더 가는 칸 수 */
+  move?: number;
 }
 
 export interface SkillText {
@@ -37,10 +39,10 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     name: '뭇별',
     color: '#8EDBD9',
     hp: 9,
-    atk: 1,
+    atk: 2,
     def: 0,
-    startCoins: 9,
-    stars: [{ maxHp: 2 }, { maxHp: 1, atk: 1 }, { maxHp: 1, atk: 1 }],
+    startCoins: 12,
+    stars: [{ maxHp: 1, atk: 1, move: 1 }, { atk: 2 }, { atk: 2, move: 1 }],
     active: {
       name: '피할만 한데?',
       cooldown: 4,
