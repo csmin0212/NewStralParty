@@ -5,6 +5,7 @@ import type { Action, GameState, Player } from '../engine/types';
 import { tileLabel } from './boardView';
 import { campusVector } from './campusMap';
 import { esc } from './html';
+import { CARD_ART, UI_ART } from './assets';
 
 export interface HudHandlers {
   dispatch(action: Action): void;
@@ -113,9 +114,11 @@ function progressTrack(state: GameState): string {
     </div>`;
 }
 
-function stars(level: number): string {
+/** 레벨: 코인 아이콘이 별 모양이라, 헷갈리지 않게 별 대신 Lv 배지 + 칸(pip)으로 표시한다 */
+function levelBadge(level: number): string {
   const max = Math.max(...Object.keys(RULES.levelUpCost).map(Number)) + 1;
-  return Array.from({ length: max }, (_, i) => `<i class="${i < level ? 'on' : ''}">★</i>`).join('');
+  const pips = Array.from({ length: max }, (_, i) => `<i class="${i < level ? 'on' : ''}"></i>`).join('');
+  return `<span class="lv-badge" title="레벨 ${level} / ${max}">Lv.<b>${level}</b><span class="pips">${pips}</span></span>`;
 }
 
 function playerCard(state: GameState, p: Player): string {
@@ -124,13 +127,13 @@ function playerCard(state: GameState, p: Player): string {
   return `
     <li class="${cls}" style="--c:${p.color}">
       <div class="pc-avatar"><span>${p.id + 1}</span></div>
-      <div class="pc-hp"><b>${p.hp}</b>/${p.maxHp}</div>
+      <div class="pc-hp"><img class="hp-icon" src="${UI_ART.heart}" alt="HP"><b>${p.hp}</b>/${p.maxHp}</div>
       <div class="pc-body">
         <div class="pc-name">${esc(p.name)}${p.ko ? ` <span class="ko-tag">KO · ${p.reviveRound}R 부활</span>` : ''}</div>
         <div class="pc-row">
-          <span class="coin">🪙 <b>${p.coins}</b>${cost !== undefined ? `<small>/${cost}</small>` : ''}</span>
-          <span class="stars">${stars(p.level)}</span>
-          <span class="hand-count" title="손패">🃏${p.hand.length}</span>
+          <span class="coin"><img class="ui-icon" src="${UI_ART.coin}" alt="코인"> <b>${p.coins}</b>${cost !== undefined ? `<small>/${cost}</small>` : ''}</span>
+          ${levelBadge(p.level)}
+          <span class="hand-count" title="손패"><img class="card-back-icon" src="${UI_ART.cardBack}" alt="손패">${p.hand.length}</span>
         </div>
       </div>
     </li>`;
@@ -163,7 +166,7 @@ function handCards(state: GameState): string {
           const c = CARDS[id];
           return `
             <button class="hand-card" data-card="${i}" ${usable ? '' : 'disabled'}>
-              <span class="hc-art">${c.icon}</span>
+              <span class="hc-art"><img src="${CARD_ART[id]}" alt="" draggable="false"></span>
               <span class="hc-name">${c.name}</span>
               <span class="hc-desc">${c.description}</span>
             </button>`;

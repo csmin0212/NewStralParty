@@ -1,5 +1,6 @@
 import type { PlayerSetup } from '../engine/game';
 import { esc, PLAYER_COLORS } from './html';
+import { UI_ART } from './assets';
 
 export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[]) => void) {
   let count = 4;
@@ -8,7 +9,7 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
   const render = () => {
     root.innerHTML = `
       <div class="setup">
-        <h1>NewParty</h1>
+        <h1><img class="game-logo" src="${UI_ART.logo}" alt="NewParty"></h1>
         <p class="subtitle">한 화면에서 돌아가며 하는 핫시트 모드</p>
         <div class="count">
           ${[2, 3, 4]

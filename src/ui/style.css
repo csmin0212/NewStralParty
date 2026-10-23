@@ -138,6 +138,41 @@ button.primary kbd {
 .setup h1::first-letter {
   color: var(--sky);
 }
+.game-logo {
+  display: block;
+  width: 100%;
+  height: 125px;
+  object-fit: contain;
+}
+.ui-icon {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+.hp-icon {
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+  vertical-align: baseline;
+  margin-right: 1px;
+}
+.card-back-icon {
+  width: 15px;
+  height: 21px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+.hc-art img {
+  display: block;
+  width: 74px;
+  height: 78px;
+  object-fit: contain;
+}
+@media (max-width: 900px) {
+  .hc-art img { width: 50px; height: 52px; }
+}
 .subtitle {
   color: var(--muted);
   margin: 4px 0 24px;
@@ -417,6 +452,17 @@ button.primary kbd {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
+}
+.enemy-art-clip {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
+}
+.enemy-delinquent .enemy-art {
+  transform: scale(2.4);
+  transform-origin: 50% 22%;
 }
 .enemy .ehp {
   position: absolute;
@@ -1156,15 +1202,37 @@ button.primary kbd {
 .coin small {
   color: var(--muted);
 }
-.stars {
-  letter-spacing: -1px;
+/* 레벨 배지: 하늘색 Lv + 칸. 코인(노란 별)과 색 · 모양이 겹치지 않게 */
+.lv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 6px;
+  border-radius: 999px;
+  background: var(--sky-pale);
+  border: 1px solid var(--sky-light);
+  font-size: 11px;
+  font-weight: 800;
+  font-style: italic;
+  color: var(--sky-deep);
 }
-.stars i {
-  font-style: normal;
-  color: var(--border);
+.lv-badge b {
+  font-size: 14px;
+  font-weight: 900;
 }
-.stars i.on {
-  color: #ffbf1f;
+.lv-badge .pips {
+  display: inline-flex;
+  gap: 2px;
+}
+.lv-badge .pips i {
+  width: 6px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--border);
+  transform: skewX(-12deg);
+}
+.lv-badge .pips i.on {
+  background: var(--sky);
 }
 .hand-count {
   margin-left: auto;
@@ -1541,7 +1609,18 @@ button.primary kbd {
   .coin b {
     font-size: 12px;
   }
-  .stars,
+  .pc-row .ui-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .pc-row {
+    column-gap: 3px;
+  }
+  .lv-badge {
+    padding: 0 5px;
+  }
+  .coin small,
+  .lv-badge .pips,
   .hand-count,
   .ko-tag {
     display: none;

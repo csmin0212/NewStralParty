@@ -83,8 +83,8 @@ isolated on a plain solid #00FF00 green background, no ground shadow
 | 차수 | 무엇을 | 상태 |
 |---|---|---|
 | **1차** | 배경 1장, 칸 3종(본부 · 코인+ · 균열) | ✅ 들어옴 |
-| **2차** | 나머지 칸 5종, 에너미 3종(경비 로봇 · 정찰 드론 · 불량배) 기본 그림 | ⬅ 지금 |
-| 3차 | 에너미 전투 포즈, UI 아이콘, 아이템, 로고 | 패널 · 시작 화면 · 전투 연출 |
+| **2차** | 나머지 칸 5종, 에너미 3종(경비 로봇 · 정찰 드론 · 불량배) 기본 그림 | ✅ 제작·적용 |
+| 3차 | 에너미 전투 포즈, UI 아이콘, 아이템, 로고 | ✅ 제작·적용 |
 | 캐릭터 때 | 캐릭터 메인 일러스트, 보드 말, 전투 포즈 | 캐릭터 시스템을 만들 때 |
 | 이후 | 보스, 에너미 추가, 유물 아이콘 | 보스 · 유물 시스템 |
 
@@ -164,11 +164,11 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 | `tiles/base.png` | 본부 | 작은 하이테크 본부 건물과 깃발. **다른 칸보다 눈에 띄게** | ✅ |
 | `tiles/coin-plus.png` | 코인+ | 별 모양 코인 더미 | ✅ |
 | `tiles/spawn.png` | 균열 (에너미가 나타나는 곳) | 보라색 소용돌이 구멍. 위에 에너미가 올라서므로 **가운데는 단순하게** | ✅ |
-| `tiles/coin-minus.png` | 코인- | 쓰러진 자판기 | |
-| `tiles/card.png` | 아이템 | 보급 상자 | |
-| `tiles/heal.png` | 회복 | 응급 키트 | |
-| `tiles/warp.png` | 워프 | 전송 게이트 | |
-| `tiles/empty.png` | 빈 칸 | 아무것도 없는 발판 | |
+| `tiles/coin-minus.png` | 코인- | 쓰러진 자판기 | ✅ |
+| `tiles/card.png` | 아이템 | 보급 상자 | ✅ |
+| `tiles/heal.png` | 회복 | 응급 키트 | ✅ |
+| `tiles/warp.png` | 워프 | 전송 게이트 | ✅ |
+| `tiles/empty.png` | 빈 칸 | 아무것도 없는 발판 | ✅ |
 
 - 크기 **512×512**, **투명 PNG**.
 - **발판 모양 · 두께 · 테두리는 모든 칸이 같게**, 윗면 소품만 다르게 한다. 1차 칸 3종이 기준이다.
@@ -260,10 +260,14 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 | 스타일 가이드 확정 | ✅ |
 | **1차** 배경 | ✅ |
 | **1차** 칸 — base / coin-plus / spawn | ✅ ✅ ✅ |
-| **2차** 칸 — coin-minus / card / heal / warp / empty | ☐ ☐ ☐ ☐ ☐ |
-| **2차** 에너미 — robot / drone / delinquent idle | ☐ ☐ ☐ |
-| 3차 에너미 포즈 — delinquent attack / hit, drone evade, robot hit | ☐ ☐ ☐ ☐ |
-| 3차 UI — coin / heart / star / card-back / logo | ☐ ☐ ☐ ☐ ☐ |
-| 3차 아이템 — dash / double-dice / bandage | ☐ ☐ ☐ |
+| **2차** 칸 — coin-minus / card / heal / warp / empty | ✅ ✅ ✅ ✅ ✅ |
+| **2차** 에너미 — robot / drone / delinquent idle | ✅ ✅ ✅ |
+| 3차 에너미 포즈 — delinquent attack / hit, drone evade, robot hit | ✅ ✅ ✅ ✅ |
+| 추가 에너미 포즈 — drone hit | ✅ |
+| 3차 UI — coin / heart / star / card-back / logo | ✅ ✅ ✅ ✅ ✅ |
+| 3차 아이템 — dash / double-dice / bandage | ✅ ✅ ✅ |
+| 선택용 길 — board/path | ✅ (현재 맵은 SVG 보행로 사용) |
 | 캐릭터 1~4 — main / token / portrait | ☐ ☐ ☐ ☐ |
 | 캐릭터 1~4 — 전투 포즈 (idle / attack / hit / block / evade) | ☐ ☐ ☐ ☐ |
+
+2026-10-23: 사용자 요청에 따라 캐릭터와 보스를 제외한 남은 22종을 제작했습니다. 원본 PNG·프롬프트·검증 기록은 `assets-raw/remaining-assets/`, 게임용 WebP는 `public/assets/`에 있습니다. 전체 목록은 `public/assets/gallery.html`에서 볼 수 있습니다. 전투 포즈 5종은 전투 이벤트에 연결했고, 아이템·UI·로고도 해당 화면에 적용했습니다.

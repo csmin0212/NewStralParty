@@ -1,6 +1,6 @@
 import type { AttackResult, Battle, BattleEvent, DefenseMode, GameState } from '../engine/types';
 import { esc } from './html';
-import { ENEMY_ART } from './assets';
+import { ENEMY_ART, ENEMY_POSES, type EnemyPose } from './assets';
 
 export type BattleChoice =
   | { type: 'ENCOUNTER'; choice: 'attack' | 'release' }
@@ -24,6 +24,7 @@ export class BattleView {
   private shown = 0;
   private lastSeq = 0;
   private playerMaxHp = 1;
+  private enemyPoseTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(root: HTMLElement) {
     this.el = document.createElement('div');
@@ -67,6 +68,9 @@ export class BattleView {
     const p = state.players[record.player];
     const e = record.enemy;
     const enemyArt = ENEMY_ART[e.kind];
+    for (const src of Object.values(ENEMY_POSES[e.kind] ?? {})) {
+      if (src) new Image().src = src;
+    }
     this.playerMaxHp = p.maxHp;
 
     this.el.innerHTML = `
@@ -223,6 +227,16 @@ export class BattleView {
     f.classList.remove('lunge', 'hit', 'dodge');
     void f.offsetWidth; // 같은 애니메이션 다시 재생
     f.classList.add(pose);
+    if (side === 'enemy' && this.battle) {
+      clearTimeout(this.enemyPoseTimer);
+      const art = ENEMY_POSES[this.battle.enemy.kind];
+      const image = f.querySelector<HTMLImageElement>('.enemy-art');
+      const key: EnemyPose = pose === 'lunge' ? 'attack' : pose === 'dodge' ? 'evade' : pose === 'hit' ? 'hit' : 'idle';
+      if (image && art?.idle) {
+        image.src = art[key] ?? art.idle;
+        if (pose !== 'down') this.enemyPoseTimer = setTimeout(() => { image.src = art.idle!; }, 750);
+      }
+    }
   }
 
   private pop(side: Side, text: string, kind: 'dmg' | 'miss') {
@@ -246,6 +260,7 @@ export class BattleView {
   }
 
   private close() {
+    clearTimeout(this.enemyPoseTimer);
     this.el.classList.remove('open');
     this.battle = null;
   }

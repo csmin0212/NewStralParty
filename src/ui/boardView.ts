@@ -117,9 +117,9 @@ export class BoardView {
       let el = this.enemyEls.get(enemy.id);
       if (!el) {
         el = document.createElement('div');
-        el.className = `enemy${enemy.isBoss ? ' boss' : ''}`;
+        el.className = `enemy enemy-${enemy.kind}${enemy.isBoss ? ' boss' : ''}`;
         const art = ENEMY_ART[enemy.kind];
-        el.innerHTML = `${art ? `<img class="enemy-art" src="${art}" alt="" draggable="false">` : `<span class="face">${enemy.icon}</span>`}<i class="ehp"><b></b></i>`;
+        el.innerHTML = `${art ? `<span class="enemy-art-clip"><img class="enemy-art" src="${art}" alt="" draggable="false"></span>` : `<span class="face">${enemy.icon}</span>`}<i class="ehp"><b></b></i>`;
         this.el.append(el);
         this.enemyEls.set(enemy.id, el);
       }
