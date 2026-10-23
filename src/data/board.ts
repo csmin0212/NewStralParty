@@ -53,13 +53,10 @@ export const DEFAULT_BOARD: Board = {
     { id: 20, kind: 'card', x: 0, y: 2, next: [21] },
     { id: 21, kind: 'coinMinus', x: 0, y: 1, next: [0] },
     { id: 22, kind: 'spawn', x: 3, y: 1, next: [23] },
-    { id: 23, kind: 'coinPlus', x: 3, y: 2, next: [24] },
+    { id: 23, kind: 'empty', x: 3, y: 2, next: [24] },
     { id: 24, kind: 'spawn', x: 3, y: 3, next: [15] },
   ],
-  enemySpawns: [
-    { tile: 10, enemy: 'goblin' },
-    { tile: 17, enemy: 'slime' },
-    { tile: 22, enemy: 'bat' },
-    { tile: 24, enemy: 'goblin' },
-  ],
+  spawnTiles: [10, 17, 22, 24],
+  // 지름길 한가운데. 보스가 길을 막고 서 있다
+  bossTile: 23,
 };

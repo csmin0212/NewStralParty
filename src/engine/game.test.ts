@@ -1,23 +1,70 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BOARD } from '../data/board';
+import { PLACEHOLDER_BOSS } from '../data/bosses';
+import { ENEMIES } from '../data/enemies';
 import { applyAction, createGame, RuleError, validateBoard } from './game';
 import { RULES } from './rules';
-import type { Board, EnemySpawn, GameState, TileKind } from './types';
+import type { Board, BossDef, EnemyKind, GameState, Gimmick, TileKind } from './types';
 
-/** 0번 본부 + 나머지 칸이 한 바퀴로 이어진 보드 */
-function ring(kinds: TileKind[], enemySpawns: EnemySpawn[] = []): Board {
+/** 기믹 없는 테스트용 보스 */
+const TEST_BOSS: BossDef = {
+  name: '테스트 보스',
+  icon: 'B',
+  hpPerPlayer: 5,
+  atk: 1,
+  def: 0,
+  eva: 0,
+  counter: false,
+  defense: 'block',
+  defeatAt: 99,
+  timeline: [],
+};
+
+const withTimeline = (timeline: Gimmick[], patch: Partial<BossDef> = {}): BossDef => ({
+  ...TEST_BOSS,
+  ...patch,
+  timeline,
+});
+
+/** 0번 본부 + 나머지 칸이 한 바퀴로 이어진 보드. 보스 칸은 기본으로 마지막 칸 */
+function ring(kinds: TileKind[], opts: { spawnTiles?: number[]; bossTile?: number } = {}): Board {
   const all: TileKind[] = ['base', ...kinds];
   return {
     name: 'test',
     baseTile: 0,
     tiles: all.map((kind, id) => ({ id, kind, x: id, y: 0, next: [(id + 1) % all.length] })),
-    enemySpawns,
+    spawnTiles: opts.spawnTiles ?? [],
+    bossTile: opts.bossTile ?? all.length - 1,
   };
 }
 
-function newGame(board: Board, players = 2, seed = 42): GameState {
+function newGame(board: Board, opts: { players?: number; seed?: number; boss?: BossDef } = {}): GameState {
+  const { players = 2, seed = 42, boss = TEST_BOSS } = opts;
   const setups = Array.from({ length: players }, (_, i) => ({ name: `P${i + 1}`, color: '#fff' }));
-  return createGame({ board, players: setups, seed });
+  return createGame({ board, boss, players: setups, seed });
+}
+
+/** 에너미를 원하는 칸에 바로 놓는다 */
+function withEnemy(state: GameState, kind: EnemyKind, tile: number): GameState {
+  const s = structuredClone(state);
+  const info = ENEMIES[kind];
+  s.enemies.push({
+    id: s.nextEnemyId++,
+    kind,
+    name: info.name,
+    icon: info.icon,
+    isBoss: false,
+    tile,
+    hp: info.hp,
+    maxHp: info.hp,
+    atk: info.atk,
+    def: info.def,
+    eva: info.eva,
+    counter: info.counter,
+    defense: info.defense,
+    reward: info.reward,
+  });
+  return s;
 }
 
 /** 주사위 없이 정확히 steps칸 이동시킨다 */
@@ -32,14 +79,20 @@ function finishTurn(state: GameState): GameState {
   return applyAction(rollExactly(state, 1), { type: 'END_TURN', player: state.current });
 }
 
+const attack = (s: GameState) => applyAction(s, { type: 'ENCOUNTER', player: s.current, choice: 'attack' });
+const release = (s: GameState) => applyAction(s, { type: 'ENCOUNTER', player: s.current, choice: 'release' });
+const defend = (s: GameState, mode: 'block' | 'evade') => applyAction(s, { type: 'DEFEND', player: s.current, mode });
+
+const empties = (n: number): TileKind[] => Array(n).fill('empty');
+
 describe('createGame', () => {
-  it('모두 본부에서 시작하고 첫 플레이어는 턴 수입을 받는다', () => {
-    const s = newGame(ring(Array(5).fill('empty')), 3);
+  it('모두 본부에서 시작하고, 첫 플레이어는 턴 수입을 받고, 진행도 1에서 시작한다', () => {
+    const s = newGame(ring(empties(5)), { players: 3 });
     expect(s.players.map((p) => p.tile)).toEqual([0, 0, 0]);
     expect(s.players[0].coins).toBe(RULES.startCoins + RULES.turnIncome);
     expect(s.players[1].coins).toBe(RULES.startCoins);
     expect(s.phase).toEqual({ kind: 'preRoll' });
-    expect(s.round).toBe(1);
+    expect([s.round, s.progress]).toEqual([1, 1]);
   });
 
   it('잘못된 보드는 거부한다', () => {
@@ -48,23 +101,26 @@ describe('createGame', () => {
     expect(validateBoard(bad)).not.toEqual([]);
     expect(() => newGame(bad)).toThrow(RuleError);
 
-    const badSpawn = ring(['empty'], [{ tile: 7, enemy: 'slime' }]);
-    expect(validateBoard(badSpawn)).not.toEqual([]);
-  });
-
-  it('스폰 지점마다 에너미가 하나씩 나온다', () => {
-    const s = newGame(ring(['spawn', 'spawn'], [{ tile: 1, enemy: 'slime' }, { tile: 2, enemy: 'goblin' }]));
-    expect(s.enemies.map((e) => [e.tile, e.kind])).toEqual([[1, 'slime'], [2, 'goblin']]);
+    expect(validateBoard(ring(['empty'], { bossTile: 0 }))).not.toEqual([]);
+    expect(validateBoard(ring(['empty'], { spawnTiles: [7] }))).not.toEqual([]);
   });
 
   it('기본 보드는 올바르다', () => {
     expect(validateBoard(DEFAULT_BOARD)).toEqual([]);
   });
+
+  it('진행도 1의 기믹은 시작하자마자 발동한다', () => {
+    const boss = withTimeline([{ at: 1, actions: [{ type: 'summon', enemies: ['slime', 'goblin'] }] }]);
+    const s = newGame(ring(empties(6), { spawnTiles: [2, 4] }), { boss });
+    expect(s.enemies.map((e) => e.kind).sort()).toEqual(['goblin', 'slime']);
+    expect(s.enemies.map((e) => e.tile).sort()).toEqual([2, 4]);
+    expect(s.notices).toHaveLength(1);
+  });
 });
 
 describe('주사위와 이동', () => {
   it('주사위 눈만큼 이동하고 턴 종료 단계로 간다', () => {
-    const s0 = newGame(ring(Array(12).fill('empty')));
+    const s0 = newGame(ring(empties(12)));
     const s1 = applyAction(s0, { type: 'ROLL', player: 0 });
     const roll = s1.turn.dice[0];
     expect(roll).toBeGreaterThanOrEqual(1);
@@ -75,7 +131,7 @@ describe('주사위와 이동', () => {
   });
 
   it('입력 state를 바꾸지 않는다', () => {
-    const s0 = newGame(ring(Array(12).fill('empty')));
+    const s0 = newGame(ring(empties(12)));
     const before = JSON.stringify(s0);
     applyAction(s0, { type: 'ROLL', player: 0 });
     expect(JSON.stringify(s0)).toBe(before);
@@ -83,8 +139,8 @@ describe('주사위와 이동', () => {
 
   it('같은 시드 + 같은 행동이면 결과가 같다', () => {
     const play = () => {
-      let s = newGame(DEFAULT_BOARD, 2, 7);
-      for (let i = 0; i < 20 && s.phase.kind !== 'gameOver'; i++) {
+      let s = newGame(DEFAULT_BOARD, { seed: 7, boss: PLACEHOLDER_BOSS });
+      for (let i = 0; i < 60 && s.phase.kind !== 'gameOver'; i++) {
         const player = s.current;
         if (s.phase.kind === 'preRoll') s = applyAction(s, { type: 'ROLL', player });
         else if (s.phase.kind === 'choosePath')
@@ -99,22 +155,22 @@ describe('주사위와 이동', () => {
   });
 
   it('차례가 아닌 플레이어나 잘못된 단계의 행동은 거부한다', () => {
-    const s0 = newGame(ring(Array(12).fill('empty')));
+    const s0 = newGame(ring(empties(12)));
     expect(() => applyAction(s0, { type: 'ROLL', player: 1 })).toThrow(RuleError);
     expect(() => applyAction(s0, { type: 'END_TURN', player: 0 })).toThrow(RuleError);
     const s1 = applyAction(s0, { type: 'ROLL', player: 0 });
     expect(() => applyAction(s1, { type: 'ROLL', player: 0 })).toThrow(RuleError);
   });
 
-  it('턴을 넘기면 다음 플레이어가 수입을 받고, 한 바퀴 돌면 라운드가 오른다', () => {
-    let s = newGame(ring(Array(12).fill('empty')));
+  it('턴을 넘기면 다음 플레이어가 수입을 받고, 한 바퀴 돌면 라운드와 진행도가 오른다', () => {
+    let s = newGame(ring(empties(12)));
     s = finishTurn(s);
     expect(s.current).toBe(1);
     expect(s.players[1].coins).toBe(RULES.startCoins + RULES.turnIncome);
-    expect(s.round).toBe(1);
+    expect([s.round, s.progress]).toEqual([1, 1]);
     s = finishTurn(s);
     expect(s.current).toBe(0);
-    expect(s.round).toBe(2);
+    expect([s.round, s.progress]).toEqual([2, 2]);
   });
 
   it('갈림길에서 멈추고 고른 방향으로 남은 칸을 간다', () => {
@@ -127,7 +183,8 @@ describe('주사위와 이동', () => {
         { id: 2, kind: 'empty', x: 1, y: 1, next: [3] },
         { id: 3, kind: 'empty', x: 2, y: 0, next: [0] },
       ],
-      enemySpawns: [],
+      spawnTiles: [],
+      bossTile: 1,
     };
     const s1 = rollExactly(newGame(board), 2);
     expect(s1.phase).toEqual({ kind: 'choosePath', stepsLeft: 2, options: [1, 2] });
@@ -166,53 +223,44 @@ describe('본부와 레벨업', () => {
     expect(s.players[0].coins).toBe(19);
   });
 
-  it('레벨 3을 달성하면 그 자리에서 게임이 끝난다', () => {
+  it('레벨 3이 되어도 게임은 끝나지 않는다 (승리는 보스 처치)', () => {
     const s0 = newGame(ring(['empty', 'empty']));
     s0.players[0].level = 2;
     s0.players[0].coins = 40;
     const s = rollExactly(s0, 5);
-    expect(s.phase).toEqual({ kind: 'gameOver', winner: 0 });
     expect(s.players[0].level).toBe(3);
-    expect(s.players[0].tile).toBe(0);
-    expect(() => applyAction(s, { type: 'END_TURN', player: 0 })).toThrow(RuleError);
+    expect(s.phase).toEqual({ kind: 'endTurn' });
   });
 });
 
 describe('칸 효과', () => {
   it('코인+ / 코인- (0 아래로는 안 내려간다)', () => {
-    const plus = rollExactly(newGame(ring(['coinPlus'])), 1);
+    const plus = rollExactly(newGame(ring(['coinPlus', 'empty'])), 1);
     expect(plus.players[0].coins).toBe(RULES.turnIncome + RULES.coinPlus);
 
-    const s0 = newGame(ring(['coinMinus']));
+    const s0 = newGame(ring(['coinMinus', 'empty']));
     s0.players[0].coins = 1;
     expect(rollExactly(s0, 1).players[0].coins).toBe(0);
   });
 
   it('회복은 최대 HP를 넘지 않는다', () => {
-    const s0 = newGame(ring(['heal']));
+    const s0 = newGame(ring(['heal', 'empty']));
     s0.players[0].hp = s0.players[0].maxHp - 1;
     expect(rollExactly(s0, 1).players[0].hp).toBe(s0.players[0].maxHp);
   });
 
   it('카드 칸에서 1장 뽑고, 손패가 가득 차면 버린다', () => {
-    const s0 = newGame(ring(['card']));
+    const s0 = newGame(ring(['card', 'empty']));
     expect(rollExactly(s0, 1).players[0].hand).toHaveLength(1);
 
     s0.players[0].hand = ['dash', 'dash', 'dash'];
     expect(rollExactly(s0, 1).players[0].hand).toHaveLength(RULES.handLimit);
   });
-
 });
 
 describe('인카운터', () => {
-  /** 0 본부 → 1 → 2(에너미) → 3 → 4 → 5 → 6 */
-  function enemyRing(enemy: EnemySpawn['enemy'] = 'slime'): GameState {
-    return newGame(ring(['empty', 'spawn', 'empty', 'empty', 'empty', 'empty'], [{ tile: 2, enemy }]));
-  }
-  const attack = (s: GameState) => applyAction(s, { type: 'ENCOUNTER', player: s.current, choice: 'attack' });
-  const release = (s: GameState) => applyAction(s, { type: 'ENCOUNTER', player: s.current, choice: 'release' });
-  const defend = (s: GameState, mode: 'block' | 'evade') =>
-    applyAction(s, { type: 'DEFEND', player: s.current, mode });
+  /** 0 본부 → 1 → 2(에너미) → 3 … 9 */
+  const enemyRing = (kind: EnemyKind = 'slime') => withEnemy(newGame(ring(empties(9))), kind, 2);
 
   it('에너미가 있는 칸을 지나가면 멈추고 인카운터가 시작된다', () => {
     const s0 = enemyRing();
@@ -280,24 +328,6 @@ describe('인카운터', () => {
     expect(s.players[0].hp).toBe(s.players[0].maxHp);
   });
 
-  it('반격에 KO 되면 이동이 끝나고 코인 절반을 잃고 본부로, 다음 턴에 부활한다', () => {
-    const s0 = rollExactly(enemyRing('goblin'), 4);
-    s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
-    s0.players[0].hp = 1;
-    s0.players[0].coins = 11;
-
-    let s = defend(attack(s0), 'block');
-    expect(s.players[0]).toMatchObject({ ko: true, hp: 0, tile: 0, coins: 6 });
-    expect(s.phase).toEqual({ kind: 'endTurn' });
-    expect(s.battles.at(-1)).toMatchObject({ done: true });
-    expect(s.battles.at(-1)?.events.at(-1)).toEqual({ type: 'playerKO', coinsLost: 5 });
-
-    s = applyAction(s, { type: 'END_TURN', player: 0 });
-    s = finishTurn(s);
-    expect(s.current).toBe(0);
-    expect(s.players[0]).toMatchObject({ ko: false, hp: s.players[0].maxHp, coins: 6 + RULES.turnIncome });
-  });
-
   it('에너미 칸에 딱 도착해도 인카운터가 일어나고, 끝나면 그 칸에 머문다', () => {
     const s1 = rollExactly(enemyRing(), 2);
     expect(s1.phase).toMatchObject({ kind: 'encounter', stepsLeft: 0 });
@@ -307,12 +337,7 @@ describe('인카운터', () => {
   });
 
   it('한 번 이동에 인카운터가 여러 번 일어날 수 있다', () => {
-    const s0 = newGame(
-      ring(['empty', 'spawn', 'empty', 'spawn', 'empty'], [
-        { tile: 2, enemy: 'slime' },
-        { tile: 4, enemy: 'bat' },
-      ]),
-    );
+    const s0 = withEnemy(withEnemy(newGame(ring(empties(6))), 'slime', 2), 'bat', 4);
     const s1 = release(rollExactly(s0, 5));
     expect(s1.phase).toMatchObject({ kind: 'encounter', stepsLeft: 1 });
     expect(s1.players[0].tile).toBe(4);
@@ -332,28 +357,127 @@ describe('인카운터', () => {
         { id: 2, kind: 'spawn', x: 1, y: 1, next: [3] },
         { id: 3, kind: 'empty', x: 2, y: 0, next: [0] },
       ],
-      enemySpawns: [{ tile: 2, enemy: 'slime' }],
+      spawnTiles: [2],
+      bossTile: 3,
     };
-    const s = applyAction(rollExactly(newGame(board), 2), { type: 'CHOOSE_PATH', player: 0, to: 2 });
+    const s0 = withEnemy(newGame(board), 'slime', 2);
+    const s = applyAction(rollExactly(s0, 2), { type: 'CHOOSE_PATH', player: 0, to: 2 });
     expect(s.phase).toMatchObject({ kind: 'encounter', stepsLeft: 1 });
   });
+});
 
-  it('처치된 에너미는 다음 라운드에 스폰 지점에 다시 나타난다 (임시 규칙)', () => {
-    const s0 = rollExactly(enemyRing(), 2);
+describe('KO', () => {
+  /** 고블린 반격에 KO 당하는 상황까지 만든다 */
+  function knockedOut(boss: BossDef = TEST_BOSS): GameState {
+    let s = withEnemy(newGame(ring(empties(9)), { boss }), 'goblin', 2);
+    s = rollExactly(s, 4);
+    s.enemies[0].hp = s.enemies[0].maxHp = 100;
+    s.players[0].hp = 1;
+    s.players[0].coins = 11;
+    return defend(attack(s), 'block');
+  }
+
+  it('쓰러진 자리에 눕고, 코인은 그대로, 진행도 +1, 이동은 끝', () => {
+    const s = knockedOut();
+    expect(s.players[0]).toMatchObject({ ko: true, hp: 0, tile: 2, coins: 11, reviveRound: 3 });
+    expect(s.progress).toBe(2);
+    expect(s.phase).toEqual({ kind: 'endTurn' });
+    expect(s.battles.at(-1)).toMatchObject({ done: true });
+    expect(s.battles.at(-1)?.events.at(-1)).toEqual({ type: 'playerKO' });
+  });
+
+  it('KO로 진행도가 기믹 시점에 닿으면 기믹이 바로 발동한다', () => {
+    const boss = withTimeline([{ at: 2, actions: [{ type: 'summon', enemies: ['slime'] }] }]);
+    const s = knockedOut(boss);
+    expect(s.progress).toBe(2);
+    expect(s.enemies.map((e) => e.kind)).toContain('slime');
+    expect(s.gimmicksDone).toBe(2);
+  });
+
+  it('다음 라운드는 쉬고, 그다음 라운드 자기 차례에 쓰러진 자리에서 HP 가득으로 부활', () => {
+    let s = knockedOut();
+    s.enemies = []; // 다른 플레이어가 고블린과 마주치지 않게
+    s = applyAction(s, { type: 'END_TURN', player: 0 });
+    expect([s.current, s.round]).toEqual([1, 1]);
+
+    s = finishTurn(s); // 2라운드: P1은 건너뛴다
+    expect([s.current, s.round]).toEqual([1, 2]);
+    expect(s.players[0].ko).toBe(true);
+
+    s = finishTurn(s); // 3라운드: P1 부활
+    expect([s.current, s.round]).toEqual([0, 3]);
+    expect(s.players[0]).toMatchObject({ ko: false, hp: s.players[0].maxHp, tile: 2, reviveRound: null });
+    expect(s.players[0].coins).toBe(11 + RULES.turnIncome);
+  });
+});
+
+describe('진행도와 보스', () => {
+  it('진행도가 한계에 닿으면 패배', () => {
+    let s = newGame(ring(empties(12)), { boss: withTimeline([], { defeatAt: 3 }) });
+    for (let i = 0; i < 4; i++) s = finishTurn(s);
+    expect(s.progress).toBe(3);
+    expect(s.phase).toEqual({ kind: 'gameOver', result: 'defeat' });
+    expect(() => applyAction(s, { type: 'ROLL', player: s.current })).toThrow(RuleError);
+  });
+
+  it('보스는 보스 칸에 나타나고, HP는 인원수에 비례한다', () => {
+    const boss = withTimeline([{ at: 1, actions: [{ type: 'bossAppear' }] }]);
+    const s = newGame(ring(empties(6), { bossTile: 4 }), { boss, players: 3 });
+    const b = s.enemies.find((e) => e.isBoss)!;
+    expect(b).toMatchObject({ tile: 4, hp: TEST_BOSS.hpPerPlayer * 3, name: TEST_BOSS.name });
+  });
+
+  it('보스 칸에 있던 에너미는 보스에게 자리를 내준다', () => {
+    const boss = withTimeline([
+      { at: 1, actions: [{ type: 'summon', enemies: ['slime'] }] },
+      { at: 2, actions: [{ type: 'bossAppear' }] },
+    ]);
+    let s = newGame(ring(empties(12), { spawnTiles: [10], bossTile: 10 }), { boss });
+    expect(s.enemies.map((e) => e.tile)).toEqual([10]);
+    s = finishTurn(finishTurn(s));
+    expect(s.enemies.map((e) => [e.tile, e.isBoss])).toEqual([[10, true]]);
+  });
+
+  it('보스를 처치하면 모두 승리', () => {
+    const boss = withTimeline([{ at: 1, actions: [{ type: 'bossAppear' }] }]);
+    const s0 = rollExactly(newGame(ring(empties(6), { bossTile: 3 }), { boss }), 4);
+    expect(s0.phase).toMatchObject({ kind: 'encounter' });
     s0.players[0].atk = 100;
-    let s = applyAction(attack(s0), { type: 'END_TURN', player: 0 });
+    const s = attack(s0);
+    expect(s.phase).toEqual({ kind: 'gameOver', result: 'victory' });
     expect(s.enemies).toEqual([]);
-    s = finishTurn(s);
-    expect(s.round).toBe(2);
-    expect(s.enemies).toHaveLength(1);
-    expect(s.enemies[0]).toMatchObject({ tile: 2, kind: 'slime' });
-    expect(s.enemies[0].id).not.toBe(s0.enemies[0].id);
+  });
+
+  it('에너미 강화는 지금 있는 에너미와 이후 소환되는 에너미에 모두 적용된다', () => {
+    const boss = withTimeline([
+      { at: 1, actions: [{ type: 'summon', enemies: ['slime'] }] },
+      { at: 2, actions: [{ type: 'buffEnemies', atk: 1, def: 2 }] },
+      { at: 3, actions: [{ type: 'summon', enemies: ['slime'] }] },
+    ]);
+    let s = newGame(ring(empties(14), { spawnTiles: [12, 13] }), { boss });
+    for (let i = 0; i < 4; i++) s = finishTurn(s);
+    expect(s.progress).toBe(3);
+    expect(s.enemies).toHaveLength(2);
+    for (const e of s.enemies) {
+      expect([e.atk, e.def]).toEqual([ENEMIES.slime.atk + 1, ENEMIES.slime.def + 2]);
+    }
+  });
+
+  it('소환 칸이 다 차면 본부 · 보스 칸이 아닌 빈 칸에 나온다', () => {
+    const boss = withTimeline([{ at: 1, actions: [{ type: 'summon', enemies: ['slime', 'slime', 'slime'] }] }]);
+    const s = newGame(ring(empties(6), { spawnTiles: [2], bossTile: 5 }), { boss });
+    const tiles = s.enemies.map((e) => e.tile);
+    expect(tiles).toHaveLength(3);
+    expect(tiles).toContain(2);
+    expect(new Set(tiles).size).toBe(3);
+    expect(tiles).not.toContain(0);
+    expect(tiles).not.toContain(5);
   });
 });
 
 describe('카드', () => {
   it('질주: 이동 +2, 턴마다 1장만', () => {
-    const s0 = newGame(ring(Array(12).fill('empty')));
+    const s0 = newGame(ring(empties(12)));
     s0.players[0].hand = ['dash', 'dash'];
     const s1 = applyAction(s0, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
     expect(s1.players[0].hand).toEqual(['dash']);
@@ -364,7 +488,7 @@ describe('카드', () => {
   });
 
   it('더블 주사위: 주사위 2개', () => {
-    const s0 = newGame(ring(Array(12).fill('empty')));
+    const s0 = newGame(ring(empties(12)));
     s0.players[0].hand = ['doubleDice'];
     let s = applyAction(s0, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
     s = applyAction(s, { type: 'ROLL', player: 0 });
@@ -373,7 +497,7 @@ describe('카드', () => {
   });
 
   it('붕대: HP 회복', () => {
-    const s0 = newGame(ring(['empty']));
+    const s0 = newGame(ring(['empty', 'empty']));
     s0.players[0].hand = ['bandage'];
     s0.players[0].hp = 3;
     const s = applyAction(s0, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
@@ -381,7 +505,7 @@ describe('카드', () => {
   });
 
   it('주사위를 굴린 뒤에는 카드를 쓸 수 없다', () => {
-    const s0 = newGame(ring(Array(12).fill('empty')));
+    const s0 = newGame(ring(empties(12)));
     s0.players[0].hand = ['dash'];
     const s1 = applyAction(s0, { type: 'ROLL', player: 0 });
     expect(() => applyAction(s1, { type: 'PLAY_CARD', player: 0, handIndex: 0 })).toThrow(RuleError);

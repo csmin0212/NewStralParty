@@ -1,10 +1,13 @@
 import { DEFAULT_BOARD } from '../data/board';
+import { PLACEHOLDER_BOSS } from '../data/bosses';
 import { applyAction, createGame, RuleError, type PlayerSetup } from '../engine/game';
 import type { Action, GameState } from '../engine/types';
 import { BattleView } from './battleView';
 import { BoardView } from './boardView';
 import { esc } from './html';
 import { renderPanel, type PanelHandlers } from './panel';
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * 핫시트: 한 화면에서 모두가 돌아가며 조작한다.
@@ -13,6 +16,7 @@ import { renderPanel, type PanelHandlers } from './panel';
 export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: () => void) {
   let state: GameState = createGame({
     board: DEFAULT_BOARD,
+    boss: PLACEHOLDER_BOSS,
     players,
     seed: (Math.random() * 2 ** 32) >>> 0,
   });
@@ -25,6 +29,23 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   const board = new BoardView(boardArea, state.board, state);
   const battle = new BattleView(boardArea);
   battle.onChoice = (choice) => dispatch({ ...choice, player: state.current });
+
+  // 기믹 발동 같은 큰 알림은 보드 위 배너로 하나씩 띄운다
+  const banner = document.createElement('div');
+  banner.className = 'banner';
+  boardArea.append(banner);
+  let lastNotice = 0;
+  async function showNotices(s: GameState) {
+    for (const n of s.notices) {
+      if (n.seq <= lastNotice) continue;
+      lastNotice = n.seq;
+      banner.textContent = n.text;
+      banner.classList.remove('show');
+      void banner.offsetWidth; // 애니메이션 재시작
+      banner.classList.add('show');
+      await sleep(1800);
+    }
+  }
 
   const handlers: PanelHandlers = {
     dispatch,
@@ -55,9 +76,10 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     battle.renderChoices(state, true);
     if (action.type === 'ROLL') board.showDice(state.turn.dice, state.turn.extraSteps);
 
-    // 연출 순서: 진행 중이던 전투 마무리 → 말 이동 → 새로 만난 에너미와 전투 시작
+    // 연출 순서: 진행 중이던 전투 마무리 → 말 이동 → 기믹 알림 → 새로 만난 에너미와 전투 시작
     await battle.playPending(state);
     await board.show(state);
+    await showNotices(state);
     await battle.openIfNew(state);
 
     busy = false;
@@ -65,8 +87,11 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     battle.renderChoices(state, false);
 
     if (state.phase.kind === 'gameOver') {
-      const winner = state.players[state.phase.winner];
-      board.showMessage(`<div>🏆</div><b style="color:${winner.color}">${esc(winner.name)}</b> 승리!`);
+      board.showMessage(
+        state.phase.result === 'victory'
+          ? `<div>🎉</div>${esc(state.boss.name)} 처치!<small>모두의 승리</small>`
+          : `<div>💫</div>진행도가 다 찼다…<small>패배</small>`,
+      );
     }
   }
 
@@ -86,5 +111,11 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     { signal: cleanup.signal },
   );
 
-  renderPanel(panel, state, false, handlers);
+  // 시작하자마자 발동한 기믹(진행도 1)도 보여 준다
+  busy = true;
+  renderPanel(panel, state, true, handlers);
+  showNotices(state).then(() => {
+    busy = false;
+    renderPanel(panel, state, false, handlers);
+  });
 }

@@ -1,5 +1,5 @@
 import { CARDS } from '../data/cards';
-import { currentPlayer } from '../engine/game';
+import { currentPlayer, describeGimmick, nextGimmick } from '../engine/game';
 import { RULES } from '../engine/rules';
 import type { Action, GameState, Player } from '../engine/types';
 import { tileLabel } from './boardView';
@@ -13,7 +13,7 @@ export interface PanelHandlers {
 /** 오른쪽 패널: 플레이어 정보, 행동 버튼, 로그. 기본 행동 버튼에는 data-primary를 붙인다 (스페이스바) */
 export function renderPanel(el: HTMLElement, state: GameState, busy: boolean, h: PanelHandlers) {
   el.innerHTML = `
-    <div class="round">라운드 ${state.round} · ${esc(state.board.name)}</div>
+    ${progressSection(state)}
     <ul class="players">${state.players.map((p) => playerRow(state, p)).join('')}</ul>
     <section class="actions ${busy ? 'busy' : ''}">${actions(state)}</section>
     <ol class="log">${state.log.map((line) => `<li>${esc(line)}</li>`).join('')}</ol>`;
@@ -35,15 +35,55 @@ export function renderPanel(el: HTMLElement, state: GameState, busy: boolean, h:
   };
 }
 
+/** 진행도 막대: 기믹 시점마다 표시, 다 차면 패배 */
+function progressSection(state: GameState): string {
+  const { boss, progress } = state;
+  const span = Math.max(1, boss.defeatAt - 1);
+  const pct = (at: number) => (Math.min(at - 1, span) / span) * 100;
+
+  const markers = boss.timeline
+    .map((g) => {
+      const isBoss = g.actions.some((a) => a.type === 'bossAppear');
+      const done = g.at <= state.gimmicksDone ? 'done' : '';
+      const title = esc(`진행도 ${g.at}: ${describeGimmick(state, g.actions)}`);
+      return `<span class="marker ${done} ${isBoss ? 'boss' : ''}" style="left:${pct(g.at)}%" title="${title}">${isBoss ? boss.icon : '⚠'}</span>`;
+    })
+    .join('');
+
+  const next = nextGimmick(state);
+  const nextText = next
+    ? `다음 기믹 · 진행도 ${next.at}: ${esc(describeGimmick(state, next.actions))}`
+    : '남은 기믹 없음';
+  const danger = boss.defeatAt - progress <= 3 ? 'danger' : '';
+
+  return `
+    <section class="progress ${danger}">
+      <div class="progress-head">
+        <span class="boss-name">${boss.icon} ${esc(boss.name)}</span>
+        <span class="muted">라운드 ${state.round}</span>
+      </div>
+      <div class="progress-track">
+        <i class="fill" style="width:${pct(progress)}%"></i>
+        ${markers}
+        <span class="marker end" style="left:100%" title="진행도 ${boss.defeatAt}: 패배">💫</span>
+      </div>
+      <div class="progress-foot">
+        <span>진행도 <b>${progress}</b> / ${boss.defeatAt}</span>
+        <span class="muted">${nextText}</span>
+      </div>
+    </section>`;
+}
+
 function playerRow(state: GameState, p: Player): string {
   const cost = RULES.levelUpCost[p.level];
   const goal = cost === undefined ? '' : `<span class="muted">/ ${cost}</span>`;
   const classes = ['player', p.id === state.current ? 'current' : '', p.ko ? 'ko' : ''].join(' ');
+  const ko = p.ko ? ` <span class="ko-tag">KO · ${p.reviveRound}라운드 부활</span>` : '';
   return `
     <li class="${classes}" style="--c:${p.color}">
       <span class="dot"></span>
       <div class="pinfo">
-        <div class="pname">${esc(p.name)} <span class="lv">Lv.${p.level}</span>${p.ko ? ' <span class="ko-tag">KO</span>' : ''}</div>
+        <div class="pname">${esc(p.name)} <span class="lv">Lv.${p.level}</span>${ko}</div>
         <div class="stats">
           <span>🪙 ${p.coins} ${goal}</span>
           <span>❤️ ${p.hp}/${p.maxHp}</span>
@@ -103,18 +143,20 @@ function actions(state: GameState): string {
         <h2>${who}: ⚔ 전투 중</h2>
         <p class="muted">전투 창에서 선택하세요</p>`;
 
-    case 'endTurn':
+    case 'endTurn': {
+      const result = p.ko
+        ? `💀 쓰러졌다… ${p.reviveRound}라운드에 이 자리에서 부활`
+        : `🎲 ${state.turn.dice.join(' + ') || '-'} → ${tileLabel(state.board, p.tile)} 도착`;
       return `
         <h2>${who}의 차례</h2>
-        <p>🎲 ${state.turn.dice.join(' + ') || '-'} → ${tileLabel(state.board, p.tile)} 도착</p>
+        <p>${result}</p>
         <button class="primary" data-action="end" data-primary>턴 종료 <kbd>Space</kbd></button>`;
-
-    case 'gameOver': {
-      const winner = state.players[phase.winner];
-      return `
-        <h2>🏆 <span class="who" style="color:${winner.color}">${esc(winner.name)}</span> 승리!</h2>
-        <button class="primary" data-action="new" data-primary>새 게임</button>`;
     }
+
+    case 'gameOver':
+      return `
+        <h2>${phase.result === 'victory' ? `🎉 ${esc(state.boss.name)} 처치! 모두의 승리` : '💫 진행도가 다 찼다… 패배'}</h2>
+        <button class="primary" data-action="new" data-primary>새 게임</button>`;
   }
 }
 

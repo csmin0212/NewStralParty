@@ -1,5 +1,4 @@
 import { TILE_INFO } from '../data/board';
-import { ENEMIES } from '../data/enemies';
 import type { Board, GameState } from '../engine/types';
 import { esc } from './html';
 
@@ -115,12 +114,11 @@ export class BoardView {
     }
 
     for (const enemy of state.enemies) {
-      const info = ENEMIES[enemy.kind];
       let el = this.enemyEls.get(enemy.id);
       if (!el) {
         el = document.createElement('div');
-        el.className = 'enemy';
-        el.innerHTML = `<span class="face">${info.icon}</span><i class="ehp"><b></b></i>`;
+        el.className = `enemy${enemy.isBoss ? ' boss' : ''}`;
+        el.innerHTML = `<span class="face">${enemy.icon}</span><i class="ehp"><b></b></i>`;
         this.el.append(el);
         this.enemyEls.set(enemy.id, el);
       }
@@ -128,7 +126,7 @@ export class BoardView {
       el.style.left = `${PAD + tile.x * UNIT + TILE - 8}px`;
       el.style.top = `${PAD + tile.y * UNIT + 8}px`;
       el.classList.toggle('counter', enemy.counter);
-      el.title = `${info.name} HP ${enemy.hp}/${enemy.maxHp}${enemy.counter ? ' · 반격형' : ''}`;
+      el.title = `${enemy.name} HP ${enemy.hp}/${enemy.maxHp} · 공격 ${enemy.atk} 방어 ${enemy.def}${enemy.counter ? ' · 반격형' : ''}`;
       el.querySelector<HTMLElement>('.ehp b')!.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
     }
   }

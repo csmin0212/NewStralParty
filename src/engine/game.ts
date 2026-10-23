@@ -9,11 +9,14 @@ import { RULES } from './rules';
 import type {
   Action,
   Battle,
+  BossDef,
   Board,
   CardId,
   DefenseMode,
   Enemy,
+  EnemyKind,
   GameState,
+  GimmickAction,
   Player,
   TurnInfo,
 } from './types';
@@ -27,11 +30,12 @@ export interface PlayerSetup {
 
 export interface GameOptions {
   board: Board;
+  boss: BossDef;
   players: PlayerSetup[];
   seed: number;
 }
 
-export function createGame({ board, players, seed }: GameOptions): GameState {
+export function createGame({ board, boss, players, seed }: GameOptions): GameState {
   if (players.length < 1 || players.length > 4) {
     throw new RuleError('플레이어는 1~4명이어야 합니다');
   }
@@ -43,6 +47,7 @@ export function createGame({ board, players, seed }: GameOptions): GameState {
   const { hp, atk, def, eva } = RULES.baseStats;
   const state: GameState = {
     board,
+    boss,
     players: players.map((p, id) => ({
       id,
       name: p.name,
@@ -57,22 +62,30 @@ export function createGame({ board, players, seed }: GameOptions): GameState {
       eva,
       hand: [],
       ko: false,
+      reviveRound: null,
     })),
     enemies: [],
     nextEnemyId: 0,
+    enemyBonus: { atk: 0, def: 0 },
     current: 0,
     round: 1,
+    progress: 1,
+    gimmicksDone: 0,
     phase: { kind: 'preRoll' },
     turn: freshTurn(),
     lastMove: null,
     battles: [],
+    notices: [],
     log: [],
     rngState: seed >>> 0,
     seq: 0,
   };
+
+  const rng = createRng(state.rngState);
   log(state, '── 1라운드 ──');
-  respawnEnemies(state);
-  beginTurn(state);
+  runGimmicks(state, rng);
+  beginTurn(state, rng);
+  state.rngState = rng.state;
   return state;
 }
 
@@ -104,7 +117,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       defend(s, rng, action.mode);
       break;
     case 'END_TURN':
-      endTurn(s);
+      endTurn(s, rng);
       break;
   }
 
@@ -114,6 +127,27 @@ export function applyAction(state: GameState, action: Action): GameState {
 
 export function currentPlayer(state: GameState): Player {
   return state.players[state.current];
+}
+
+/** 아직 실행되지 않은 다음 기믹 */
+export function nextGimmick(state: GameState) {
+  return state.boss.timeline.find((g) => g.at > state.gimmicksDone);
+}
+
+/** 기믹 한 줄 설명 (로그 · 화면 공용) */
+export function describeGimmick(state: GameState, actions: GimmickAction[]): string {
+  return actions
+    .map((a) => {
+      switch (a.type) {
+        case 'summon':
+          return `에너미 ${a.enemies.length}마리 소환`;
+        case 'bossAppear':
+          return `${state.boss.name} 등장`;
+        case 'buffEnemies':
+          return `모든 에너미 공격 +${a.atk} · 방어 +${a.def}`;
+      }
+    })
+    .join(', ');
 }
 
 /** 보드 데이터 오류 목록. 비어 있으면 정상 */
@@ -134,11 +168,11 @@ export function validateBoard(board: Board): string[] {
   if (!exists(board.baseTile)) problems.push('본부 칸이 없음');
   else if (board.tiles[board.baseTile].kind !== 'base') problems.push('본부 칸의 종류가 base가 아님');
 
-  const spawnTiles = board.enemySpawns.map((sp) => sp.tile);
-  for (const tile of spawnTiles) {
-    if (!exists(tile)) problems.push(`에너미 스폰 칸 ${tile}이 없음`);
+  for (const tile of board.spawnTiles) {
+    if (!exists(tile)) problems.push(`에너미 소환 칸 ${tile}이 없음`);
   }
-  if (new Set(spawnTiles).size !== spawnTiles.length) problems.push('에너미 스폰 칸이 겹침');
+  if (!exists(board.bossTile)) problems.push('보스 칸이 없음');
+  else if (board.bossTile === board.baseTile) problems.push('보스 칸이 본부와 같음');
   return problems;
 }
 
@@ -204,11 +238,10 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   const enemy = findEnemy(s, s.phase.enemy);
   const battle = currentBattle(s);
   const p = currentPlayer(s);
-  const name = ENEMIES[enemy.kind].name;
 
   if (choice === 'release') {
     battle.events.push({ type: 'release' });
-    log(s, `  ${name} 놓아주기`);
+    log(s, `  ${enemy.name} 놓아주기`);
     finishBattle(s, rng, stepsLeft);
     return;
   }
@@ -222,14 +255,22 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
     s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
     p.coins += enemy.reward;
     battle.events.push({ type: 'enemyDefeated', reward: enemy.reward });
-    log(s, `  ${name} 처치! 코인 +${enemy.reward}`);
+
+    if (enemy.isBoss) {
+      battle.done = true;
+      s.phase = { kind: 'gameOver', result: 'victory' };
+      log(s, `🎉 ${enemy.name} 처치! 모두의 승리!`);
+      notice(s, `🎉 ${enemy.name} 처치!`);
+      return;
+    }
+    log(s, `  ${enemy.name} 처치! 코인 +${enemy.reward}`);
     finishBattle(s, rng, stepsLeft);
     return;
   }
 
   if (enemy.counter) {
     s.phase = { kind: 'defend', enemy: enemy.id, stepsLeft };
-    log(s, `  ${name}의 반격이 온다!`);
+    log(s, `  ${enemy.name}의 반격이 온다!`);
     return;
   }
   finishBattle(s, rng, stepsLeft);
@@ -250,32 +291,23 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
     result: hit,
     targetHp: Math.max(0, p.hp - hit.damage),
   });
-  log(
-    s,
-    `  ${ENEMIES[enemy.kind].name}의 반격 ${hit.attackValue} vs ${defenseName(mode)} ${hit.defenseValue} → ${hit.damage} 피해`,
-  );
+  log(s, `  ${enemy.name}의 반격 ${hit.attackValue} vs ${defenseName(mode)} ${hit.defenseValue} → ${hit.damage} 피해`);
 
-  const coinsBefore = p.coins;
-  damage(s, p, hit.damage);
+  damage(s, rng, p, hit.damage);
   if (p.ko) {
-    // KO 되면 이동도 끝
-    battle.events.push({ type: 'playerKO', coinsLost: coinsBefore - p.coins });
+    // KO 되면 이동도 끝. 진행도가 올라 패배했을 수도 있다
+    battle.events.push({ type: 'playerKO' });
     battle.done = true;
-    s.phase = { kind: 'endTurn' };
+    if (!isOver(s)) s.phase = { kind: 'endTurn' };
     return;
   }
   finishBattle(s, rng, stepsLeft);
 }
 
-function endTurn(s: GameState) {
+function endTurn(s: GameState, rng: Rng) {
   if (s.phase.kind !== 'endTurn') throw new RuleError('아직 턴을 끝낼 수 없습니다');
-  s.current = (s.current + 1) % s.players.length;
-  if (s.current === 0) {
-    s.round += 1;
-    log(s, `── ${s.round}라운드 ──`);
-    respawnEnemies(s);
-  }
-  beginTurn(s);
+  nextPlayer(s, rng);
+  beginTurn(s, rng);
 }
 
 // ───────────────────────── 진행 ─────────────────────────
@@ -284,18 +316,83 @@ function freshTurn(): TurnInfo {
   return { cardPlayed: false, diceCount: 1, extraSteps: 0, dice: [] };
 }
 
-function beginTurn(s: GameState) {
-  const p = currentPlayer(s);
-  s.turn = freshTurn();
-  s.phase = { kind: 'preRoll' };
-  log(s, `${p.name}의 차례`);
+/** 다음 플레이어로. 한 바퀴 돌면 라운드 +1, 진행도 +1 */
+function nextPlayer(s: GameState, rng: Rng) {
+  s.current = (s.current + 1) % s.players.length;
+  if (s.current !== 0) return;
+  s.round += 1;
+  log(s, `── ${s.round}라운드 ──`);
+  advanceProgress(s, rng, '라운드');
+}
 
-  if (p.ko) {
-    p.ko = false;
-    p.hp = p.maxHp;
-    log(s, `${p.name}: 본부에서 부활! (HP ${p.hp})`);
+/** 차례 시작. 쉬어야 하는 KO 플레이어는 건너뛴다 */
+function beginTurn(s: GameState, rng: Rng) {
+  // 모두 누워 있어도 라운드가 흐르다 보면 부활하거나 패배하므로 끝난다
+  while (s.phase.kind !== 'gameOver') {
+    const p = currentPlayer(s);
+    s.turn = freshTurn();
+    s.phase = { kind: 'preRoll' };
+
+    if (p.ko && s.round < p.reviveRound!) {
+      log(s, `${p.name}: 💤 쓰러져서 이번 차례는 쉰다`);
+      nextPlayer(s, rng);
+      continue;
+    }
+
+    log(s, `${p.name}의 차례`);
+    if (p.ko) {
+      p.ko = false;
+      p.reviveRound = null;
+      p.hp = p.maxHp;
+      log(s, `${p.name}: ✨ 부활! (HP ${p.hp})`);
+    }
+    p.coins += RULES.turnIncome;
+    return;
   }
-  p.coins += RULES.turnIncome;
+}
+
+/** 진행도 +1. 그 진행도의 기믹은 바로 발동하고, 한계에 닿으면 패배 */
+function advanceProgress(s: GameState, rng: Rng, reason: '라운드' | 'KO') {
+  if (s.phase.kind === 'gameOver') return;
+  s.progress += 1;
+  log(s, `⏳ 진행도 ${s.progress}${reason === 'KO' ? ' (KO)' : ''}`);
+  runGimmicks(s, rng);
+
+  if (s.progress >= s.boss.defeatAt && !isOver(s)) {
+    s.phase = { kind: 'gameOver', result: 'defeat' };
+    log(s, `💫 진행도가 다 찼다… 패배`);
+    notice(s, '💫 진행도가 다 찼다…');
+  }
+}
+
+/** 지금 진행도까지 아직 실행 안 한 기믹을 순서대로 실행 */
+function runGimmicks(s: GameState, rng: Rng) {
+  for (const gimmick of s.boss.timeline) {
+    if (gimmick.at <= s.gimmicksDone || gimmick.at > s.progress) continue;
+    for (const action of gimmick.actions) {
+      switch (action.type) {
+        case 'summon':
+          for (const kind of action.enemies) summon(s, rng, kind);
+          break;
+        case 'bossAppear':
+          bossAppear(s);
+          break;
+        case 'buffEnemies':
+          s.enemyBonus.atk += action.atk;
+          s.enemyBonus.def += action.def;
+          for (const e of s.enemies) {
+            if (e.isBoss) continue;
+            e.atk += action.atk;
+            e.def += action.def;
+          }
+          break;
+      }
+    }
+    const text = describeGimmick(s, gimmick.actions);
+    log(s, `⚠ 기믹: ${text}`);
+    notice(s, `⚠ 진행도 ${gimmick.at} — ${text}`);
+  }
+  s.gimmicksDone = Math.max(s.gimmicksDone, s.progress);
 }
 
 /** steps칸 이동. 갈림길이나 에너미를 만나면 멈추고 해당 단계로 넘어간다 */
@@ -303,7 +400,7 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
   const p = currentPlayer(s);
   let left = steps;
 
-  while (left > 0 && s.phase.kind !== 'gameOver') {
+  while (left > 0) {
     const tile = s.board.tiles[p.tile];
     if (tile.next.length > 1) {
       s.phase = { kind: 'choosePath', stepsLeft: left, options: [...tile.next] };
@@ -317,19 +414,17 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
     }
   }
 
-  // 이동 도중 레벨 3을 달성하면 그 자리에서 게임 끝
-  if (s.phase.kind !== 'gameOver') {
-    land(s, rng, path);
-    s.phase = { kind: 'endTurn' };
-  }
+  land(s, rng, path);
+  s.phase = { kind: 'endTurn' };
   recordMove(s, path);
 }
 
 /** 한 칸 들어간다. 그 칸에 에너미가 있으면 인카운터를 시작하고 true */
 function enter(s: GameState, tileId: number, path: number[], stepsLeft: number): boolean {
-  stepTo(s, tileId);
+  const p = currentPlayer(s);
+  p.tile = tileId;
   path.push(tileId);
-  if (s.phase.kind === 'gameOver') return false;
+  if (tileId === s.board.baseTile) tryLevelUp(s, p);
 
   const enemy = s.enemies.find((e) => e.tile === tileId);
   if (!enemy) return false;
@@ -337,13 +432,7 @@ function enter(s: GameState, tileId: number, path: number[], stepsLeft: number):
   return true;
 }
 
-/** 한 칸 이동. 본부는 지나가기만 해도 레벨업 판정 */
-function stepTo(s: GameState, tileId: number) {
-  const p = currentPlayer(s);
-  p.tile = tileId;
-  if (tileId === s.board.baseTile) tryLevelUp(s, p);
-}
-
+/** 본부를 지나가거나 도착하면 코인을 내고 레벨업 */
 function tryLevelUp(s: GameState, p: Player) {
   const cost = RULES.levelUpCost[p.level];
   if (cost === undefined) return;
@@ -353,11 +442,8 @@ function tryLevelUp(s: GameState, p: Player) {
   }
   p.coins -= cost;
   p.level += 1;
+  // 캐릭터별 레벨업 능력치는 캐릭터 시스템이 생기면 여기서 적용한다
   log(s, `${p.name}: ⭐ 코인 ${cost}개로 레벨 ${p.level} 달성!`);
-  if (p.level >= RULES.winLevel) {
-    s.phase = { kind: 'gameOver', winner: p.id };
-    log(s, `🏆 ${p.name} 승리!`);
-  }
 }
 
 /** 도착한 칸의 효과. 워프하면 path에 도착 칸을 덧붙인다 */
@@ -409,29 +495,58 @@ function drawCard(s: GameState, p: Player, card: CardId) {
 
 // ───────────────────────── 에너미 · 전투 ─────────────────────────
 
-/**
- * 빈 스폰 지점에 에너미를 놓는다.
- * 임시 규칙: 라운드가 바뀔 때마다 다시 채운다. 보스 기믹 시간표가 생기면 그쪽으로 옮긴다.
- */
-function respawnEnemies(s: GameState) {
-  for (const spawn of s.board.enemySpawns) {
-    if (s.enemies.some((e) => e.tile === spawn.tile)) continue;
-    const info = ENEMIES[spawn.enemy];
-    s.enemies.push({
-      id: s.nextEnemyId++,
-      kind: spawn.enemy,
-      tile: spawn.tile,
-      hp: info.hp,
-      maxHp: info.hp,
-      atk: info.atk,
-      def: info.def,
-      eva: info.eva,
-      counter: info.counter,
-      defense: info.defense,
-      reward: info.reward,
-    });
-    log(s, `${info.icon} ${info.name} 등장`);
+/** 빈 소환 칸에 에너미를 놓는다. 소환 칸이 다 차면 본부 · 보스 칸 · 워프를 뺀 빈 칸 아무 데나 */
+function summon(s: GameState, rng: Rng, kind: EnemyKind) {
+  const occupied = new Set(s.enemies.map((e) => e.tile));
+  let candidates = s.board.spawnTiles.filter((t) => !occupied.has(t));
+  if (candidates.length === 0) {
+    candidates = s.board.tiles
+      .filter((t) => t.kind !== 'base' && t.kind !== 'warp' && t.id !== s.board.bossTile && !occupied.has(t.id))
+      .map((t) => t.id);
   }
+  if (candidates.length === 0) return;
+
+  const info = ENEMIES[kind];
+  s.enemies.push({
+    id: s.nextEnemyId++,
+    kind,
+    name: info.name,
+    icon: info.icon,
+    isBoss: false,
+    tile: rng.pick(candidates),
+    hp: info.hp,
+    maxHp: info.hp,
+    atk: info.atk + s.enemyBonus.atk,
+    def: info.def + s.enemyBonus.def,
+    eva: info.eva,
+    counter: info.counter,
+    defense: info.defense,
+    reward: info.reward,
+  });
+}
+
+function bossAppear(s: GameState) {
+  if (s.enemies.some((e) => e.isBoss)) return;
+  const b = s.boss;
+  const hp = b.hpPerPlayer * s.players.length;
+  // 보스 칸에 에너미가 있으면 보스에게 자리를 내준다
+  s.enemies = s.enemies.filter((e) => e.tile !== s.board.bossTile);
+  s.enemies.push({
+    id: s.nextEnemyId++,
+    kind: 'boss',
+    name: b.name,
+    icon: b.icon,
+    isBoss: true,
+    tile: s.board.bossTile,
+    hp,
+    maxHp: hp,
+    atk: b.atk,
+    def: b.def,
+    eva: b.eva,
+    counter: b.counter,
+    defense: b.defense,
+    reward: 0,
+  });
 }
 
 function startEncounter(s: GameState, enemy: Enemy, stepsLeft: number) {
@@ -439,7 +554,7 @@ function startEncounter(s: GameState, enemy: Enemy, stepsLeft: number) {
   s.seq += 1;
   s.battles.push({ seq: s.seq, player: s.current, enemy: structuredClone(enemy), events: [], done: false });
   if (s.battles.length > RULES.battleHistory) s.battles.shift();
-  log(s, `${currentPlayer(s).name}: ⚔ ${ENEMIES[enemy.kind].name} 인카운터!`);
+  log(s, `${currentPlayer(s).name}: ⚔ ${enemy.name} 인카운터!`);
 }
 
 /** 전투를 마치고 남은 칸만큼 이어서 이동 */
@@ -447,6 +562,11 @@ function finishBattle(s: GameState, rng: Rng, stepsLeft: number) {
   currentBattle(s).done = true;
   s.phase = { kind: 'preRoll' }; // move()가 다시 정한다
   move(s, rng, stepsLeft, [currentPlayer(s).tile]);
+}
+
+/** 함수 호출 뒤에도 TS가 좁혀 둔 phase 타입을 믿지 않게, 매번 새로 읽는다 */
+function isOver(s: GameState): boolean {
+  return s.phase.kind === 'gameOver';
 }
 
 function findEnemy(s: GameState, id: number): Enemy {
@@ -463,15 +583,15 @@ function defenseName(mode: DefenseMode): string {
   return mode === 'block' ? '방어' : '회피';
 }
 
-function damage(s: GameState, p: Player, amount: number) {
+/** 피해. HP 0이면 그 자리에 KO — 다음 라운드를 쉬고, 진행도 +1 (기믹 즉시 발동) */
+function damage(s: GameState, rng: Rng, p: Player, amount: number) {
   p.hp = Math.max(0, p.hp - amount);
   if (p.hp > 0) return;
 
-  const lost = Math.floor(p.coins / 2);
-  p.coins -= lost;
   p.ko = true;
-  p.tile = s.board.baseTile;
-  log(s, `${p.name}: 💀 KO! 코인 ${lost}개를 잃고 본부로 돌아간다`);
+  p.reviveRound = s.round + RULES.reviveAfterRounds;
+  log(s, `${p.name}: 💀 KO! ${p.reviveRound}라운드에 부활`);
+  advanceProgress(s, rng, 'KO');
 }
 
 function heal(p: Player, amount: number): number {
@@ -484,6 +604,12 @@ function recordMove(s: GameState, path: number[]) {
   if (path.length < 2) return;
   s.seq += 1;
   s.lastMove = { seq: s.seq, player: s.current, path };
+}
+
+function notice(s: GameState, text: string) {
+  s.seq += 1;
+  s.notices.push({ seq: s.seq, text });
+  if (s.notices.length > RULES.noticeHistory) s.notices.shift();
 }
 
 function log(s: GameState, text: string) {

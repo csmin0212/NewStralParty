@@ -8,17 +8,19 @@ export const RULES = {
   coinMinus: 4,
   heal: 3,
 
-  /** 현재 레벨 → 다음 레벨로 올리는 비용 */
+  /** 현재 레벨 → 다음 레벨로 올리는 비용. 없는 레벨은 더 못 올린다 */
   levelUpCost: { 1: 20, 2: 40 } as Record<number, number>,
-  winLevel: 3,
 
   handLimit: 3,
   dashSteps: 2,
   bandageHeal: 4,
 
   baseStats: { hp: 10, atk: 1, def: 1, eva: 1 },
+  /** KO 되면 다음 라운드를 쉬고 그다음 라운드에 부활: 쓰러진 라운드 + 2 */
+  reviveAfterRounds: 2,
+
   /** 남겨 둘 인카운터 기록 수 */
   battleHistory: 3,
-
-  logLimit: 50,
+  noticeHistory: 5,
+  logLimit: 60,
 };

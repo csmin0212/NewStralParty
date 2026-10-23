@@ -1,4 +1,3 @@
-import { ENEMIES } from '../data/enemies';
 import type { AttackResult, Battle, BattleEvent, DefenseMode, GameState } from '../engine/types';
 import { esc } from './html';
 
@@ -66,12 +65,11 @@ export class BattleView {
 
     const p = state.players[record.player];
     const e = record.enemy;
-    const info = ENEMIES[e.kind];
     this.playerMaxHp = p.maxHp;
 
     this.el.innerHTML = `
-      <div class="battle-card">
-        <div class="battle-title">⚔ 인카운터</div>
+      <div class="battle-card ${e.isBoss ? 'boss-fight' : ''}">
+        <div class="battle-title">${e.isBoss ? '👑 보스전' : '⚔ 인카운터'}</div>
         <div class="fighters">
           <div class="fighter" data-side="player" style="--c:${p.color}">
             <div class="avatar"><span>${p.id + 1}</span></div>
@@ -83,9 +81,10 @@ export class BattleView {
           </div>
           <div class="vs">VS</div>
           <div class="fighter" data-side="enemy">
-            <div class="avatar enemy-avatar"><span>${info.icon}</span></div>
-            <div class="fname">${info.name}</div>
+            <div class="avatar enemy-avatar"><span>${e.icon}</span></div>
+            <div class="fname">${esc(e.name)}</div>
             <div class="ftags">
+              ${e.isBoss ? '<span class="tag boss">보스</span>' : ''}
               <span class="tag ${e.counter ? 'warn' : ''}">${e.counter ? '반격형' : '반격 없음'}</span>
               <span class="tag">${e.defense === 'block' ? '🛡 방어형' : '💨 회피형'}</span>
             </div>
@@ -96,7 +95,7 @@ export class BattleView {
           </div>
         </div>
         <div class="dice-row"></div>
-        <div class="battle-msg">${info.name}이(가) 길을 막았다!</div>
+        <div class="battle-msg">${esc(e.name)}이(가) 길을 막았다!</div>
         <div class="battle-actions"></div>
       </div>`;
     this.setHp('player', p.hp, p.maxHp);
@@ -121,7 +120,7 @@ export class BattleView {
           <button data-choice="release">🕊 놓아주기</button>
         </div>`;
     } else if (phase.kind === 'defend') {
-      this.message(`${ENEMIES[this.battle.enemy.kind].name}의 반격이 온다!`);
+      this.message(`${this.battle.enemy.name}의 반격이 온다!`);
       this.actions.innerHTML = `
         <div class="choice-row">
           <button class="defense" data-choice="block">
@@ -140,7 +139,7 @@ export class BattleView {
   // ───────── 연출 ─────────
 
   private async play(record: Battle, event: BattleEvent) {
-    const enemyName = ENEMIES[record.enemy.kind].name;
+    const enemyName = record.enemy.name;
     switch (event.type) {
       case 'attack': {
         const attacker: Side = event.attacker;
@@ -167,12 +166,12 @@ export class BattleView {
       }
       case 'enemyDefeated':
         this.pose('enemy', 'down');
-        this.message(`${enemyName} 처치! 🪙 +${event.reward}`);
-        await sleep(1000);
+        this.message(record.enemy.isBoss ? `🎉 ${enemyName} 처치!` : `${enemyName} 처치! 🪙 +${event.reward}`);
+        await sleep(record.enemy.isBoss ? 1600 : 1000);
         break;
       case 'playerKO':
         this.pose('player', 'down');
-        this.message(`쓰러졌다… 🪙 -${event.coinsLost}`);
+        this.message('쓰러졌다… 진행도 +1');
         await sleep(1200);
         break;
       case 'release':
