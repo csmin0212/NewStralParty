@@ -1,5 +1,4 @@
 import type { CardId, CharacterId, Enemy, TileKind } from '../engine/types';
-import { placeholderFigure } from './placeholderArt';
 
 const root = `${import.meta.env.BASE_URL}assets/`;
 
@@ -15,6 +14,7 @@ export const TILE_ART: Partial<Record<TileKind, string>> = {
   heal: `${root}tiles/heal.webp`,
   warp: `${root}tiles/warp.webp`,
   empty: `${root}tiles/empty.webp`,
+  shop: `${root}tiles/shop.webp`,
 };
 
 export const ENEMY_ART: Partial<Record<Enemy['kind'], string>> = {
@@ -50,6 +50,23 @@ export const CARD_ART: Partial<Record<CardId, string>> = {
   dash: `${root}cards/dash.webp`,
   doubleDice: `${root}cards/double-dice.webp`,
   bandage: `${root}cards/bandage.webp`,
+  tripleDice: `${root}cards/triple-dice.webp`,
+  remoteDice: `${root}cards/remote-dice.webp`,
+  portal: `${root}cards/portal.webp`,
+  cookie: `${root}cards/cookie.webp`,
+  cake: `${root}cards/cake.webp`,
+  pudding: `${root}cards/pudding.webp`,
+  extend: `${root}cards/extend.webp`,
+  notes: `${root}cards/notes.webp`,
+  poisonCure: `${root}cards/poison-cure.webp`,
+  kingPower: `${root}cards/king-power.webp`,
+  immovable: `${root}cards/immovable.webp`,
+  hurry: `${root}cards/hurry.webp`,
+  feast: `${root}cards/feast.webp`,
+  share: `${root}cards/share.webp`,
+  backup: `${root}cards/backup.webp`,
+  revival: `${root}cards/revival.webp`,
+  slingshot: `${root}cards/slingshot.webp`,
 };
 
 export const UI_ART = {
@@ -91,13 +108,11 @@ export interface CharacterArt {
   /** 스킬 아이콘. 없으면 글자 아이콘 */
   skillActive?: string;
   skillPassive?: string;
+  skillPassive2?: string;
   potential?: string;
   poses: Record<CharacterPose, string>;
 }
 
-/** Soda · 모나: 그림이 오기 전까지 임시 실루엣 (docs/ASSETS.md 6차 요청) */
-const sodaSquare = placeholderFigure('S', '#7FA8E8', 'square');
-const monaSquare = placeholderFigure('M', '#F28BB5', 'square');
 export const CHARACTER_ART: Record<CharacterId, CharacterArt> = {
   mutbyeol: {
     name: '뭇별',
@@ -120,17 +135,36 @@ export const CHARACTER_ART: Record<CharacterId, CharacterArt> = {
   soda: {
     name: 'Soda',
     color: '#7FA8E8',
-    main: placeholderFigure('S', '#7FA8E8', 'tall'),
-    token: sodaSquare,
-    portrait: sodaSquare,
-    poses: { idle: sodaSquare, attack: sodaSquare, hit: sodaSquare, block: sodaSquare, evade: sodaSquare, down: sodaSquare },
+    main: `${root}characters/soda/main.webp`,
+    token: `${root}characters/soda/token.webp`,
+    portrait: `${root}characters/soda/portrait.webp`,
+    skillActive: `${root}characters/soda/skill-active.webp`,
+    skillPassive: `${root}characters/soda/skill-passive.webp`,
+    poses: {
+      idle: `${root}characters/soda/battle-idle.webp`,
+      attack: `${root}characters/soda/battle-attack.webp`,
+      hit: `${root}characters/soda/battle-hit.webp`,
+      block: `${root}characters/soda/battle-block.webp`,
+      evade: `${root}characters/soda/battle-evade.webp`,
+      down: `${root}characters/soda/battle-down.webp`,
+    },
   },
   mona: {
     name: '모나',
     color: '#F28BB5',
-    main: placeholderFigure('M', '#F28BB5', 'tall'),
-    token: monaSquare,
-    portrait: monaSquare,
-    poses: { idle: monaSquare, attack: monaSquare, hit: monaSquare, block: monaSquare, evade: monaSquare, down: monaSquare },
+    main: `${root}characters/mona/main.webp`,
+    token: `${root}characters/mona/token.webp`,
+    portrait: `${root}characters/mona/portrait.webp`,
+    skillActive: `${root}characters/mona/skill-active.webp`,
+    skillPassive: `${root}characters/mona/skill-passive.webp`,
+    skillPassive2: `${root}characters/mona/skill-passive-2.webp`,
+    poses: {
+      idle: `${root}characters/mona/battle-idle.webp`,
+      attack: `${root}characters/mona/battle-attack.webp`,
+      hit: `${root}characters/mona/battle-hit.webp`,
+      block: `${root}characters/mona/battle-block.webp`,
+      evade: `${root}characters/mona/battle-evade.webp`,
+      down: `${root}characters/mona/battle-down.webp`,
+    },
   },
 };
