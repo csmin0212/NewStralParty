@@ -141,6 +141,12 @@ export class BoardView {
     this.diceEl.classList.add('pop');
   }
 
+  /** 연출용: 플레이어 말의 화면 좌표 (말 머리 위) */
+  tokenPoint(player: number): { x: number; y: number } {
+    const r = this.tokenEls[player].getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top };
+  }
+
   showMessage(html: string) {
     const overlay = document.createElement('div');
     overlay.className = 'board-overlay';

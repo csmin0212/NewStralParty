@@ -1,0 +1,448 @@
+/* 화면 연출. trpg-vtt의 fxevents.css(연출 모음)를 옮겨 와서 학원 도시 색으로 바꿨다.
+   위치 · 크기는 개별 속성(translate / rotate / scale)으로 쓴다. 키프레임이 정적인 translate와 합쳐지도록 transform으로 바꾸지 않는다. */
+
+.fxe {
+  --c: var(--fx, var(--sky));
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  pointer-events: auto;
+  animation: fxe-life var(--dur) ease both;
+  font-family: 'Exo 2', 'Pretendard Variable', sans-serif;
+  color: #fff;
+}
+@keyframes fxe-life {
+  0% { opacity: 0; }
+  6%, 85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fxe-big,
+.fxe-sub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+.fxe-big {
+  top: 50%;
+  translate: 0 -50%;
+  font-size: clamp(40px, 9vw, 120px);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-shadow: 0 6px 0 rgba(31, 58, 104, 0.45);
+}
+.fxe-big span {
+  display: inline-block;
+}
+.fxe-sub {
+  top: calc(50% + clamp(34px, 6vw, 78px));
+  font-family: 'Pretendard Variable', sans-serif;
+  font-size: clamp(14px, 2vw, 22px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-shadow: 0 2px 6px rgba(31, 58, 104, 0.8);
+}
+@keyframes fxe-flash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fxe-up { from { opacity: 0; translate: 0 14px; } }
+@keyframes fxe-spread { from { letter-spacing: 0.6em; opacity: 0; } }
+@keyframes fxe-shake {
+  25% { translate: -4px calc(-50% + 3px); }
+  75% { translate: 4px calc(-50% - 3px); }
+}
+@keyframes fxe-pop { from { scale: 0; opacity: 0; rotate: -30deg; } }
+
+/* ── ENCOUNTER: 섬광 + 사선 베기 3줄 + 글자가 쾅 ── */
+.fxe--encounter {
+  background: rgba(31, 58, 104, 0.5);
+}
+.fxe-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  animation: fxe-flash 0.5s ease-out both;
+}
+.fxe-slash {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 46%;
+  height: 10px;
+  background: var(--c);
+  box-shadow: 0 0 24px var(--c);
+  rotate: -14deg;
+  transform-origin: left;
+  animation: fxe-slash 0.35s 0.15s cubic-bezier(0.7, 0, 0.3, 1) both;
+}
+.fxe-slash--2 { top: 30%; height: 4px; background: #fff; animation-delay: 0.25s; }
+.fxe-slash--3 { top: 64%; height: 6px; animation-delay: 0.32s; }
+@keyframes fxe-slash { from { scale: 0 1; } }
+.fxe--encounter .fxe-big {
+  -webkit-text-stroke: 2px var(--navy);
+  paint-order: stroke fill;
+  animation: fxe-slam 0.45s 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) both, fxe-shake 0.3s 0.75s linear 2;
+}
+.fxe--encounter .fxe-sub { animation: fxe-up 0.4s 0.6s ease both; }
+@keyframes fxe-slam { from { scale: 3; opacity: 0; filter: blur(8px); } }
+
+/* ── ROUND: 양쪽에서 모이는 선 + 글자 간격이 좁혀지며 + 빛이 한 번 쓸고 간다 ── */
+.fxe--round {
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 24% at 50% 50%, rgba(31, 58, 104, 0.45), transparent 72%);
+}
+.fxe-line {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  width: 50%;
+  background: linear-gradient(90deg, transparent, var(--c));
+  animation: fxe-line 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.fxe-line--l { left: 0; margin-top: -50px; }
+.fxe-line--r {
+  right: 0;
+  margin-top: 46px;
+  background: linear-gradient(270deg, transparent, var(--c));
+  animation-name: fxe-line-r;
+}
+@keyframes fxe-line { from { translate: -100% 0; } }
+@keyframes fxe-line-r { from { translate: 100% 0; } }
+.fxe--round .fxe-big {
+  font-size: clamp(34px, 7vw, 84px);
+  color: #fff;
+  -webkit-text-stroke: 2px var(--c);
+  paint-order: stroke fill;
+  animation: fxe-spread 0.6s 0.15s ease both;
+}
+.fxe--round .fxe-sub {
+  color: #fff;
+  animation: fxe-up 0.4s 0.4s ease both;
+}
+/* 반짝: 사선 빛 한 줄기가 글자 위를 지나간다 (trpg-vtt에 없어서 새로 만듦) */
+.fxe-glint {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 26%;
+  height: 160px;
+  translate: -100% -50%;
+  rotate: 18deg;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
+  filter: blur(6px);
+  mix-blend-mode: overlay;
+  z-index: 1;
+  animation: fxe-glint 0.7s 0.55s cubic-bezier(0.5, 0, 0.3, 1) both;
+}
+@keyframes fxe-glint { to { translate: 480% -50%; } }
+
+/* ── TURN / BANNER: 사선 띠가 왼쪽에서 휙 들어와 머물다 오른쪽으로 ── */
+.fxe--turn,
+.fxe--banner {
+  pointer-events: none;
+}
+.fxe-band {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 50%;
+  height: clamp(90px, 16vh, 150px);
+  translate: 0 -50%;
+  rotate: -6deg;
+  background:
+    radial-gradient(rgba(255, 255, 255, 0.18) 1.4px, transparent 1.6px) 0 0 / 10px 10px,
+    linear-gradient(90deg, color-mix(in srgb, var(--c) 80%, var(--navy)), var(--c) 40%, color-mix(in srgb, var(--c) 75%, #fff));
+  box-shadow: 0 0 0 4px var(--navy), 0 0 0 8px #fff, 0 20px 50px rgba(31, 58, 104, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  animation: fxe-band var(--dur) cubic-bezier(0.7, 0, 0.3, 1) both;
+}
+@keyframes fxe-band {
+  0% { translate: -110% -50%; }
+  22%, 78% { translate: 0 -50%; }
+  100% { translate: 110% -50%; }
+}
+.fxe-face {
+  width: clamp(70px, 12vh, 120px);
+  height: clamp(70px, 12vh, 120px);
+  border-radius: 50%;
+  border: 4px solid #fff;
+  rotate: 6deg;
+  box-shadow: 0 6px 0 rgba(31, 58, 104, 0.4);
+  background: color-mix(in srgb, var(--c) 70%, #fff);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: clamp(36px, 6vh, 60px);
+  font-weight: 900;
+  font-style: italic;
+  text-shadow: 0 3px 0 rgba(31, 58, 104, 0.4);
+}
+.fxe-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 15%;
+}
+.fxe-band-text {
+  position: relative;
+  rotate: 6deg;
+}
+.fxe-band .fxe-big,
+.fxe-band .fxe-sub {
+  position: static;
+  translate: none;
+  text-align: left;
+}
+.fxe-band .fxe-big {
+  font-size: clamp(32px, 6vw, 72px);
+  text-shadow: 4px 4px 0 var(--navy), 0 0 20px rgba(255, 255, 255, 0.6);
+}
+.fxe-band .fxe-sub {
+  margin-top: 4px;
+}
+.fxe--banner .fxe-band {
+  rotate: 0deg;
+  height: clamp(70px, 12vh, 110px);
+}
+.fxe--banner .fxe-band-text {
+  rotate: 0deg;
+  text-align: center;
+}
+.fxe--banner .fxe-big {
+  font-family: 'Pretendard Variable', sans-serif;
+  font-style: normal;
+  font-size: clamp(22px, 4vw, 46px);
+  text-align: center;
+  text-shadow: 3px 3px 0 var(--navy);
+}
+.fxe--banner .fxe-sub {
+  text-align: center;
+}
+
+/* ── WARNING (보스 등장): 위아래 경고 띠가 반대로 흐르고 붉게 깜빡 ── */
+.fxe--warning {
+  background: rgba(60, 0, 20, 0.5);
+  animation: fxe-life var(--dur) ease both, fxe-redpulse 0.8s ease-in-out infinite;
+}
+@keyframes fxe-redpulse { 50% { background-color: rgba(120, 0, 30, 0.6); } }
+.fxe-hazard {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 44px;
+  background: repeating-linear-gradient(-45deg, #ffcc00 0 22px, #111 22px 44px);
+  background-size: 62px 62px;
+  animation: fxe-stripe 1s linear infinite;
+  box-shadow: 0 0 24px rgba(255, 0, 0, 0.5);
+}
+.fxe-hazard--top { top: 26%; }
+.fxe-hazard--bottom { bottom: 26%; animation-direction: reverse; }
+@keyframes fxe-stripe { to { background-position: 62px 0; } }
+.fxe--warning .fxe-big {
+  color: #ff3355;
+  font-style: normal;
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 20px #f00, 0 0 2px #fff;
+  animation: fxe-blink 0.5s steps(2) infinite;
+}
+@keyframes fxe-blink { 50% { opacity: 0.35; } }
+
+/* ── LEVEL UP / VICTORY: 도는 빛살 + 반짝이 + 한 글자씩 튀어나오는 금빛 글자 ── */
+.fxe--victory,
+.fxe--levelup {
+  background: radial-gradient(ellipse at center, rgba(31, 58, 104, 0.25), rgba(31, 58, 104, 0.7));
+}
+.fxe-rays {
+  position: absolute;
+  width: 160vmax;
+  height: 160vmax;
+  background: repeating-conic-gradient(rgba(255, 230, 140, 0.24) 0 6deg, transparent 6deg 18deg);
+  mask-image: radial-gradient(circle, #000 0%, transparent 55%);
+  animation: fxe-spin 8s linear infinite, fxe-up 0.6s ease both;
+}
+@keyframes fxe-spin { to { rotate: 360deg; } }
+.fxe-sparkle {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(2px 2px at 20% 30%, #fff, transparent),
+    radial-gradient(2px 2px at 75% 25%, #ffe9a8, transparent),
+    radial-gradient(3px 3px at 60% 70%, #fff, transparent),
+    radial-gradient(2px 2px at 35% 80%, #ffe9a8, transparent),
+    radial-gradient(2px 2px at 85% 60%, #fff, transparent),
+    radial-gradient(3px 3px at 12% 62%, #bfe4ff, transparent),
+    radial-gradient(2px 2px at 48% 18%, #bfe4ff, transparent);
+  animation: fxe-twinkle 1.2s ease-in-out infinite alternate;
+}
+@keyframes fxe-twinkle { to { opacity: 0.3; translate: 0 -12px; } }
+.fxe--victory .fxe-big,
+.fxe--levelup .fxe-big {
+  filter: drop-shadow(0 4px 0 #6b3d00) drop-shadow(0 0 20px rgba(255, 200, 80, 0.6));
+  text-shadow: none;
+}
+/* 글자마다 따로 움직이므로 금빛도 글자마다 (부모에 clip하면 사라진다). 이탤릭이 잘리지 않게 여백을 주고 당긴다 */
+.fxe--victory .fxe-big span,
+.fxe--levelup .fxe-big span {
+  padding: 0 0.12em;
+  margin: 0 -0.12em;
+  background: linear-gradient(180deg, #fff6d0, #ffd34d 45%, #c98a12);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: fxe-pop 0.35s calc(0.25s + var(--i) * 45ms) cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.fxe--victory .fxe-sub,
+.fxe--levelup .fxe-sub {
+  letter-spacing: 0.4em;
+  animation: fxe-spread 0.9s 0.8s ease both;
+}
+.fxe--levelup .fxe-big {
+  animation: fxe-rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes fxe-rise { from { translate: 0 30%; opacity: 0; } }
+
+/* ── KO: 색이 빠지고 글자가 떨어진다 (trpg-vtt의 FUMBLE) ── */
+.fxe--ko {
+  backdrop-filter: grayscale(1) brightness(0.8);
+  background: rgba(31, 30, 60, 0.4);
+}
+.fxe--ko .fxe-big {
+  color: #b9c3dc;
+}
+.fxe--ko .fxe-big span {
+  animation: fxe-drop 0.9s calc(0.5s + var(--i) * 70ms) cubic-bezier(0.5, 0, 0.9, 0.4) both;
+}
+@keyframes fxe-drop {
+  60% { translate: 0 6px; rotate: 8deg; }
+  to { translate: 0 40vh; rotate: 40deg; opacity: 0; }
+}
+.fxe--ko .fxe-sub {
+  color: #dde3f0;
+}
+
+/* ── DEFEATED: 어두워지며 금이 가고 글자가 하나씩 떠오른다 ── */
+.fxe--defeat {
+  background: rgba(10, 14, 30, 0.82);
+}
+.fxe-crack {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 49.6%, rgba(255, 255, 255, 0.5) 50%, transparent 50.4%),
+    linear-gradient(62deg, transparent 49.7%, rgba(255, 255, 255, 0.35) 50%, transparent 50.3%),
+    linear-gradient(160deg, transparent 49.8%, rgba(255, 255, 255, 0.3) 50%, transparent 50.2%);
+  animation: fxe-flash 0.2s 0.3s reverse both;
+}
+.fxe--defeat .fxe-big {
+  color: #e2425f;
+  letter-spacing: 0.25em;
+  font-style: normal;
+}
+.fxe--defeat .fxe-big span {
+  animation: fxe-up 1s calc(0.3s + var(--i) * 90ms) ease both;
+}
+.fxe--defeat .fxe-sub {
+  color: #bbb;
+  animation: fxe-up 1s 1.4s ease both;
+}
+
+/* ── 말 머리 위 숫자 (trpg-vtt의 dmg-pop) ── */
+.fx-float {
+  position: fixed;
+  z-index: 55;
+  translate: -50% 0;
+  font-family: 'Exo 2', 'Pretendard Variable', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  font-style: italic;
+  -webkit-text-stroke: 4px #fff;
+  paint-order: stroke fill;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fx-float 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.fx-float--coin { color: #e6a200; }
+.fx-float--hurt { color: #ff3d5e; }
+.fx-float--heal { color: #17c47c; }
+.fx-float--level { color: var(--sky-deep); font-size: 18px; }
+@keyframes fx-float {
+  0% { opacity: 0; scale: 2; translate: -50% 0; }
+  15% { opacity: 1; scale: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; translate: -50% -46px; }
+}
+
+/* ── 차례 시작 칸에 퍼지는 동그라미 (trpg-vtt의 vtt-ping) ── */
+.fx-ping {
+  position: fixed;
+  z-index: 15;
+  pointer-events: none;
+}
+.fx-ping span {
+  position: absolute;
+  left: -32px;
+  top: -32px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid var(--c);
+  box-shadow: 0 0 12px var(--c);
+  animation: fx-ping 1.2s ease-out 2 both;
+}
+.fx-ping span + span {
+  animation-delay: 0.35s;
+}
+@keyframes fx-ping {
+  from { scale: 0.2; opacity: 1; }
+  to { scale: 1.6; opacity: 0; }
+}
+
+/* ── 평소 화면의 반짝임 ── */
+/* 지금 차례인 말 아래 빛나는 링 */
+.token.current::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  border: 3px solid var(--yellow);
+  box-shadow: 0 0 14px var(--yellow);
+  animation: token-ring 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes token-ring {
+  50% { scale: 1.18; opacity: 0.45; }
+}
+/* 맵 위에 은은하게 떠오르는 반짝이 */
+.board-area::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(2px 2px at 18% 24%, #fff, transparent),
+    radial-gradient(3px 3px at 72% 18%, #fff, transparent),
+    radial-gradient(2px 2px at 64% 66%, #e9f6ff, transparent),
+    radial-gradient(2px 2px at 30% 78%, #fff, transparent),
+    radial-gradient(3px 3px at 86% 58%, #fff8d6, transparent),
+    radial-gradient(2px 2px at 44% 40%, #fff, transparent);
+  animation: fxe-twinkle 2.6s ease-in-out infinite alternate;
+  z-index: 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fxe,
+  .fxe *,
+  .fx-float,
+  .fx-ping span {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
