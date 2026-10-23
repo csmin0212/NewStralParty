@@ -8,6 +8,7 @@ export const TILE_INFO: Record<TileKind, { name: string; icon: string }> = {
   spawn: { name: '균열', icon: '🌀' },
   heal: { name: '회복', icon: '❤️' },
   warp: { name: '워프', icon: '🚪' },
+  shop: { name: '상점', icon: '🛒' },
   base: { name: '본부', icon: '🏠' },
 };
 
@@ -32,7 +33,7 @@ export const DEFAULT_BOARD: Board = {
   tiles: [
     { id: 0, kind: 'base', x: 0, y: 0, next: [1] },
     { id: 1, kind: 'coinPlus', x: 1, y: 0, next: [2] },
-    { id: 2, kind: 'empty', x: 2, y: 0, next: [3] },
+    { id: 2, kind: 'shop', x: 2, y: 0, next: [3] },
     { id: 3, kind: 'card', x: 3, y: 0, next: [4, 22] },
     { id: 4, kind: 'coinPlus', x: 4, y: 0, next: [5] },
     { id: 5, kind: 'heal', x: 5, y: 0, next: [6] },
@@ -46,7 +47,7 @@ export const DEFAULT_BOARD: Board = {
     { id: 13, kind: 'coinMinus', x: 5, y: 4, next: [14] },
     { id: 14, kind: 'card', x: 4, y: 4, next: [15] },
     { id: 15, kind: 'coinPlus', x: 3, y: 4, next: [16] },
-    { id: 16, kind: 'empty', x: 2, y: 4, next: [17] },
+    { id: 16, kind: 'shop', x: 2, y: 4, next: [17] },
     { id: 17, kind: 'spawn', x: 1, y: 4, next: [18] },
     { id: 18, kind: 'coinPlus', x: 0, y: 4, next: [19] },
     { id: 19, kind: 'heal', x: 0, y: 3, next: [20] },

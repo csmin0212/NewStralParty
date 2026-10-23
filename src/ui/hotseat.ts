@@ -150,6 +150,9 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
       deckOpen = !deckOpen;
       draw(shownState, busy);
     },
+    refresh() {
+      draw(shownState, busy);
+    },
     toggleLog() {
       logOpen = !logOpen;
       draw(shownState, busy);

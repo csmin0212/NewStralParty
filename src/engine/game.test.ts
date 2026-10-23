@@ -4,7 +4,7 @@ import { DEFAULT_PRESETS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
 import { PLACEHOLDER_BOSS } from '../data/bosses';
 import { ENEMIES } from '../data/enemies';
-import { validateDeck } from './cards';
+import { canAddToDeck, cardTargets, deckPoints, validateDeck } from './cards';
 import { applyAction, createGame, RuleError, validateBoard } from './game';
 import { RULES } from './rules';
 import type { Board, BossDef, CardId, EnemyKind, GameState, Gimmick, TileKind } from './types';
@@ -157,6 +157,7 @@ describe('주사위와 이동', () => {
           s = applyAction(s, { type: 'CHOOSE_PATH', player, to: s.phase.options[0] });
         else if (s.phase.kind === 'encounter') s = applyAction(s, { type: 'ENCOUNTER', player, choice: 'attack' });
         else if (s.phase.kind === 'defend') s = applyAction(s, { type: 'DEFEND', player, mode: 'block' });
+        else if (s.phase.kind === 'shop') s = applyAction(s, { type: 'LEAVE_SHOP', player });
         else s = applyAction(s, { type: 'END_TURN', player });
       }
       return s;
@@ -445,7 +446,8 @@ describe('KO', () => {
     s = finishTurn(s); // 3라운드: P1 부활
     expect([s.current, s.round]).toEqual([0, 3]);
     expect(s.players[0]).toMatchObject({ ko: false, hp: s.players[0].maxHp, tile: 2, reviveRound: null });
-    expect(s.players[0].coins).toBe(11 + RULES.turnIncome);
+    // 3라운드 = 라운드 보상
+    expect(s.players[0].coins).toBe(11 + RULES.turnIncome + RULES.roundRewardCoins);
   });
 });
 
@@ -599,61 +601,42 @@ describe('진행도와 보스', () => {
 
 describe('덱', () => {
   const total = (p: GameState['players'][number]) => p.drawPile.length + p.discard.length + p.hand.length;
+  const budget = MUT.deckPoints;
 
-  it('게임 시작: 내 덱을 섞고 2장, 첫 차례 시작에 1장 더', () => {
+  it('게임 시작: 내 덱을 섞어 3장. 차례가 시작돼도 더 뽑지 않는다', () => {
     const s = newGame(ring(empties(4)));
-    expect(s.players[0].hand).toHaveLength(RULES.startHand + 1);
+    expect(s.players[0].hand).toHaveLength(RULES.startHand);
     expect(s.players[1].hand).toHaveLength(RULES.startHand);
     expect(total(s.players[0])).toBe(DEFAULT_PRESETS[0].cards.length);
     expect([...s.players[0].deck].sort()).toEqual([...DEFAULT_PRESETS[0].cards].sort());
   });
 
-  it('고른 덱을 가져간다', () => {
-    const cards = DEFAULT_PRESETS[1].cards;
-    const s = createGame({
-      board: ring(empties(4)),
-      boss: TEST_BOSS,
-      players: [{ name: 'A', color: '#fff', character: 'mutbyeol', deck: cards }],
-      seed: 1,
-    });
-    expect([...s.players[0].deck].sort()).toEqual([...cards].sort());
+  it('프리셋 덱은 모두 규칙에 맞다', () => {
+    for (const p of DEFAULT_PRESETS.filter((d) => d.cards.length > 0)) expect(validateDeck(p.cards, budget)).toEqual([]);
   });
 
-  it('덱 규칙: 10장까지, 같은 카드 2장까지 (1장 제한 카드는 1장)', () => {
-    expect(validateDeck(DEFAULT_PRESETS[0].cards)).toEqual([]);
-    expect(validateDeck([...DEFAULT_PRESETS[0].cards, 'dash'])).not.toEqual([]);
-    expect(validateDeck(['dash', 'dash', 'dash', 'bandage', 'notes'])).not.toEqual([]);
-    expect(validateDeck(['pierce', 'pierce', 'dash', 'bandage', 'notes'])).not.toEqual([]);
-    expect(() =>
-      createGame({
-        board: ring(empties(4)),
-        boss: TEST_BOSS,
-        players: [{ name: 'A', color: '#fff', character: 'mutbyeol', deck: ['dash'] }],
-        seed: 1,
-      }),
-    ).toThrow(RuleError);
+  it('덱 규칙: 10장까지 · 카드별 장수 제한 · 덱 포인트 예산 · 생성 카드 금지', () => {
+    const base: CardId[] = ['dash', 'dash', 'cake', 'cake', 'atkM'];
+    expect(validateDeck(base, budget)).toEqual([]);
+    expect(validateDeck([...base, 'dash', 'dash'], budget)).not.toEqual([]); // 질주 4장
+    expect(validateDeck([...base, 'pudding', 'pudding'], budget)).not.toEqual([]); // 1장 제한
+    expect(validateDeck([...base, 'pudding', 'gawu', 'railgun', 'charge'], budget)).not.toEqual([]); // 20점
+    expect(validateDeck([...base, 'fullAttack'], budget)).not.toEqual([]);
+    expect(deckPoints(['pudding', 'laser', 'dash'])).toBe(7);
+    expect(canAddToDeck([...base, 'pudding', 'gawu', 'railgun'], 'laser', budget)).toBe(false); // 15 + 2
   });
 
   it('쓴 덱 카드는 버린 더미로, 뽑을 더미가 비면 버린 더미를 섞어 다시 뽑는다', () => {
     const s0 = newGame(ring(['card', ...empties(4)]));
     const p0 = s0.players[0];
-    p0.hand = [{ card: 'allowance' }];
-    p0.discard = ['notes', 'dash'];
+    p0.hand = [{ card: 'cake' }];
+    p0.discard = ['dash', 'cookie'];
     p0.drawPile = [];
     const s1 = applyAction(s0, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
-    expect(s1.players[0].discard).toEqual(['notes', 'dash', 'allowance']);
+    expect(s1.players[0].discard).toEqual(['dash', 'cookie', 'cake']);
     const s2 = rollExactly(s1, 1); // 카드 칸
     expect(s2.players[0].hand).toHaveLength(1);
     expect(s2.players[0].drawPile.length + s2.players[0].discard.length).toBe(2);
-  });
-
-  it('상점 카드는 쓰면 사라진다', () => {
-    const s0 = newGame(ring(empties(4)));
-    s0.players[0].hand = [{ card: 'allowance', shop: true }];
-    const before = s0.players[0].discard.length;
-    const s = applyAction(s0, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
-    expect(s.players[0].discard).toHaveLength(before);
-    expect(s.players[0].hand).toHaveLength(0);
   });
 
   it('손패가 가득 차면 뽑은 카드는 버린 더미로', () => {
@@ -665,20 +648,74 @@ describe('덱', () => {
     expect(s.players[0].discard).toHaveLength(before + 1);
   });
 
-  it('본부에서만 덱 정비: 넣으면 뽑을 더미로, 빼면 더미에서 사라진다', () => {
+  it('본부에서만 덱 정비: 넣으면 뽑을 더미로, 빼면 더미에서 사라진다. 포인트 예산을 넘길 수 없다', () => {
     const s0 = newGame(ring(empties(4)));
-    expect(s0.players[0].tile).toBe(0);
     const deckBefore = s0.players[0].deck.length;
     const removable = s0.players[0].drawPile[0];
     let s = applyAction(s0, { type: 'EDIT_DECK', player: 0, remove: removable });
     expect(s.players[0].deck).toHaveLength(deckBefore - 1);
-    s = applyAction(s, { type: 'EDIT_DECK', player: 0, add: 'tripleDice' });
-    expect(s.players[0].deck).toContain('tripleDice');
-    expect(s.players[0].drawPile).toContain('tripleDice');
-    expect(() => applyAction(s, { type: 'EDIT_DECK', player: 0, add: 'tripleDice' })).toThrow(RuleError);
+    s = applyAction(s, { type: 'EDIT_DECK', player: 0, add: 'pudding' });
+    expect(s.players[0].drawPile).toContain('pudding');
+    expect(() => applyAction(s, { type: 'EDIT_DECK', player: 0, add: 'pudding' })).toThrow(RuleError);
 
     const away = rollExactly(s, 1);
     expect(() => applyAction(away, { type: 'EDIT_DECK', player: 0, add: 'dash' })).toThrow(RuleError);
+  });
+
+  it('라운드 보상: 3라운드마다 모두 코인 +5 · 카드 1장', () => {
+    let s = newGame(ring(empties(20)), { players: 2 });
+    for (const p of s.players) p.hand = [];
+    const coins = s.players.map((p) => p.coins);
+    while (s.round < RULES.roundRewardEvery) s = finishTurn(s);
+    expect(s.players.map((p) => p.hand.length)).toEqual([1, 1]);
+    // 차례 수입(2코인)을 빼고 보면 5코인씩 늘었다
+    const income = s.players.map((p, i) => p.coins - coins[i]);
+    expect(income[1] - (RULES.roundRewardEvery - 1) * RULES.turnIncome).toBe(RULES.roundRewardCoins);
+  });
+});
+
+describe('상점', () => {
+  const shopRing = () => newGame(ring(['empty', 'shop', ...empties(6)]));
+
+  it('상점을 지나가면 열리고, 사거나 그냥 나가면 남은 칸을 마저 간다', () => {
+    let s = shopRing();
+    s.players[0].coins = 10;
+    s.players[0].hand = [];
+    s = rollExactly(s, 4);
+    expect(s.phase.kind).toBe('shop');
+    if (s.phase.kind !== 'shop') throw new Error();
+    expect(s.phase.offers).toHaveLength(RULES.shopOffers);
+    expect(s.phase.free).toBe(false);
+    s = applyAction(s, { type: 'BUY_CARD', player: 0, offer: 0 });
+    expect(s.players[0].coins).toBe(10 - RULES.shopPrice);
+    expect(s.players[0].hand[0].shop).toBe(true);
+    expect(() => applyAction(s, { type: 'BUY_CARD', player: 0, offer: 0 })).toThrow(RuleError);
+    s = applyAction(s, { type: 'LEAVE_SHOP', player: 0 });
+    expect(s.players[0].tile).toBe(4);
+    expect(s.phase.kind).toBe('endTurn');
+  });
+
+  it('상점에 멈추면 첫 구매가 무료', () => {
+    let s = shopRing();
+    s.players[0].coins = 0;
+    s.players[0].hand = [];
+    s = rollExactly(s, 2);
+    if (s.phase.kind !== 'shop') throw new Error();
+    expect(s.phase.free).toBe(true);
+    s = applyAction(s, { type: 'BUY_CARD', player: 0, offer: 1 });
+    expect(s.players[0].hand).toHaveLength(1);
+    expect(() => applyAction(s, { type: 'BUY_CARD', player: 0, offer: 2 })).toThrow(RuleError);
+    s = applyAction(s, { type: 'LEAVE_SHOP', player: 0 });
+    expect(s.phase.kind).toBe('endTurn');
+  });
+
+  it('상점 카드는 쓰면 사라진다', () => {
+    const s0 = newGame(ring(empties(4)));
+    s0.players[0].hand = [{ card: 'cake', shop: true }];
+    const before = s0.players[0].discard.length;
+    const s = applyAction(s0, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
+    expect(s.players[0].discard).toHaveLength(before);
+    expect(s.players[0].hand).toHaveLength(0);
   });
 });
 
@@ -687,230 +724,221 @@ describe('카드', () => {
     s.players[s.current].hand = cards.map((card) => ({ card }));
     return s;
   };
-  const play = (s: GameState, i = 0) => applyAction(s, { type: 'PLAY_CARD', player: s.current, handIndex: i });
+  const play = (s: GameState, i = 0, extra: { target?: number; value?: number } = {}) =>
+    applyAction(s, { type: 'PLAY_CARD', player: s.current, handIndex: i, ...extra });
+  const lastAttack = (s: GameState) => {
+    const hit = s.battles.at(-1)!.events.filter((e) => e.type === 'attack').at(-1)!;
+    if (hit.type !== 'attack') throw new Error();
+    return hit.result;
+  };
 
-  it('질주: 이동 +2, 주사위 전 카드는 턴마다 1장만', () => {
+  it('주사위 전 카드는 턴마다 1장, 굴린 뒤에는 못 쓴다', () => {
     const s0 = give(newGame(ring(empties(12))), 'dash', 'dash');
     const s1 = play(s0);
-    expect(s1.players[0].hand).toEqual([{ card: 'dash' }]);
     expect(() => play(s1)).toThrow(RuleError);
     const s2 = applyAction(s1, { type: 'ROLL', player: 0 });
     expect(s2.players[0].tile).toBe(s2.turn.dice[0] + 2);
+    expect(() => play(s2)).toThrow(RuleError);
   });
 
-  it('주사위를 굴린 뒤에는 주사위 전 카드를 쓸 수 없다', () => {
-    const s0 = give(newGame(ring(empties(12))), 'dash');
-    const s1 = applyAction(s0, { type: 'ROLL', player: 0 });
-    expect(() => play(s1)).toThrow(RuleError);
+  it('성 제한: 성이 모자라면 못 쓴다', () => {
+    const s0 = give(newGame(ring(empties(12))), 'bandage');
+    expect(() => play(s0)).toThrow(RuleError);
+    s0.players[0].level = 1;
+    s0.players[0].hp = 2;
+    expect(play(s0).players[0].hp).toBe(6);
   });
 
-  it('더블 · 트리플 주사위, 산책(눈 최대 3)', () => {
-    let s = play(give(newGame(ring(empties(20))), 'doubleDice'));
-    s = applyAction(s, { type: 'ROLL', player: 0 });
+  it('코인 비용: 더블 주사위 3코인', () => {
+    const s0 = give(newGame(ring(empties(20))), 'doubleDice');
+    s0.players[0].coins = 2;
+    expect(() => play(s0)).toThrow(RuleError);
+    s0.players[0].coins = 5;
+    const s = applyAction(play(s0), { type: 'ROLL', player: 0 });
     expect(s.turn.dice).toHaveLength(2);
+    expect(s.players[0].coins).toBe(2);
+  });
 
-    const rich = give(newGame(ring(empties(20))), 'tripleDice');
-    rich.players[0].coins = 10;
-    s = applyAction(play(rich), { type: 'ROLL', player: 0 });
+  it('트리플 주사위: 주사위 3개, 다음 차례를 쉰다', () => {
+    let s = give(newGame(ring(empties(30)), { players: 2 }), 'tripleDice');
+    s.players[0].level = 2;
+    s.players[0].coins = 10;
+    s = applyAction(play(s), { type: 'ROLL', player: 0 });
     expect(s.turn.dice).toHaveLength(3);
-    expect(s.players[0].coins).toBe(6);
-
-    for (let seed = 1; seed < 15; seed++) {
-      s = applyAction(play(give(newGame(ring(empties(20)), { seed }), 'stroll')), { type: 'ROLL', player: 0 });
-      expect(s.turn.dice[0]).toBeLessThanOrEqual(3);
-    }
+    s = finishTurn(applyAction(s, { type: 'END_TURN', player: 0 }));
+    expect([s.current, s.round]).toEqual([1, 2]); // 2라운드 0번 차례는 건너뛰었다
+    expect(s.players[0].status.skipTurn).toBe(false);
   });
 
-  it('코인이 모자라면 비용 있는 카드를 못 쓴다', () => {
-    const s0 = give(newGame(ring(empties(12))), 'tripleDice');
-    s0.players[0].coins = 3;
+  it('리모컨 주사위: 고른 칸만큼 이동', () => {
+    const s0 = give(newGame(ring(empties(12))), 'remoteDice');
+    s0.players[0].level = 1;
     expect(() => play(s0)).toThrow(RuleError);
+    const s = applyAction(play(s0, 0, { value: 5 }), { type: 'ROLL', player: 0 });
+    expect(s.players[0].tile).toBe(5);
   });
 
-  it('붕대 · 에너지 드링크 · 용돈 · 수업 노트 · 리프레시', () => {
-    const base = newGame(ring(empties(12)));
-    base.players[0].hp = 3;
-    expect(play(give(structuredClone(base), 'bandage')).players[0].hp).toBe(7);
-    const drink = play(give(structuredClone(base), 'energyDrink'));
-    expect([drink.players[0].hp, drink.turn.extraSteps]).toEqual([5, 1]);
-    expect(play(give(structuredClone(base), 'allowance')).players[0].coins).toBe(base.players[0].coins + 5);
-    expect(play(give(structuredClone(base), 'notes')).players[0].hand).toHaveLength(2);
-    const cd = give(structuredClone(base), 'refresh');
-    cd.players[0].skillCooldown = 3;
-    expect(play(cd).players[0].skillCooldown).toBe(1);
-    expect(() => play(give(structuredClone(base), 'refresh'))).toThrow(RuleError);
-  });
-
-  it('귀환 신호: 본부로 가서 별을 따고, 거기서 굴린다', () => {
-    const s0 = give(newGame(ring(empties(12))), 'recall');
-    s0.players[0].tile = 5;
-    s0.players[0].coins = 20;
-    const s = play(s0);
-    expect(s.players[0].tile).toBe(0);
-    expect(s.players[0].level).toBe(1);
-    expect(s.phase).toEqual({ kind: 'preRoll' });
-  });
-
-  it('아드레날린 · 강타: 공격력이 오른다 (이번 턴 · 이번 전투)', () => {
-    const s0 = withEnemy(newGame(ring(empties(9))), 'robot', 2);
-    give(s0, 'adrenaline', 'powerStrike');
-    let s = play(s0);
-    s = rollExactly(s, 3);
-    expect(s.phase.kind).toBe('encounter');
+  it('이독제독: 체력 -2, 다음 2번의 차례 시작에 체력 +3', () => {
+    let s = give(newGame(ring(empties(30)), { players: 1 }), 'poisonCure');
+    s.players[0].level = 1;
+    s.players[0].hp = 5;
     s = play(s);
-    s = attack(s);
-    const hit = s.battles.at(-1)!.events.find((e) => e.type === 'attack')!;
-    if (hit.type !== 'attack') throw new Error();
-    expect(hit.result.attackValue).toBe(hit.result.attackRoll + MUT.atk + 4);
+    expect(s.players[0].hp).toBe(3);
+    s = finishTurn(s);
+    expect(s.players[0].hp).toBe(6);
+    s = finishTurn(s);
+    expect(s.players[0].hp).toBe(9);
+    expect(s.players[0].status.regen).toBe(null);
   });
 
-  it('전투 카드는 전투 중에만, 공격 카드는 공격 때, 방어 카드는 반격 때', () => {
-    const s0 = give(newGame(ring(empties(9))), 'powerStrike', 'ironWall');
-    expect(() => play(s0)).toThrow(RuleError);
-    let s = withEnemy(s0, 'delinquent', 2);
+  it('왕의 힘: 체력 -4, 이번 턴과 다음 2턴 공격력 +5', () => {
+    let s = give(withEnemy(newGame(ring(empties(9)), { players: 1 }), 'robot', 2), 'kingPower');
+    s.players[0].level = 2;
+    s.enemies[0].hp = 99;
+    s = play(s);
+    expect(s.players[0].hp).toBe(MUT.hp - 4);
+    s = attack(rollExactly(s, 3));
+    expect(lastAttack(s).attackValue).toBe(lastAttack(s).attackRoll + MUT.atk + 5);
+    s = finishTurn(applyAction(s, { type: 'END_TURN', player: 0 }));
+    s = finishTurn(s);
+    expect(s.players[0].status.atkUp).toBe(null);
+  });
+
+  it('보충 수업: 쓰러지면 쉬지 않고 다음 차례에 부활', () => {
+    let s = give(newGame(ring(empties(20)), { players: 2 }), 'extend');
+    s.players[0].level = 3;
+    s.players[0].coins = 20;
+    s = play(s);
+    expect(s.players[0].status.extend).toBe(true);
+    s.players[0].hp = 1;
+    s = withEnemy(s, 'delinquent', 2);
+    s.enemies[0].hp = 99;
+    s.enemies[0].atk = 50;
+    s = defend(attack(rollExactly(s, 3)), 'block');
+    expect(s.players[0].ko).toBe(true);
+    expect(s.players[0].reviveRound).toBe(s.round + 1);
+  });
+
+  it('서둘러: 고른 아군의 다음 이동 주사위 2개', () => {
+    let s = give(newGame(ring(empties(30)), { players: 2 }), 'hurry');
+    expect(() => play(s)).toThrow(RuleError); // 대상 필요
+    s = play(s, 0, { target: 1 });
+    expect(s.players[1].status.nextMoveDice).toBe(2);
+    s = finishTurn(s);
+    s = applyAction(s, { type: 'ROLL', player: 1 });
+    expect(s.turn.dice).toHaveLength(2);
+  });
+
+  it('너도 나도 · 지원 요청 · 호화 만찬', () => {
+    const base = newGame(ring(empties(12)), { players: 3 });
+    base.players[0].level = 1;
+    base.players[1].tile = 2;
+    base.players[2].tile = 9;
+    base.players[1].hp = 1;
+    base.players[2].hp = 1;
+    expect(() => play(give(structuredClone(base), 'share'), 0, { target: 0 })).toThrow(RuleError);
+    const share = play(give(structuredClone(base), 'share'), 0, { target: 1 });
+    expect(share.players[1].hand).toHaveLength(base.players[1].hand.length + 1);
+    const backup = play(give(structuredClone(base), 'backup'), 0, { target: 2 });
+    expect(backup.players[0].tile).toBe(9);
+    const feast = play(give(structuredClone(base), 'feast'), 0, { target: 1 });
+    expect(feast.players.map((p) => p.hp)).toEqual([MUT.hp, 4, 1]); // 9번 칸 아군은 3칸 밖
+  });
+
+  it('새총 · 벽돌: 사거리 안 에너미만, 쓰러뜨리면 보상', () => {
+    const base = withEnemy(withEnemy(newGame(ring(empties(12))), 'robot', 2), 'drone', 8);
+    base.players[0].level = 2;
+    base.enemies[1].hp = 9;
+    const [near, far] = base.enemies;
+    expect(cardTargets(base, base.players[0], 'brick')).toEqual([near.id]); // 8번은 뒤로 5칸
+    expect(() => play(give(structuredClone(base), 'brick'), 0, { target: far.id })).toThrow(RuleError);
+    const sling = play(give(structuredClone(base), 'slingshot'), 0, { target: far.id });
+    expect(sling.enemies.find((e) => e.id === far.id)!.hp).toBe(Math.max(0, far.hp - 2));
+    const coins = base.players[0].coins;
+    const brick = play(give(structuredClone(base), 'brick'), 0, { target: near.id });
+    expect(brick.enemies.map((e) => e.id)).not.toContain(near.id);
+    expect(brick.players[0].coins).toBe(coins + ENEMIES.robot.reward);
+  });
+
+  it('전투 코스트: 인카운터마다 3 + 성, 그 안에서 여러 장', () => {
+    let s = give(withEnemy(newGame(ring(empties(9))), 'robot', 2), 'atkM', 'atkL', 'atkM');
+    s.enemies[0].hp = 99;
+    s = rollExactly(s, 3);
+    s = play(s, 0); // 1
+    s = play(s, 0); // +2 = 3
+    expect(() => play(s, 0)).toThrow(RuleError); // 4 > 3
+    const b = s.turn.battle;
+    expect(b.costUsed).toBe(3);
+    s = attack(s);
+    expect(lastAttack(s).attackValue).toBe(lastAttack(s).attackRoll + MUT.atk + b.atk);
+    expect(b.atk).toBeGreaterThanOrEqual(2);
+    expect(b.atk).toBeLessThanOrEqual(9);
+  });
+
+  it('공격 카드는 공격 때, 방어 카드는 반격 때만', () => {
+    let s = give(withEnemy(newGame(ring(empties(9))), 'delinquent', 2), 'atkM', 'defM');
+    s.enemies[0].hp = 99;
+    expect(() => play(s, 0)).toThrow(RuleError);
     s = rollExactly(s, 3);
     expect(() => play(s, 1)).toThrow(RuleError);
-    s = play(s, 0);
-    expect(() => play(s, 0)).toThrow(RuleError); // 공격 때는 1장
-  });
-
-  it('기절탄: 반격형도 반격하지 않는다', () => {
-    let s = give(withEnemy(newGame(ring(empties(9))), 'delinquent', 2), 'stun');
-    s.enemies[0].hp = 99;
-    s = rollExactly(s, 3);
-    s = attack(play(s));
-    expect(s.phase.kind).not.toBe('defend');
-  });
-
-  it('관통탄: 방어 · 회피 무시, 공격값 그대로 피해', () => {
-    let s = give(withEnemy(newGame(ring(empties(9))), 'robot', 2), 'pierce');
-    s.players[0].coins = 10;
-    s.enemies[0].hp = 99;
-    s.enemies[0].def = 50;
-    s = attack(play(rollExactly(s, 3)));
-    const hit = s.battles.at(-1)!.events.find((e) => e.type === 'attack')!;
-    if (hit.type !== 'attack') throw new Error();
-    expect(hit.result.damage).toBe(hit.result.attackValue);
-  });
-
-  it('현상금: 처치 보상 2배', () => {
-    let s = give(withEnemy(newGame(ring(empties(9))), 'robot', 2), 'bounty');
-    s.enemies[0].hp = 1;
-    const coins = s.players[0].coins;
-    s = attack(play(rollExactly(s, 3)));
-    expect(s.players[0].coins).toBe(coins + ENEMIES.robot.reward * 2);
-  });
-
-  it('흡혈 탄환: 준 피해만큼 회복', () => {
-    let s = give(withEnemy(newGame(ring(empties(9))), 'robot', 2), 'lifeSteal');
-    s.players[0].hp = 1;
-    s.enemies[0].hp = 99;
-    s = attack(play(rollExactly(s, 3)));
-    const hit = s.battles.at(-1)!.events.find((e) => e.type === 'attack')!;
-    if (hit.type !== 'attack') throw new Error();
-    expect(s.players[0].hp).toBe(Math.min(s.players[0].maxHp, 1 + hit.result.damage));
-  });
-
-  /** 반격형 불량배와 싸워 반격을 받는 장면까지 */
-  const toDefend = (seed = 42, ...cards: CardId[]) => {
-    let s = withEnemy(newGame(ring(empties(9)), { seed }), 'delinquent', 2);
-    s.enemies[0].hp = 99;
-    s = attack(rollExactly(s, 3));
+    s = attack(play(s, 0));
     expect(s.phase.kind).toBe('defend');
-    return give(s, ...cards);
-  };
-
-  it('완벽한 회피: 반드시 회피하고, 회피 성공 효과도 발동', () => {
-    for (let seed = 1; seed < 8; seed++) {
-      const s0 = toDefend(seed, 'perfectDodge');
-      s0.players[0].skillCooldown = 2;
-      const s = defend(play(s0), 'block');
-      expect(s.players[0].hp).toBe(s0.players[0].hp);
-      expect(s.players[0].skillCooldown).toBe(1); // 뭇별 패시브
-    }
+    s = play(s, 0);
+    expect(s.turn.battle.def).toBeGreaterThanOrEqual(1);
   });
 
-  it('철벽: 방어력 +3', () => {
-    const s = defend(play(toDefend(42, 'ironWall')), 'block');
-    const hit = s.battles.at(-1)!.events.filter((e) => e.type === 'attack').at(-1)!;
-    if (hit.type !== 'attack') throw new Error();
-    expect(hit.result.defenseValue).toBe(hit.result.defenseRoll + MUT.def + 3);
-  });
-
-  it('사이드 스텝: 회피 주사위 +1', () => {
-    const s = defend(play(toDefend(42, 'sidestep')), 'evade');
-    const hit = s.battles.at(-1)!.events.filter((e) => e.type === 'attack').at(-1)!;
-    if (hit.type !== 'attack') throw new Error();
-    expect(hit.result.defenseRolls).toHaveLength(2);
-  });
-
-  it('맞받아치기: 방어로 받은 피해만큼 에너미에게', () => {
-    const s0 = toDefend(42, 'counterShot');
-    const enemyHp = s0.enemies[0].hp;
-    const s = defend(play(s0), 'block');
-    const taken = s0.players[0].hp - s.players[0].hp;
-    expect(s.enemies[0].hp).toBe(enemyHp - taken);
-  });
-
-  it('연막탄: 반격을 받지 않고 남은 칸 이동', () => {
-    const s0 = toDefend(42, 'smokeBomb');
-    const s = play(s0);
-    expect(s.players[0].hp).toBe(s0.players[0].hp);
+  it('그림자 습격: 공격력 +3, 반격 없음', () => {
+    let s = give(withEnemy(newGame(ring(empties(9))), 'delinquent', 2), 'shadowRaid');
+    s.players[0].level = 1;
+    s.enemies[0].hp = 99;
+    s = attack(play(rollExactly(s, 3)));
     expect(s.phase.kind).not.toBe('defend');
-    expect(s.battles.at(-1)!.events.at(-1)).toEqual({ type: 'escape' });
+    expect(lastAttack(s).attackValue).toBe(lastAttack(s).attackRoll + MUT.atk + 3);
   });
 
-  it('지원: 구급상자 · 단체 급식 · 동아리 회비 · 응원 · 바톤 터치', () => {
-    const base = newGame(ring(empties(9)), { players: 3 });
-    base.players[1].hp = 2;
-    base.players[2].hp = 5;
-    const aid = play(give(structuredClone(base), 'firstAid'));
-    expect(aid.players[1].hp).toBe(6);
-    const meal = play(give(structuredClone(base), 'groupMeal'));
-    expect(meal.players.map((p) => p.hp)).toEqual([MUT.hp, 4, 7]);
-    const fund = play(give(structuredClone(base), 'clubFund'));
-    expect(fund.players.map((p) => p.coins - base.players[p.id].coins)).toEqual([3, 3, 3]);
-    const cheer = play(give(structuredClone(base), 'cheer'));
-    expect(cheer.players[1].hand).toHaveLength(base.players[1].hand.length + 1);
-    const baton = give(structuredClone(base), 'batonTouch');
-    baton.players[1].skillCooldown = 2;
-    expect(play(baton).players[1].skillCooldown).toBe(1);
+  it('축적 → 전력 공격: 공격력 +5, 다음 전투에서 (공격력 + 6) × 1.5', () => {
+    let s = give(withEnemy(newGame(ring(empties(9))), 'robot', 2), 'charge');
+    s.players[0].level = 2;
+    s.enemies[0].hp = 99;
+    s = play(rollExactly(s, 3));
+    expect(s.players[0].hand.map((h) => h.card)).toEqual(['fullAttack']);
+    s = attack(s);
+    expect(lastAttack(s).attackValue).toBe(lastAttack(s).attackRoll + MUT.atk + 5);
   });
 
-  it('긴급 호출: 쓰러진 아군 부활, 없으면 못 쓴다', () => {
-    const base = newGame(ring(empties(9)));
-    expect(() => play(give(structuredClone(base), 'emergencyCall'))).toThrow(RuleError);
+  it('전술적 후퇴: 반격을 받지 않고 이탈 · 실드 카운터: 반사 피해 후 종료', () => {
+    const toDefend = (...cards: CardId[]) => {
+      let s = withEnemy(newGame(ring(empties(9))), 'delinquent', 2);
+      s.enemies[0].hp = 99;
+      s = attack(rollExactly(s, 3));
+      expect(s.phase.kind).toBe('defend');
+      s.players[0].level = 3;
+      s.players[0].coins = 10;
+      return give(s, ...cards);
+    };
+    const r0 = toDefend('retreat');
+    const r = play(r0);
+    expect(r.players[0].hp).toBe(r0.players[0].hp);
+    expect(r.battles.at(-1)!.events.at(-1)).toEqual({ type: 'escape' });
+
+    const c0 = toDefend('shieldCounter');
+    const enemyHp = c0.enemies[0].hp;
+    const c = play(c0);
+    expect(c.players[0].hp).toBe(c0.players[0].hp);
+    expect(c.enemies[0].hp).toBe(enemyHp - Math.max(1, c0.enemies[0].atk - MUT.def));
+  });
+
+  it('이벤트: 단체 급식 · 총공격 · 긴급 호출', () => {
+    const base = newGame(ring(empties(9)), { players: 2 });
+    base.players[0].level = 3;
+    base.players[0].coins = 50;
+    base.players[1].hp = 1;
+    expect(play(give(structuredClone(base), 'dinner')).players[1].hp).toBe(4);
+    expect(play(give(structuredClone(base), 'allOut')).players.map((p) => p.status.nextBattleAtk)).toEqual([2, 2]);
+    expect(() => play(give(structuredClone(base), 'revival'))).toThrow(RuleError);
     base.players[1].ko = true;
-    base.players[1].hp = 0;
-    base.players[1].reviveRound = 3;
-    const s = play(give(base, 'emergencyCall'));
-    expect(s.players[1]).toMatchObject({ ko: false, hp: Math.ceil(MUT.hp / 2), reviveRound: null });
-  });
-
-  it('이벤트: 지원 사격 · 통금 · 정학 처분', () => {
-    let base = withEnemy(withEnemy(newGame(ring(empties(9))), 'robot', 3), 'drone', 5);
-    base.players[0].coins = 20;
-    base.enemies[0].hp = 2;
-    base.enemies[1].hp = 5;
-    const strike = play(give(structuredClone(base), 'airStrike'));
-    expect(strike.enemies).toHaveLength(1);
-    expect(strike.enemies[0].hp).toBe(base.enemies[1].hp - 2);
-    expect(strike.players[0].coins).toBe(20 - 3 + ENEMIES.robot.reward);
-
-    const curfew = play(give(structuredClone(base), 'curfew'));
-    expect(curfew.enemies.map((e) => e.atk)).toEqual(base.enemies.map((e) => Math.max(0, e.atk - 1)));
-
-    const expel = play(give(structuredClone(base), 'expel'));
-    expect(expel.enemies.map((e) => e.kind)).toEqual(['drone']);
-
-    base = newGame(ring(empties(9)));
-    expect(() => play(give(base, 'airStrike'))).toThrow(RuleError);
-  });
-
-  it('방과 후 연장: 진행도 -1', () => {
-    const s0 = give(newGame(ring(empties(9))), 'overtime');
-    s0.players[0].coins = 10;
-    s0.progress = 4;
-    expect(play(s0).progress).toBe(3);
+    base.players[1].reviveRound = 5;
+    const rev = play(give(base, 'revival'));
+    expect(rev.players[1]).toMatchObject({ ko: false, hp: Math.ceil(MUT.hp / 2) });
   });
 });

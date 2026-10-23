@@ -1,4 +1,4 @@
-import type { CharacterId } from '../engine/types';
+import type { CardId, CharacterId } from '../engine/types';
 
 export interface StatGrowth {
   maxHp?: number;
@@ -22,6 +22,10 @@ export interface CharacterDef {
   atk: number;
   def: number;
   startCoins: number;
+  /** 덱 포인트 예산 (100% 오렌지 쥬스 코옵은 10~25) */
+  deckPoints: number;
+  /** 캐릭터 전용 카드: 상점에서 코인으로 산다. 정해지면 넣는다 */
+  hyper?: { card: CardId; price: number };
   /** [1성, 2성, 3성]에 도달했을 때 오르는 능력치 */
   stars: [StatGrowth, StatGrowth, StatGrowth];
   active: SkillText & { cooldown: number };
@@ -42,6 +46,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     atk: 2,
     def: 0,
     startCoins: 12,
+    deckPoints: 15,
     stars: [{ maxHp: 1, atk: 1, move: 1 }, { atk: 2 }, { atk: 2, move: 1 }],
     active: {
       name: '피할만 한데?',

@@ -1,9 +1,20 @@
 // 순수 규칙 로직. UI · 네트워크 코드에 의존하지 않는다.
 // applyAction(state, action) → 새 state. 입력 state는 건드리지 않는다.
 
-import { CARDS, DEFAULT_PRESETS } from '../data/cards';
+import { CARDS, DECK_CARD_IDS, DEFAULT_PRESETS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
-import { canAddToDeck, canEditDeck, cardBlocker, freshBattleMods, shuffle, validateDeck } from './cards';
+import {
+  canAddToDeck,
+  canEditDeck,
+  cardBlocker,
+  cardTargets,
+  deckBudget,
+  distances,
+  freshBattleMods,
+  freshStatus,
+  shuffle,
+  validateDeck,
+} from './cards';
 import { ENEMIES } from '../data/enemies';
 import { resolveAttack } from './combat';
 import { createRng, type Rng } from './rng';
@@ -22,6 +33,7 @@ import type {
   GameState,
   GimmickAction,
   Player,
+  ShopOffer,
   TurnInfo,
 } from './types';
 
@@ -53,7 +65,7 @@ export function createGame({ board, boss, players, seed }: GameOptions): GameSta
     throw new RuleError(`잘못된 보드: ${problems.join(', ')}`);
   }
   for (const p of players) {
-    const deckProblems = validateDeck(p.deck ?? DEFAULT_PRESETS[0].cards);
+    const deckProblems = validateDeck(p.deck ?? DEFAULT_PRESETS[0].cards, CHARACTERS[p.character].deckPoints);
     if (deckProblems.length > 0) throw new RuleError(`${p.name}의 덱: ${deckProblems.join(', ')}`);
   }
 
@@ -76,6 +88,7 @@ export function createGame({ board, boss, players, seed }: GameOptions): GameSta
         atk: c.atk,
         def: c.def,
         move: 0,
+        status: freshStatus(),
         deck: [...(p.deck ?? DEFAULT_PRESETS[0].cards)],
         drawPile: [],
         discard: [],
@@ -129,7 +142,13 @@ export function applyAction(state: GameState, action: Action): GameState {
 
   switch (action.type) {
     case 'PLAY_CARD':
-      playCard(s, rng, action.handIndex);
+      playCard(s, rng, action.handIndex, action.target, action.value);
+      break;
+    case 'BUY_CARD':
+      buyCard(s, action.offer);
+      break;
+    case 'LEAVE_SHOP':
+      leaveShop(s, rng);
       break;
     case 'EDIT_DECK':
       editDeck(s, rng, action.add, action.remove);
@@ -211,36 +230,47 @@ export function validateBoard(board: Board): string[] {
 
 // ───────────────────────── 행동 ─────────────────────────
 
-function playCard(s: GameState, rng: Rng, handIndex: number) {
+function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, value?: number) {
   const p = currentPlayer(s);
   const hand = p.hand[handIndex];
   if (hand === undefined) throw new RuleError('그런 카드가 없습니다');
   const blocker = cardBlocker(s, p, hand);
   if (blocker) throw new RuleError(blocker);
-
   const info = CARDS[hand.card];
+  const targets = cardTargets(s, p, hand.card);
+  if (targets && (target === undefined || !targets.includes(target))) throw new RuleError('대상을 골라야 합니다');
+  if (hand.card === 'remoteDice' && !(Number.isInteger(value) && value! >= 1 && value! <= 6)) {
+    throw new RuleError('1~6 중에서 골라야 합니다');
+  }
+
   p.hand.splice(handIndex, 1);
-  // 덱 카드는 버린 더미로 가서 다시 돈다. 상점 카드는 쓰면 사라진다
+  // 덱 카드는 버린 더미로 가서 다시 돈다. 상점 · 생성 카드는 쓰면 사라진다
   if (!hand.shop) p.discard.push(hand.card);
   if (info.cost) p.coins -= info.cost;
-  if (info.type !== 'battle') s.turn.cardPlayed = true;
-  else if (info.timing === 'attack') s.turn.battle.attackCard = true;
-  else s.turn.battle.defendCard = true;
+  if (info.type === 'battle') s.turn.battle.costUsed += info.battleCost!;
+  else s.turn.cardPlayed = true;
 
   s.seq += 1;
   s.lastCard = { seq: s.seq, player: s.current, card: hand.card };
   log(s, `${p.name}: 🃏 「${info.name}」${info.cost ? ` (코인 ${info.cost})` : ''}`);
-  if (info.type === 'battle') currentBattle(s).events.push({ type: 'card', card: hand.card });
-  cardEffect(s, rng, p, hand.card);
+  cardEffect(s, rng, p, hand.card, target, value);
 }
 
 /** 카드 효과 (data/cards.ts의 글과 맞춘다) */
-function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId) {
+function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: number, value?: number) {
   const t = s.turn;
   const b = t.battle;
-  const allies = s.players.filter((o) => !o.ko);
-  const others = allies.filter((o) => o.id !== p.id);
-  const normalEnemies = () => s.enemies.filter((e) => !e.isBoss);
+  const st = p.status;
+  const ally = target !== undefined ? s.players[target] : undefined;
+  const enemy = target !== undefined ? s.enemies.find((e) => e.id === target) : undefined;
+  const battleEvent = (extra: { value?: number; damage?: number; targetHp?: number } = {}) =>
+    currentBattle(s).events.push({ type: 'card', card, ...extra });
+  const boost = (key: 'atk' | 'def', max: number) => {
+    const v = rng.int(1, max);
+    b[key] += v;
+    battleEvent({ value: v });
+    log(s, `  ${key === 'atk' ? '공격력' : '방어력'} +${v}`);
+  };
 
   switch (card) {
     // 부스트
@@ -248,161 +278,217 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId) {
       t.extraSteps += 2;
       break;
     case 'doubleDice':
-      t.diceCount = 2;
+      t.diceCount = Math.max(t.diceCount, 2);
       break;
     case 'tripleDice':
       t.diceCount = 3;
+      st.skipTurn = true;
       break;
-    case 'sprint':
-      t.extraSteps += 4;
-      damage(s, rng, p, 1);
+    case 'remoteDice':
+      t.fixedMove = value!;
       break;
-    case 'stroll':
-      t.diceMode = 'cap3';
-      break;
-    case 'luckyDice':
-      t.diceMode = 'best';
-      break;
-    case 'recall': {
+    case 'portal': {
+      const warps = s.board.tiles.filter((x) => x.kind === 'warp' && x.id !== p.tile);
       const from = p.tile;
-      p.tile = s.board.baseTile;
+      p.tile = rng.pick(warps).id;
       recordMove(s, [from, p.tile]);
-      tryLevelUp(s, p);
       break;
     }
-    case 'adrenaline':
-      t.atk += 2;
+    case 'cookie':
+      heal(p, 1);
       break;
-    case 'guard':
-      t.def += 2;
-      break;
-    case 'focus':
-      t.evadeDice += 1;
+    case 'cake':
+      heal(p, 2);
       break;
     case 'bandage':
       heal(p, 4);
       break;
-    case 'energyDrink':
-      heal(p, 2);
-      t.extraSteps += 1;
+    case 'pudding':
+      heal(p, p.maxHp);
       break;
-    case 'allowance':
-      p.coins += 5;
+    case 'poisonCure':
+      p.hp -= 2;
+      st.regen = { amount: 3, turns: 2 };
       break;
     case 'notes':
       drawCards(s, p, rng, 2);
       break;
-    case 'refresh':
-      p.skillCooldown = Math.max(0, p.skillCooldown - 2);
+    case 'extend':
+      st.extend = true;
+      break;
+    case 'kingPower':
+      p.hp -= 4;
+      st.atkUp = { amount: 5, turns: 3 };
+      break;
+    case 'immovable':
+      st.defUp = { amount: 6, turns: 2 };
       break;
 
+    // 지원
+    case 'hurry':
+      ally!.status.nextMoveDice = 2;
+      break;
+    case 'feast': {
+      const dist = distances(s.board, ally!.tile);
+      for (const o of s.players) {
+        if (!o.ko && (dist.get(o.tile) ?? Infinity) <= 3) heal(o, 3);
+      }
+      break;
+    }
+    case 'share':
+      drawCards(s, p, rng, 1);
+      drawCards(s, ally!, rng, 1);
+      break;
+    case 'backup': {
+      const from = p.tile;
+      p.tile = ally!.tile;
+      recordMove(s, [from, p.tile]);
+      if (p.tile === s.board.baseTile) tryLevelUp(s, p);
+      break;
+    }
+
+    // 이벤트
+    case 'dinner':
+      for (const o of s.players) if (!o.ko) heal(o, 3);
+      notice(s, '🍲 단체 급식 — 모든 아군 체력 +3');
+      break;
+    case 'allOut':
+      for (const o of s.players) o.status.nextBattleAtk += 2;
+      notice(s, '📣 총공격 — 모든 아군 다음 전투 공격력 +2');
+      break;
+    case 'revival':
+      for (const o of s.players) {
+        if (!o.ko) continue;
+        o.ko = false;
+        o.reviveRound = null;
+        o.hp = Math.ceil(o.maxHp / 2);
+        log(s, `  ${o.name} 부활! (체력 ${o.hp})`);
+      }
+      notice(s, '📞 긴급 호출 — 쓰러진 아군 부활');
+      break;
+    case 'slingshot':
+      strike(s, p, enemy!, 2);
+      break;
+    case 'laser':
+      strike(s, p, enemy!, 3);
+      break;
+    case 'brick':
+      strike(s, p, enemy!, 5);
+      break;
+    case 'railgun':
+      strike(s, p, enemy!, 6);
+      break;
+    case 'blast': {
+      const dist = distances(s.board, enemy!.tile);
+      for (const e of [...s.enemies]) {
+        if ((dist.get(e.tile) ?? Infinity) <= 2 && !isOver(s)) strike(s, p, e, 4);
+      }
+      break;
+    }
+
     // 전투: 공격할 때
-    case 'powerStrike':
+    case 'atkM':
+      boost('atk', 3);
+      break;
+    case 'atkL':
+      boost('atk', 6);
+      break;
+    case 'atkG':
+      boost('atk', 10);
+      break;
+    case 'gawu':
+      boost('atk', 20);
+      break;
+    case 'onFire':
+      b.atk += 1;
+      b.def -= 1;
+      battleEvent({ value: 1 });
+      break;
+    case 'magnum':
+      p.hp -= 1;
       b.atk += 2;
+      battleEvent({ value: 2 });
       break;
-    case 'fullPower':
-      b.atk += 4;
-      break;
-    case 'critical':
-      b.attackDice = 2;
-      break;
-    case 'pierce':
-      b.pierce = true;
-      break;
-    case 'stun':
+    case 'shadowRaid':
+      b.atk += 3;
       b.noCounter = true;
+      battleEvent({ value: 3 });
       break;
-    case 'lifeSteal':
-      b.lifeSteal = true;
+    case 'charge':
+      b.atk += 5;
+      battleEvent({ value: 5 });
+      if (p.hand.length < RULES.handLimit) p.hand.push({ card: 'fullAttack', shop: true });
       break;
-    case 'bounty':
-      b.bounty = true;
+    case 'fullAttack':
+      b.atk += 6;
+      b.atkMult = 1.5;
+      battleEvent({ value: 6 });
+      break;
+    case 'accel':
+      b.attackDice = 2;
+      battleEvent();
       break;
 
     // 전투: 반격을 받을 때
-    case 'ironWall':
-      b.def += 3;
+    case 'defM':
+      boost('def', 3);
       break;
-    case 'sidestep':
+    case 'defL':
+      boost('def', 6);
+      break;
+    case 'defG':
+      boost('def', 10);
+      break;
+    case 'rainbow':
       b.evadeDice += 1;
+      battleEvent();
       break;
-    case 'perfectDodge':
-      b.autoEvade = true;
-      break;
-    case 'counterShot':
-      b.reflect = true;
-      break;
-    case 'smokeBomb': {
+    case 'retreat': {
       if (s.phase.kind !== 'defend') break;
       const { stepsLeft } = s.phase;
+      battleEvent();
       currentBattle(s).events.push({ type: 'escape' });
-      log(s, `  반격을 받지 않고 빠져나갔다`);
+      log(s, '  반격을 받지 않고 빠져나갔다');
       finishBattle(s, rng, stepsLeft);
       break;
     }
-
-    // 지원
-    case 'firstAid': {
-      const target = allies.reduce((low, o) => (o.hp / o.maxHp < low.hp / low.maxHp ? o : low), p);
-      const healed = heal(target, 4);
-      log(s, `  ${target.name} 체력 +${healed}`);
-      break;
-    }
-    case 'groupMeal':
-      for (const o of allies) heal(o, 2);
-      break;
-    case 'clubFund':
-      for (const o of allies) o.coins += 3;
-      break;
-    case 'emergencyCall': {
-      const target = s.players.find((o) => o.ko)!;
-      target.ko = false;
-      target.reviveRound = null;
-      target.hp = Math.ceil(target.maxHp / 2);
-      log(s, `  ${target.name} 부활! (체력 ${target.hp})`);
-      break;
-    }
-    case 'batonTouch':
-      for (const o of others) o.skillCooldown = Math.max(0, o.skillCooldown - 1);
-      break;
-    case 'cheer':
-      for (const o of others) drawCards(s, o, rng, 1);
-      break;
-
-    // 이벤트
-    case 'airStrike':
-      for (const e of normalEnemies()) {
-        e.hp = Math.max(0, e.hp - 2);
-        if (e.hp === 0) removeEnemy(s, p, e, true);
-      }
-      notice(s, '🚁 지원 사격 — 모든 에너미 체력 -2');
-      break;
-    case 'bossBreak': {
-      const boss = s.enemies.find((e) => e.isBoss)!;
-      boss.hp = Math.max(0, boss.hp - 3);
-      notice(s, `📡 보스 공략 — ${boss.name} 체력 -3`);
-      if (boss.hp === 0) {
-        removeEnemy(s, p, boss, true);
-        s.phase = { kind: 'gameOver', result: 'victory' };
-        log(s, `🎉 ${boss.name} 처치! 모두의 승리!`);
-      }
-      break;
-    }
-    case 'curfew':
-      for (const e of normalEnemies()) e.atk = Math.max(0, e.atk - 1);
-      notice(s, '🚨 통금 — 모든 에너미 공격력 -1');
-      break;
-    case 'overtime':
-      s.progress = Math.max(1, s.progress - 1);
-      notice(s, `🌙 방과 후 연장 — 진행도 ${s.progress}`);
-      break;
-    case 'expel': {
-      const target = normalEnemies().reduce((low, e) => (e.hp < low.hp ? e : low));
-      removeEnemy(s, p, target, false);
-      notice(s, `📜 정학 처분 — ${target.name} 퇴장`);
+    case 'shieldCounter': {
+      if (s.phase.kind !== 'defend') break;
+      const { stepsLeft } = s.phase;
+      const foe = findEnemy(s, s.phase.enemy);
+      const dmg = Math.max(1, foe.atk - (p.def + statusDef(p) + b.def));
+      foe.hp = Math.max(0, foe.hp - dmg);
+      battleEvent({ damage: dmg, targetHp: foe.hp });
+      log(s, `  실드 카운터 — ${foe.name}에게 ${dmg} 피해`);
+      if (foe.hp === 0 && defeatEnemy(s, p, foe, currentBattle(s))) return;
+      finishBattle(s, rng, stepsLeft);
       break;
     }
   }
+}
+
+/** 전투 밖에서 에너미에게 피해 (이벤트 카드). 쓰러뜨리면 보상, 보스면 승리 */
+function strike(s: GameState, p: Player, enemy: Enemy, amount: number) {
+  enemy.hp = Math.max(0, enemy.hp - amount);
+  log(s, `  ${enemy.name}에게 ${amount} 피해 (체력 ${enemy.hp})`);
+  if (enemy.hp > 0) return;
+  s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
+  p.coins += enemy.reward;
+  if (enemy.isBoss) {
+    s.phase = { kind: 'gameOver', result: 'victory' };
+    log(s, `🎉 ${enemy.name} 처치! 모두의 승리!`);
+    notice(s, `🎉 ${enemy.name} 처치!`);
+    return;
+  }
+  log(s, `  ${enemy.name} 처치! 코인 +${enemy.reward}`);
+}
+
+function statusAtk(p: Player): number {
+  return p.status.atkUp?.amount ?? 0;
+}
+
+function statusDef(p: Player): number {
+  return p.status.defUp?.amount ?? 0;
 }
 
 /** 본부에서 덱 정비: 카드 1장 넣기 / 빼기. 넣은 카드는 뽑을 더미 아무 데나 섞여 들어간다 */
@@ -410,7 +496,7 @@ function editDeck(s: GameState, rng: Rng, add?: CardId, remove?: CardId) {
   const p = currentPlayer(s);
   if (!canEditDeck(s, p)) throw new RuleError('덱 정비는 본부에서만 할 수 있습니다');
   if (add) {
-    if (!canAddToDeck(p.deck, add)) throw new RuleError('더 넣을 수 없는 카드입니다');
+    if (!canAddToDeck(p.deck, add, deckBudget(p))) throw new RuleError('더 넣을 수 없는 카드입니다');
     p.deck.push(add);
     p.drawPile.splice(rng.int(0, p.drawPile.length), 0, add);
     log(s, `${p.name}: 덱에 「${CARDS[add].name}」 추가`);
@@ -425,14 +511,55 @@ function editDeck(s: GameState, rng: Rng, add?: CardId, remove?: CardId) {
   }
 }
 
+/** 상점 열기: 카드 3장 + (있으면) 내 캐릭터 전용 카드 */
+function openShop(s: GameState, rng: Rng, stepsLeft: number) {
+  const p = currentPlayer(s);
+  // 지금 성으로 곧 쓸 수 있는 카드만 (한 단계 위까지)
+  const usable = DECK_CARD_IDS.filter((id) => CARDS[id].level <= p.level + 1);
+  const pool = shuffle(usable, rng).slice(0, RULES.shopOffers);
+  const offers: ShopOffer[] = pool.map((card) => ({ card, price: RULES.shopPrice, sold: false }));
+  const hyper = CHARACTERS[p.character].hyper;
+  if (hyper) offers.push({ card: hyper.card, price: hyper.price, sold: false });
+  s.phase = { kind: 'shop', stepsLeft, offers, free: stepsLeft === 0 };
+  log(s, `${p.name}: 🛒 상점${stepsLeft === 0 ? ' (멈춤: 첫 구매 무료)' : ''}`);
+}
+
+/** 상점에서 산 카드는 손패로. 쓰면 사라진다 */
+function buyCard(s: GameState, offerIndex: number) {
+  if (s.phase.kind !== 'shop') throw new RuleError('상점이 아닙니다');
+  const p = currentPlayer(s);
+  const offer = s.phase.offers[offerIndex];
+  if (!offer || offer.sold) throw new RuleError('살 수 없는 카드입니다');
+  const price = s.phase.free ? 0 : offer.price;
+  if (p.coins < price) throw new RuleError(`코인 ${price} 필요`);
+  if (p.hand.length >= RULES.handLimit) throw new RuleError('손패가 가득 찼습니다');
+  p.coins -= price;
+  offer.sold = true;
+  s.phase.free = false;
+  p.hand.push({ card: offer.card, shop: true });
+  log(s, `${p.name}: 「${CARDS[offer.card].name}」 구매${price ? ` (코인 ${price})` : ' (무료)'}`);
+}
+
+function leaveShop(s: GameState, rng: Rng) {
+  if (s.phase.kind !== 'shop') throw new RuleError('상점이 아닙니다');
+  const { stepsLeft } = s.phase;
+  if (stepsLeft > 0) {
+    s.phase = { kind: 'preRoll' }; // move()가 다시 정한다
+    move(s, rng, stepsLeft, [currentPlayer(s).tile]);
+  } else {
+    s.phase = { kind: 'endTurn' };
+  }
+}
+
 function roll(s: GameState, rng: Rng) {
   if (s.phase.kind !== 'preRoll') throw new RuleError('지금은 주사위를 굴릴 수 없습니다');
   const p = currentPlayer(s);
-  const dice = Array.from({ length: s.turn.diceCount }, () => {
-    if (s.turn.diceMode === 'best') return Math.max(rng.d6(), rng.d6());
-    if (s.turn.diceMode === 'cap3') return Math.min(3, rng.d6());
-    return rng.d6();
-  });
+  if (p.status.nextMoveDice > 0) {
+    s.turn.diceCount = Math.max(s.turn.diceCount, p.status.nextMoveDice);
+    p.status.nextMoveDice = 0;
+  }
+  const dice =
+    s.turn.fixedMove !== null ? [s.turn.fixedMove] : Array.from({ length: s.turn.diceCount }, () => rng.d6());
   s.turn.extraSteps += p.move;
   const steps = dice.reduce((a, b) => a + b, 0) + s.turn.extraSteps;
   s.turn.dice = dice;
@@ -449,7 +576,7 @@ function choosePath(s: GameState, rng: Rng, to: number) {
   const left = s.phase.stepsLeft - 1;
 
   s.phase = { kind: 'preRoll' }; // enter() / move()가 다시 정한다
-  if (enter(s, to, path, left)) {
+  if (enter(s, rng, to, path, left)) {
     recordMove(s, path);
     return;
   }
@@ -472,17 +599,11 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   }
 
   const mods = s.turn.battle;
-  const hit = resolveAttack({ atk: p.atk + s.turn.atk + mods.atk, def: p.def }, enemy, enemy.defense, rng, 1, {
-    attackDice: mods.attackDice,
-    pierce: mods.pierce,
-  });
+  const atk = Math.floor((p.atk + statusAtk(p) + mods.atk) * mods.atkMult);
+  const hit = resolveAttack({ atk, def: p.def }, enemy, enemy.defense, rng, 1, { attackDice: mods.attackDice });
   enemy.hp = Math.max(0, enemy.hp - hit.damage);
   battle.events.push({ type: 'attack', attacker: 'player', result: hit, targetHp: enemy.hp });
   log(s, `  ${p.name}의 공격 ${hit.attackValue} vs ${defenseName(hit.mode)} ${hit.defenseValue} → ${hit.damage} 피해`);
-  if (mods.lifeSteal && hit.damage > 0) {
-    const healed = heal(p, hit.damage);
-    log(s, `  흡혈 — 체력 +${healed}`);
-  }
 
   if (enemy.hp === 0) {
     if (defeatEnemy(s, p, enemy, battle)) return;
@@ -507,11 +628,9 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   const p = currentPlayer(s);
 
   const mods = s.turn.battle;
-  if (mods.autoEvade) mode = 'evade';
-  const me = { atk: p.atk, def: p.def + s.turn.def + mods.def };
-  const dice = evadeDice(p) + s.turn.evadeDice + mods.evadeDice;
+  const me = { atk: p.atk, def: p.def + statusDef(p) + mods.def };
+  const dice = evadeDice(p) + mods.evadeDice;
   const hit = resolveAttack(enemy, me, mode, rng, mode === 'evade' ? dice : 1);
-  if (mods.autoEvade) hit.damage = 0;
   battle.events.push({
     type: 'attack',
     attacker: 'enemy',
@@ -532,12 +651,6 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
 
   if (mode === 'evade' && hit.damage === 0) {
     if (evadeSucceeded(s, p, enemy, battle)) return;
-  }
-  if (mode === 'block' && mods.reflect && hit.damage > 0) {
-    enemy.hp = Math.max(0, enemy.hp - hit.damage);
-    battle.events.push({ type: 'card', card: 'counterShot', damage: hit.damage, targetHp: enemy.hp });
-    log(s, `  맞받아치기 — ${enemy.name}에게 ${hit.damage} 피해`);
-    if (enemy.hp === 0 && defeatEnemy(s, p, enemy, battle)) return;
   }
   finishBattle(s, rng, stepsLeft);
 }
@@ -564,7 +677,7 @@ function evadeSucceeded(s: GameState, p: Player, enemy: Enemy, battle: Battle): 
 
 /** 에너미 처치: 보상을 주고 판에서 치운다. 보스면 모두의 승리로 게임이 끝나고 true */
 function defeatEnemy(s: GameState, p: Player, enemy: Enemy, battle: Battle): boolean {
-  const reward = enemy.reward * (s.turn.battle.bounty ? 2 : 1);
+  const reward = enemy.reward;
   s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
   p.coins += reward;
   battle.events.push({ type: 'enemyDefeated', reward });
@@ -578,13 +691,6 @@ function defeatEnemy(s: GameState, p: Player, enemy: Enemy, battle: Battle): boo
   }
   log(s, `  ${enemy.name} 처치! 코인 +${reward}`);
   return false;
-}
-
-/** 전투 밖에서 에너미를 치운다 (이벤트 카드). withReward면 쓴 사람이 보상을 받는다 */
-function removeEnemy(s: GameState, p: Player, enemy: Enemy, withReward: boolean) {
-  s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
-  if (withReward && enemy.reward > 0) p.coins += enemy.reward;
-  log(s, `  ${enemy.name} 퇴장${withReward && enemy.reward > 0 ? ` · 코인 +${enemy.reward}` : ''}`);
 }
 
 /** 액티브 스킬: 주사위를 굴리기 전에, 재사용 대기가 끝났을 때만 */
@@ -613,11 +719,8 @@ function freshTurn(): TurnInfo {
     skillUsed: false,
     diceCount: 1,
     extraSteps: 0,
-    diceMode: 'normal',
+    fixedMove: null,
     dice: [],
-    atk: 0,
-    def: 0,
-    evadeDice: 0,
     battle: freshBattleMods(),
   };
 }
@@ -631,6 +734,15 @@ function nextPlayer(s: GameState, rng: Rng) {
   // 재사용 대기는 진짜 라운드만 센다 (KO로 오르는 진행도에는 줄지 않는다)
   for (const p of s.players) p.skillCooldown = Math.max(0, p.skillCooldown - 1);
   advanceProgress(s, rng, '라운드');
+  // 라운드 보상 (아스트랄 파티 코옵): 모두 코인 + 카드 1장
+  if (s.round % RULES.roundRewardEvery === 0 && !isOver(s)) {
+    for (const p of s.players) {
+      p.coins += RULES.roundRewardCoins;
+      drawCards(s, p, rng, 1);
+    }
+    log(s, `🎁 라운드 보상: 모두 코인 +${RULES.roundRewardCoins} · 카드 1장`);
+    notice(s, `🎁 라운드 보상 — 코인 +${RULES.roundRewardCoins} · 카드 1장`);
+  }
 }
 
 /** 차례 시작. 쉬어야 하는 KO 플레이어는 건너뛴다 */
@@ -646,6 +758,12 @@ function beginTurn(s: GameState, rng: Rng) {
       nextPlayer(s, rng);
       continue;
     }
+    if (p.status.skipTurn && !p.ko) {
+      p.status.skipTurn = false;
+      log(s, `${p.name}: 💤 이번 차례는 쉰다`);
+      nextPlayer(s, rng);
+      continue;
+    }
 
     log(s, `${p.name}의 차례`);
     // 액티브 스킬의 "1라운드 동안"은 다음 자기 차례가 시작되면 끝난다
@@ -657,8 +775,25 @@ function beginTurn(s: GameState, rng: Rng) {
       log(s, `${p.name}: ✨ 부활! (HP ${p.hp})`);
     }
     p.coins += RULES.turnIncome;
-    drawCards(s, p, rng, 1);
+    tickStatus(s, p);
     return;
+  }
+}
+
+/** 자기 차례 시작: 지속 효과를 한 번씩 적용하고 남은 턴을 줄인다 */
+function tickStatus(s: GameState, p: Player) {
+  const st = p.status;
+  if (st.regen) {
+    const healed = heal(p, st.regen.amount);
+    if (healed) log(s, `${p.name}: 체력 +${healed}`);
+    st.regen.turns -= 1;
+    if (st.regen.turns <= 0) st.regen = null;
+  }
+  for (const key of ['atkUp', 'defUp'] as const) {
+    const buff = st[key];
+    if (!buff) continue;
+    buff.turns -= 1;
+    if (buff.turns <= 0) st[key] = null;
   }
 }
 
@@ -719,7 +854,7 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
       return;
     }
     left -= 1;
-    if (enter(s, tile.next[0], path, left)) {
+    if (enter(s, rng, tile.next[0], path, left)) {
       recordMove(s, path);
       return;
     }
@@ -730,17 +865,23 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
   recordMove(s, path);
 }
 
-/** 한 칸 들어간다. 그 칸에 에너미가 있으면 인카운터를 시작하고 true */
-function enter(s: GameState, tileId: number, path: number[], stepsLeft: number): boolean {
+/** 한 칸 들어간다. 그 칸에 에너미가 있으면 인카운터, 상점이면 상점을 열고 true */
+function enter(s: GameState, rng: Rng, tileId: number, path: number[], stepsLeft: number): boolean {
   const p = currentPlayer(s);
   p.tile = tileId;
   path.push(tileId);
   if (tileId === s.board.baseTile) tryLevelUp(s, p);
 
   const enemy = s.enemies.find((e) => e.tile === tileId);
-  if (!enemy) return false;
-  startEncounter(s, enemy, stepsLeft);
-  return true;
+  if (enemy) {
+    startEncounter(s, enemy, stepsLeft);
+    return true;
+  }
+  if (s.board.tiles[tileId].kind === 'shop') {
+    openShop(s, rng, stepsLeft);
+    return true;
+  }
+  return false;
 }
 
 /** 본부를 지나가거나 도착하면 코인을 내고 레벨업 */
@@ -786,6 +927,7 @@ function land(s: GameState, rng: Rng, path: number[]) {
     case 'empty':
     case 'base':
     case 'spawn':
+    case 'shop':
       break;
     case 'coinPlus':
       p.coins += RULES.coinPlus;
@@ -891,6 +1033,10 @@ function bossAppear(s: GameState) {
 function startEncounter(s: GameState, enemy: Enemy, stepsLeft: number) {
   s.phase = { kind: 'encounter', enemy: enemy.id, stepsLeft };
   s.turn.battle = freshBattleMods();
+  // 총공격: 다음 전투 한 번만
+  const p = currentPlayer(s);
+  s.turn.battle.atk += p.status.nextBattleAtk;
+  p.status.nextBattleAtk = 0;
   s.seq += 1;
   s.battles.push({ seq: s.seq, player: s.current, enemy: structuredClone(enemy), events: [], done: false });
   if (s.battles.length > RULES.battleHistory) s.battles.shift();
@@ -929,7 +1075,9 @@ function damage(s: GameState, rng: Rng, p: Player, amount: number) {
   if (p.hp > 0) return;
 
   p.ko = true;
-  p.reviveRound = s.round + RULES.reviveAfterRounds;
+  // 보충 수업: 쉬지 않고 다음 차례에 부활
+  p.reviveRound = s.round + (p.status.extend ? 1 : RULES.reviveAfterRounds);
+  p.status = freshStatus();
   log(s, `${p.name}: 💀 KO! ${p.reviveRound}라운드에 부활`);
   advanceProgress(s, rng, 'KO');
 }

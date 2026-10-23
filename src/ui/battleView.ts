@@ -1,5 +1,5 @@
 import { CARDS } from '../data/cards';
-import { cardBlocker } from '../engine/cards';
+import { battleBudget, cardBlocker } from '../engine/cards';
 import { evadeDice } from '../engine/skills';
 import type { AttackResult, Battle, BattleEvent, CharacterId, DefenseMode, GameState } from '../engine/types';
 import { cardFace } from './cardView';
@@ -192,7 +192,16 @@ export class BattleView {
           return `<button class="battle-card" data-card="${i}" title="${blocker ?? ''}" ${blocker ? 'disabled' : ''}>${cardFace(h.card)}</button>`;
         })
         .join('');
-      if (cards) this.choices.insertAdjacentHTML('afterbegin', `<div class="battle-cards">${cards}</div>`);
+      // 전투 코스트 (아스트랄 파티): 인카운터마다 3 + 성
+      const budget = battleBudget(p);
+      const used = state.turn.battle.costUsed;
+      const pips = Array.from({ length: budget }, (_, i) => `<i class="${i < used ? 'used' : ''}"></i>`).join('');
+      if (cards) {
+        this.choices.insertAdjacentHTML(
+          'afterbegin',
+          `<div class="battle-cards"><span class="battle-cost" title="전투 코스트"><b>${budget - used}</b>${pips}</span>${cards}</div>`,
+        );
+      }
     }
     this.choices.querySelectorAll('button').forEach((b) => (b.disabled ||= busy));
   }
@@ -255,7 +264,9 @@ export class BattleView {
       case 'card': {
         const name = CARDS[event.card].name;
         this.skillFlash(name, 'CARD');
-        this.message(event.damage ? `${name} · ${event.damage} 피해` : name);
+        const gain = CARDS[event.card].timing === 'defend' ? '방어력' : '공격력';
+        this.message(event.damage ? `${name} · ${event.damage} 피해` : event.value ? `${name} · ${gain} +${event.value}` : name);
+        if (event.value) this.pop('player', `+${event.value}`, 'buff');
         if (event.damage) {
           await sleep(250);
           this.pose('enemy', 'hit');
@@ -368,7 +379,7 @@ export class BattleView {
     el.classList.add('show');
   }
 
-  private pop(side: Side, text: string, kind: 'dmg' | 'miss') {
+  private pop(side: Side, text: string, kind: 'dmg' | 'miss' | 'buff') {
     const el = this.unit(side).querySelector<HTMLElement>('.pop')!;
     el.textContent = text;
     el.className = `pop ${kind}`;

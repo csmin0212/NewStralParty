@@ -1,28 +1,29 @@
-import { DEFAULT_PRESETS, type DeckPreset } from '../data/cards';
-import { validateDeck } from '../engine/cards';
+import { CARDS, DEFAULT_PRESETS, type DeckPreset } from '../data/cards';
+import type { CardId } from '../engine/types';
 
-const KEY = 'newparty.decks.v1';
+const KEY = 'newparty.decks.v2';
 
-/** 저장된 덱 프리셋. 없거나 깨져 있으면 기본값 */
-export function loadPresets(): DeckPreset[] {
+/** 저장된 덱 슬롯 5개. 없거나 깨진 칸은 처음 값으로 */
+export function loadDecks(): DeckPreset[] {
+  let saved: unknown = null;
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null') as DeckPreset[] | null;
-    if (Array.isArray(saved) && saved.length === DEFAULT_PRESETS.length) {
-      return saved.map((p, i) =>
-        p && Array.isArray(p.cards) && validateDeck(p.cards).length === 0
-          ? { name: String(p.name || DEFAULT_PRESETS[i].name), cards: p.cards }
-          : structuredClone(DEFAULT_PRESETS[i]),
-      );
-    }
+    saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
   } catch {
-    // 저장소를 못 쓰면 기본값
+    // 저장소를 못 쓰면 처음 값
   }
-  return structuredClone(DEFAULT_PRESETS);
+  return DEFAULT_PRESETS.map((fallback, i) => {
+    const slot = Array.isArray(saved) ? (saved[i] as Partial<DeckPreset> | undefined) : undefined;
+    if (!slot || !Array.isArray(slot.cards)) return structuredClone(fallback);
+    return {
+      name: typeof slot.name === 'string' && slot.name.trim() ? slot.name.slice(0, 12) : fallback.name,
+      cards: slot.cards.filter((id): id is CardId => typeof id === 'string' && (CARDS[id as CardId]?.limit ?? 0) > 0),
+    };
+  });
 }
 
-export function savePresets(presets: DeckPreset[]) {
+export function saveDecks(decks: DeckPreset[]) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(presets));
+    localStorage.setItem(KEY, JSON.stringify(decks));
   } catch {
     // 저장소를 못 쓰면 이번 실행 동안만 유지된다
   }

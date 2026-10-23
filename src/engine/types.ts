@@ -8,6 +8,7 @@ export type TileKind =
   | 'spawn'
   | 'heal'
   | 'warp'
+  | 'shop'
   | 'base';
 
 export interface Tile {
@@ -38,41 +39,45 @@ export type CardId =
   | 'dash'
   | 'doubleDice'
   | 'tripleDice'
-  | 'sprint'
-  | 'stroll'
-  | 'luckyDice'
-  | 'recall'
-  | 'adrenaline'
-  | 'guard'
-  | 'focus'
+  | 'remoteDice'
+  | 'portal'
+  | 'cookie'
+  | 'cake'
   | 'bandage'
-  | 'energyDrink'
-  | 'allowance'
+  | 'pudding'
+  | 'poisonCure'
   | 'notes'
-  | 'refresh'
-  | 'powerStrike'
-  | 'fullPower'
-  | 'critical'
-  | 'pierce'
-  | 'stun'
-  | 'lifeSteal'
-  | 'bounty'
-  | 'ironWall'
-  | 'sidestep'
-  | 'perfectDodge'
-  | 'counterShot'
-  | 'smokeBomb'
-  | 'firstAid'
-  | 'groupMeal'
-  | 'clubFund'
-  | 'emergencyCall'
-  | 'batonTouch'
-  | 'cheer'
-  | 'airStrike'
-  | 'bossBreak'
-  | 'curfew'
-  | 'overtime'
-  | 'expel';
+  | 'extend'
+  | 'kingPower'
+  | 'immovable'
+  | 'hurry'
+  | 'feast'
+  | 'share'
+  | 'backup'
+  | 'dinner'
+  | 'allOut'
+  | 'revival'
+  | 'slingshot'
+  | 'laser'
+  | 'brick'
+  | 'blast'
+  | 'railgun'
+  | 'atkM'
+  | 'atkL'
+  | 'atkG'
+  | 'onFire'
+  | 'magnum'
+  | 'shadowRaid'
+  | 'gawu'
+  | 'charge'
+  | 'fullAttack'
+  | 'accel'
+  | 'defM'
+  | 'defL'
+  | 'defG'
+  | 'rainbow'
+  | 'retreat'
+  | 'shieldCounter';
 
 export interface HandCard {
   card: CardId;
@@ -99,6 +104,8 @@ export interface Player {
   def: number;
   /** 주사위를 굴릴 때마다 더 가는 칸 수 (이동거리) */
   move: number;
+  /** 카드 효과로 붙은 상태 */
+  status: PlayerStatus;
   /** 내 덱 구성 (최대 10장). 뽑을 더미 · 버린 더미 · 손패를 오가며 내 덱 안에서만 돈다 */
   deck: CardId[];
   drawPile: CardId[];
@@ -186,8 +193,8 @@ export type BattleEvent =
   | { type: 'release' }
   /** 회피에 성공해서 발동한 캐릭터 효과 (뭇별 패시브 · 잠재 능력) */
   | { type: 'skill'; name: string; damage?: number; targetHp?: number }
-  /** 전투 카드 사용. damage가 있으면 그 카드로 에너미가 피해를 입었다 (맞받아치기) */
-  | { type: 'card'; card: CardId; damage?: number; targetHp?: number }
+  /** 전투 카드 사용. value는 굴린 강화 수치, damage가 있으면 그 카드로 에너미가 피해를 입었다 (실드 카운터) */
+  | { type: 'card'; card: CardId; value?: number; damage?: number; targetHp?: number }
   /** 연막탄으로 반격을 받지 않고 빠졌다 */
   | { type: 'escape' };
 
@@ -206,25 +213,38 @@ export type Phase =
   | { kind: 'choosePath'; stepsLeft: number; options: number[] }
   | { kind: 'encounter'; enemy: number; stepsLeft: number }
   | { kind: 'defend'; enemy: number; stepsLeft: number }
+  /** 상점 칸: 지나가거나 멈추면 연다. 멈췄으면 첫 구매가 무료 */
+  | { kind: 'shop'; stepsLeft: number; offers: ShopOffer[]; free: boolean }
   | { kind: 'endTurn' }
   | { kind: 'gameOver'; result: 'victory' | 'defeat' };
 
+/** 카드로 붙는 상태. turns는 자기 차례가 시작될 때마다 1씩 준다 */
+export interface PlayerStatus {
+  regen: { amount: number; turns: number } | null;
+  atkUp: { amount: number; turns: number } | null;
+  defUp: { amount: number; turns: number } | null;
+  /** 쓰러지면 다음 차례에 부활 (보충 수업) */
+  extend: boolean;
+  /** 다음 전투 공격력 (총공격) */
+  nextBattleAtk: number;
+  /** 다음 이동 주사위 수 (서둘러). 0이면 없음 */
+  nextMoveDice: number;
+  /** 다음 차례를 쉰다 (트리플 주사위) */
+  skipTurn: boolean;
+}
+
 /** 인카운터 한 번 동안만 가는 전투 카드 효과 */
 export interface BattleMods {
+  /** 이번 인카운터의 전투 코스트 (3 + 성) 중 쓴 만큼 */
+  costUsed: number;
   atk: number;
   def: number;
   evadeDice: number;
   /** 공격 주사위 수 (높은 눈) */
   attackDice: number;
-  pierce: boolean;
+  /** 최종 공격력 배수 (전력 공격) */
+  atkMult: number;
   noCounter: boolean;
-  lifeSteal: boolean;
-  bounty: boolean;
-  autoEvade: boolean;
-  reflect: boolean;
-  /** 공격 때 · 반격 때 카드를 이미 썼는지 */
-  attackCard: boolean;
-  defendCard: boolean;
 }
 
 /** 현재 턴의 임시 값 */
@@ -234,14 +254,16 @@ export interface TurnInfo {
   skillUsed: boolean;
   diceCount: number;
   extraSteps: number;
-  /** best: 2번 굴려 높은 눈 · cap3: 눈 최대 3 */
-  diceMode: 'normal' | 'best' | 'cap3';
+  /** 정해 둔 이동 칸 (리모컨 주사위) */
+  fixedMove: number | null;
   dice: number[];
-  /** 이번 턴 동안 붙는 능력치 (부스트 카드) */
-  atk: number;
-  def: number;
-  evadeDice: number;
   battle: BattleMods;
+}
+
+export interface ShopOffer {
+  card: CardId;
+  price: number;
+  sold: boolean;
 }
 
 /** 화면 연출용: 마지막으로 쓴 카드 */
@@ -293,7 +315,10 @@ export interface GameState {
 }
 
 export type Action =
-  | { type: 'PLAY_CARD'; player: number; handIndex: number }
+  /** target: 아군이면 플레이어 id, 에너미면 에너미 id · value: 리모컨 주사위 눈 */
+  | { type: 'PLAY_CARD'; player: number; handIndex: number; target?: number; value?: number }
+  | { type: 'BUY_CARD'; player: number; offer: number }
+  | { type: 'LEAVE_SHOP'; player: number }
   | { type: 'ROLL'; player: number }
   | { type: 'CHOOSE_PATH'; player: number; to: number }
   | { type: 'ENCOUNTER'; player: number; choice: 'attack' | 'release' }

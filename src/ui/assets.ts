@@ -68,6 +68,16 @@ export const LOBBY_ART = {
   room: `${root}lobby/room.webp`,
 };
 
+/** 뭇별 전용 로비의 같은 좌표계로 정렬된 레이어. public/memorial.html에서 시연한다. */
+export const MEMORIAL_ART = {
+  mutbyeol: {
+    background: `${root}characters/mutbyeol/memorial/background.webp`,
+    character: `${root}characters/mutbyeol/memorial/character.webp`,
+    foreground: `${root}characters/mutbyeol/memorial/foreground.webp`,
+    original: `${root}characters/mutbyeol/memorial/original.webp`,
+  },
+};
+
 /** 제작된 캐릭터 그림. 캐릭터 선택·플레이어 배정 시스템에서 id로 참조한다. */
 export type CharacterPose = 'idle' | 'attack' | 'hit' | 'block' | 'evade' | 'down';
 export const CHARACTER_ART = {

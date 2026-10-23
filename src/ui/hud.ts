@@ -1,5 +1,5 @@
-import { CARD_IDS, CARDS } from '../data/cards';
-import { canAddToDeck, canEditDeck, cardBlocker } from '../engine/cards';
+import { CARDS, DECK_CARD_IDS } from '../data/cards';
+import { canAddToDeck, canEditDeck, cardBlocker, cardTargets, deckBudget, deckPoints, distances } from '../engine/cards';
 import { currentPlayer, describeGimmick } from '../engine/game';
 import { RULES } from '../engine/rules';
 import type { Action, CardId, GameState, Player } from '../engine/types';
@@ -15,7 +15,12 @@ export interface HudHandlers {
   newGame(): void;
   toggleLog(): void;
   toggleDeck(): void;
+  /** 화면만 다시 그린다 (대상 고르기 창) */
+  refresh(): void;
 }
+
+/** 대상이나 눈을 골라야 하는 카드를 눌렀을 때 */
+let picking: number | null = null;
 
 /**
  * 게임 화면 위에 떠 있는 HUD. 맵이 화면을 꽉 채우고, 정보는 네 모서리에 띄운다.
@@ -47,6 +52,8 @@ export function renderHud(
     ${handCards(state)}
     <div class="hud-action ${busy ? 'busy' : ''}">${actionArea(state)}</div>
     ${deckOpen && canEditDeck(state, currentPlayer(state)) ? deckEditor(state) : ''}
+    ${state.phase.kind === 'shop' ? shopPanel(state) : ''}
+    ${picking !== null ? targetPicker(state, picking) : ''}
     <aside class="hud-log ${logOpen ? 'open' : ''}">
       <h3>기록</h3>
       <ol>${state.log.map((line) => `<li>${esc(line)}</li>`).join('')}</ol>
@@ -62,7 +69,7 @@ export function renderHud(
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!btn || btn.disabled) return;
     const player = state.current;
-    const { action, card, path, add, remove } = btn.dataset;
+    const { action, card, path, add, remove, buy, target, value } = btn.dataset;
     if (action === 'roll') h.dispatch({ type: 'ROLL', player });
     else if (action === 'skill') h.dispatch({ type: 'USE_SKILL', player });
     else if (action === 'end') h.dispatch({ type: 'END_TURN', player });
@@ -73,7 +80,30 @@ export function renderHud(
     else if (action === 'deck') h.toggleDeck();
     else if (add) h.dispatch({ type: 'EDIT_DECK', player, add: add as CardId });
     else if (remove) h.dispatch({ type: 'EDIT_DECK', player, remove: remove as CardId });
-    else if (card !== undefined) h.dispatch({ type: 'PLAY_CARD', player, handIndex: Number(card) });
+    else if (buy !== undefined) h.dispatch({ type: 'BUY_CARD', player, offer: Number(buy) });
+    else if (action === 'leave-shop') h.dispatch({ type: 'LEAVE_SHOP', player });
+    else if (action === 'cancel-pick') {
+      picking = null;
+      h.refresh();
+    } else if (target !== undefined || value !== undefined) {
+      const handIndex = picking!;
+      picking = null;
+      h.dispatch({
+        type: 'PLAY_CARD',
+        player,
+        handIndex,
+        target: target !== undefined ? Number(target) : undefined,
+        value: value !== undefined ? Number(value) : undefined,
+      });
+      h.refresh();
+    } else if (card !== undefined) {
+      const hand = currentPlayer(state).hand[Number(card)];
+      // 대상 · 눈을 골라야 하는 카드는 고르기 창을 먼저 띄운다
+      if (CARDS[hand.card].target || hand.card === 'remoteDice') {
+        picking = Number(card);
+        h.refresh();
+      } else h.dispatch({ type: 'PLAY_CARD', player, handIndex: Number(card) });
+    }
     else if (path !== undefined) h.dispatch({ type: 'CHOOSE_PATH', player, to: Number(path) });
   };
 }
@@ -214,15 +244,16 @@ function deckEditor(state: GameState): string {
   const p = currentPlayer(state);
   const counts = new Map<CardId, number>();
   for (const id of p.deck) counts.set(id, (counts.get(id) ?? 0) + 1);
-  const mine = CARD_IDS.filter((id) => counts.has(id))
+  const mine = DECK_CARD_IDS.filter((id) => counts.has(id))
     .map((id) => {
       const removable = (p.drawPile.includes(id) || p.discard.includes(id)) && p.deck.length > RULES.deckMin;
       return `<button class="deck-card" data-remove="${id}" ${removable ? '' : 'disabled'}>${cardFace(id, { count: counts.get(id) })}</button>`;
     })
     .join('');
-  const pool = CARD_IDS.map((id) => {
-    const ok = canAddToDeck(p.deck, id);
-    const maxed = p.deck.filter((c) => c === id).length >= CARDS[id].limit;
+  const pool = DECK_CARD_IDS.map((id) => {
+    const ok = canAddToDeck(p.deck, id, deckBudget(p));
+    const maxed =
+      p.deck.filter((c) => c === id).length >= CARDS[id].limit || deckPoints(p.deck) + CARDS[id].points > deckBudget(p);
     return `<button class="deck-card ${maxed ? 'off' : ''}" data-add="${id}" ${ok ? '' : 'disabled'}>${cardFace(id)}</button>`;
   }).join('');
   return `
@@ -233,6 +264,70 @@ function deckEditor(state: GameState): string {
         <div class="ba-band">카드 넣기</div>
         <div class="deck-grid deck-grid--edit">${pool}</div>
         <div class="panel-foot"><button class="ba-btn ba-btn--sky" data-action="deck">닫기</button></div>
+      </div>
+    </div>`;
+}
+
+/** 상점: 산 카드는 손패로 가고 쓰면 사라진다 */
+function shopPanel(state: GameState): string {
+  if (state.phase.kind !== 'shop') return '';
+  const p = currentPlayer(state);
+  const { offers, free } = state.phase;
+  const full = p.hand.length >= RULES.handLimit;
+  const items = offers
+    .map((o, i) => {
+      const price = free ? 0 : o.price;
+      const ok = !o.sold && !full && p.coins >= price;
+      return `
+        <div class="shop-item ${o.sold ? 'sold' : ''}">
+          <div class="shop-card">${cardFace(o.card)}</div>
+          <button class="ba-btn ba-btn--yellow" data-buy="${i}" ${ok ? '' : 'disabled'}>
+            ${o.sold ? '구매함' : `<img src="${UI_ART.coin}" alt="">${price}`}
+          </button>
+        </div>`;
+    })
+    .join('');
+  return `
+    <div class="shop-overlay">
+      <div class="shop-panel">
+        <div class="ba-band">상점${free ? ' · 첫 구매 무료' : ''}</div>
+        <div class="shop-items">${items}</div>
+        <div class="shop-foot"><span class="shop-coins"><img src="${UI_ART.coin}" alt="">${p.coins}</span>${full ? '<span class="shop-full">손패가 가득 참</span>' : ''}</div>
+      </div>
+    </div>`;
+}
+
+/** 대상 고르기: 아군 · 사거리 안 에너미 · 리모컨 주사위 눈 */
+function targetPicker(state: GameState, handIndex: number): string {
+  const p = currentPlayer(state);
+  const hand = p.hand[handIndex];
+  if (!hand) return '';
+  const info = CARDS[hand.card];
+  let options = '';
+  if (hand.card === 'remoteDice') {
+    options = [1, 2, 3, 4, 5, 6].map((n) => `<button class="pick-num" data-value="${n}">${n}</button>`).join('');
+  } else if (info.target === 'enemy') {
+    const dist = distances(state.board, p.tile);
+    options = (cardTargets(state, p, hand.card) ?? [])
+      .map((id) => {
+        const e = state.enemies.find((x) => x.id === id)!;
+        return `<button class="pick-target" data-target="${id}"><b>${esc(e.name)}</b><span><img src="${UI_ART.heart}" alt="">${e.hp}/${e.maxHp}</span><small>${dist.get(e.tile)}칸</small></button>`;
+      })
+      .join('');
+  } else {
+    options = (cardTargets(state, p, hand.card) ?? [])
+      .map((id) => {
+        const o = state.players[id];
+        return `<button class="pick-target" data-target="${id}" style="--c:${o.color}"><img class="pick-face" src="${CHARACTER_ART[o.character].portrait}" alt=""><b>${esc(o.name)}</b><span><img src="${UI_ART.heart}" alt="">${o.hp}/${o.maxHp}</span></button>`;
+      })
+      .join('');
+  }
+  return `
+    <div class="shop-overlay pick-overlay">
+      <div class="shop-panel pick-panel">
+        <div class="ba-band">${esc(info.name)}</div>
+        <div class="pick-options">${options}</div>
+        <div class="shop-foot"><button class="ba-btn ba-btn--white" data-action="cancel-pick">취소</button></div>
       </div>
     </div>`;
 }
@@ -279,6 +374,9 @@ function actionArea(state: GameState): string {
     case 'encounter':
     case 'defend':
       return `<button class="go-btn wait" disabled><b>전투 중</b><small>BATTLE</small></button>`;
+
+    case 'shop':
+      return `<button class="go-btn end" data-action="leave-shop" data-primary><b>나가기</b><small>${phase.stepsLeft > 0 ? `${phase.stepsLeft}칸 더` : 'EXIT'}</small></button>`;
 
     case 'endTurn': {
       const result = p.ko

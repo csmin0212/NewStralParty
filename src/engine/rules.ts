@@ -14,9 +14,17 @@ export const RULES = {
   /** 덱 장수 상한 · 하한 */
   deckSize: 10,
   deckMin: 5,
-  /** 시작 손패. 이후 자기 차례 시작마다 1장, 카드 칸에서 1장 */
-  startHand: 2,
-  handLimit: 4,
+  /** 시작 손패. 이후 카드 칸 1장 · 라운드 보상 1장 · 상점 */
+  startHand: 3,
+  handLimit: 5,
+  /** 전투 코스트 = 기본 + 성 (아스트랄 파티 코옵) */
+  battleCostBase: 3,
+  /** 라운드 보상: N라운드마다 모두 코인 + 카드 1장 (아스트랄 파티 코옵: 3라운드, 5코인) */
+  roundRewardEvery: 3,
+  roundRewardCoins: 5,
+  /** 상점: 카드 3장, 장당 3코인 */
+  shopOffers: 3,
+  shopPrice: 3,
 
   /** KO 되면 다음 라운드를 쉬고 그다음 라운드에 부활: 쓰러진 라운드 + 2 */
   reviveAfterRounds: 2,

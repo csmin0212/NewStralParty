@@ -2,7 +2,8 @@ import { CHARACTER_IDS, CHARACTERS } from '../data/characters';
 import type { PlayerSetup } from '../engine/game';
 import type { CharacterId } from '../engine/types';
 import { CHARACTER_ART, LOBBY_ART, UI_ART } from './assets';
-import { loadPresets } from './deckStore';
+import { validateDeck } from '../engine/cards';
+import { loadDecks } from './deckStore';
 import { esc, PLAYER_COLORS } from './html';
 
 interface Seat {
@@ -15,12 +16,15 @@ interface Seat {
 
 export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[]) => void, onBack: () => void) {
   let count = 4;
-  const presets = loadPresets();
+  const decks = loadDecks();
+  /** 이 캐릭터가 들고 갈 수 있는 슬롯 (규칙에 맞는 덱만) */
+  const usable = (character: CharacterId) =>
+    decks.map((_, i) => i).filter((i) => validateDeck(decks[i].cards, CHARACTERS[character].deckPoints).length === 0);
   const seats: Seat[] = PLAYER_COLORS.map((_, i) => ({
     name: `플레이어 ${i + 1}`,
     character: CHARACTER_IDS[0],
     potential: false,
-    deck: 0,
+    deck: usable(CHARACTER_IDS[0])[0] ?? 0,
   }));
 
   const seatRow = (seat: Seat, i: number) => {
@@ -36,7 +40,7 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
         <span class="dot"></span>
         <input data-name="${i}" maxlength="10" value="${esc(seat.name)}" />
         ${pick}
-        <button class="seat-deck" data-deck="${i}" title="덱 바꾸기">${esc(presets[seat.deck].name)}</button>
+        <button class="seat-deck" data-deck="${i}" title="덱 바꾸기">${esc(decks[seat.deck].name)}</button>
         <label class="seat-potential" title="${esc(c.potential.description)}">
           <input type="checkbox" data-potential="${i}" ${seat.potential ? 'checked' : ''} />
           <span>잠재 능력</span>
@@ -78,7 +82,8 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
       render();
     } else if (deckBtn) {
       const seat = seats[Number(deckBtn.dataset.deck)];
-      seat.deck = (seat.deck + 1) % presets.length;
+      const options = usable(seat.character);
+      seat.deck = options[(options.indexOf(seat.deck) + 1) % options.length] ?? seat.deck;
       render();
     } else if (cycle) {
       const seat = seats[Number(cycle.dataset.cycle)];
@@ -93,7 +98,7 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
           color: PLAYER_COLORS[i],
           character: seat.character,
           potential: seat.potential,
-          deck: presets[seat.deck].cards,
+          deck: decks[seat.deck].cards,
         })),
       );
     }
