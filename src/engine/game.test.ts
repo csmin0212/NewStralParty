@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BOARD } from '../data/board';
-import { DEFAULT_PRESETS } from '../data/cards';
+import { CARDS, DEFAULT_PRESETS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
 import { PLACEHOLDER_BOSS } from '../data/bosses';
 import { ENEMIES } from '../data/enemies';
-import { canAddToDeck, cardTargets, deckPoints, validateDeck } from './cards';
+import { canAddToDeck, cardCoinCost, cardTargets, deckPoints, validateDeck } from './cards';
 import { onEnemyDefeated } from './skills';
 import { applyAction, createGame, RuleError, validateBoard } from './game';
 import { RULES } from './rules';
@@ -12,6 +12,7 @@ import type { Board, BossDef, CardId, CharacterId, EnemyKind, GameState, Gimmick
 
 /** 기믹 없는 테스트용 보스 */
 const TEST_BOSS: BossDef = {
+  id: 'test',
   name: '테스트 보스',
   icon: 'B',
   hpPerPlayer: 5,
@@ -153,7 +154,9 @@ describe('주사위와 이동', () => {
       let s = newGame(DEFAULT_BOARD, { seed: 7, boss: PLACEHOLDER_BOSS });
       for (let i = 0; i < 60 && s.phase.kind !== 'gameOver'; i++) {
         const player = s.current;
-        if (s.phase.kind === 'preRoll') s = applyAction(s, { type: 'ROLL', player });
+        const offer = s.players[player].relicOffer;
+        if (offer) s = applyAction(s, { type: 'PICK_RELIC', player, relic: offer.ids[0] });
+        else if (s.phase.kind === 'preRoll') s = applyAction(s, { type: 'ROLL', player });
         else if (s.phase.kind === 'choosePath')
           s = applyAction(s, { type: 'CHOOSE_PATH', player, to: s.phase.options[0] });
         else if (s.phase.kind === 'encounter') s = applyAction(s, { type: 'ENCOUNTER', player, choice: 'attack' });
@@ -245,6 +248,7 @@ describe('본부와 레벨업', () => {
     s = rollExactly(s, 3);
     expect(s.players[0]).toMatchObject({ level: 2, maxHp: MUT.hp, atk: MUT.atk + 2, move: 0 });
     s.players[0].tile = 0;
+    s.players[0].relicOffer = null;
     s.phase = { kind: 'preRoll' };
     s = rollExactly(s, 3);
     expect(s.players[0]).toMatchObject({ level: 3, atk: MUT.atk + 4, move: 1 });
@@ -849,6 +853,7 @@ describe('카드', () => {
   it('새총 · 벽돌: 사거리 안 에너미만, 쓰러뜨리면 보상', () => {
     const base = withEnemy(withEnemy(newGame(ring(empties(12))), 'robot', 2), 'drone', 8);
     base.players[0].level = 2;
+    base.enemies[0].hp = 5;
     base.enemies[1].hp = 9;
     const [near, far] = base.enemies;
     expect(cardTargets(base, base.players[0], 'brick')).toEqual([near.id]); // 8번은 뒤로 5칸
@@ -965,10 +970,12 @@ describe('Soda', () => {
     s = rollExactly(s, 13); // 한 바퀴 돌아 본부
     expect(s.players[0]).toMatchObject({ level: 1, atk: 3, maxHp: 11, def: 1 });
     s.players[0].tile = 0;
+    s.players[0].relicOffer = null;
     s.phase = { kind: 'preRoll' };
     s = rollExactly(s, 13);
     expect(s.players[0]).toMatchObject({ level: 2, atk: 3, maxHp: 11, def: 1, move: 0 });
     s.players[0].tile = 0;
+    s.players[0].relicOffer = null;
     s.phase = { kind: 'preRoll' };
     s = rollExactly(s, 13);
     expect(s.players[0]).toMatchObject({ level: 3, atk: 4, def: 2, move: 1 });
@@ -1101,6 +1108,7 @@ describe('모나', () => {
     expect(s.current).toBe(1);
     s = withEnemy(s, 'robot', s.players[1].tile + 1);
     s.enemies[0].hp = 20;
+    s.players[1].level = 1; // 새총은 1성부터
     const discardBefore = s.players[0].discard.length;
     s = applyAction(s, { type: 'PLAY_CARD', player: 1, handIndex: 0, target: s.enemies[0].id });
     expect(s.enemies[0].hp).toBe(20 - (2 + 3)); // 새총 2 + 팬 3
@@ -1110,7 +1118,7 @@ describe('모나', () => {
 
     s.players[0].stacks = 5;
     s.players[1].hand = [{ card: 'cookie', from: 0 }];
-    s.turn.cardPlayed = false;
+    s.turn.cardsPlayed = 0;
     s = applyAction(s, { type: 'PLAY_CARD', player: 1, handIndex: 0 });
     expect(s.players[0].stacks).toBe(5);
   });
@@ -1120,6 +1128,7 @@ describe('모나', () => {
     s = applyAction(rollExactly(s, 1), { type: 'END_TURN', player: 0 });
     s = withEnemy(s, 'robot', s.players[1].tile + 1);
     s.enemies[0].hp = 2;
+    s.players[1].level = 1;
     const monaHand = s.players[0].hand.length;
     s = applyAction(s, { type: 'PLAY_CARD', player: 1, handIndex: 0, target: s.enemies[0].id });
     expect(s.enemies).toHaveLength(0);
@@ -1130,6 +1139,7 @@ describe('모나', () => {
     t2 = applyAction(rollExactly(t2, 1), { type: 'END_TURN', player: 0 });
     t2 = withEnemy(t2, 'robot', t2.players[1].tile + 1);
     t2.enemies[0].hp = 20;
+    t2.players[1].level = 1;
     const hand2 = t2.players[0].hand.length;
     t2 = applyAction(t2, { type: 'PLAY_CARD', player: 1, handIndex: 0, target: t2.enemies[0].id });
     expect(t2.players[0].hand).toHaveLength(hand2);
@@ -1193,5 +1203,49 @@ describe('반격 순서', () => {
       if (hit.type !== 'attack') throw new Error();
       expect(hit.result.attackRoll).toBe(attackRoll);
     }
+  });
+});
+
+describe('밸런스 조정', () => {
+  it('그림자 습격의 반격 없음은 보스에게 통하지 않는다', () => {
+    let s = withEnemy(newGame(ring(empties(9))), 'delinquent', 2);
+    s.enemies[0].isBoss = true;
+    s.enemies[0].hp = 99;
+    s.players[0].level = 1;
+    s.players[0].hand = [{ card: 'shadowRaid' }];
+    s = rollExactly(s, 3);
+    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
+    s = attack(s);
+    expect(s.phase.kind).toBe('defend');
+  });
+
+  it('전술적 후퇴는 성 × 3코인 (최소 3)', () => {
+    const p = newGame(ring(empties(4))).players[0];
+    expect(cardCoinCost('retreat', p)).toBe(3);
+    p.level = 2;
+    expect(cardCoinCost('retreat', p)).toBe(6);
+    p.level = 3;
+    expect(cardCoinCost('retreat', p)).toBe(9);
+  });
+
+  it('액셀: 공격 주사위 2개를 더한다', () => {
+    for (let seed = 1; seed < 20; seed++) {
+      let s = withEnemy(newGame(ring(empties(9)), { seed }), 'robot', 2);
+      s.enemies[0].hp = 99;
+      s.players[0].level = 3;
+      s.players[0].hand = [{ card: 'accel' }];
+      s = attack(applyAction(rollExactly(s, 3), { type: 'PLAY_CARD', player: 0, handIndex: 0 }));
+      const hit = s.battles.at(-1)!.events.find((e) => e.type === 'attack')!;
+      if (hit.type !== 'attack') throw new Error();
+      expect(hit.result.attackRoll).toBeGreaterThanOrEqual(2);
+      expect(hit.result.attackRoll).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it('덱 제한: 질주 2장 · 벽돌 2장 · 새총 1성 2포인트 · 명검 2성 · 너도 나도 2포인트', () => {
+    expect([CARDS.dash.limit, CARDS.brick.limit]).toEqual([2, 2]);
+    expect([CARDS.slingshot.level, CARDS.slingshot.points]).toEqual([1, 2]);
+    expect(CARDS.gawu.level).toBe(2);
+    expect(CARDS.share.points).toBe(2);
   });
 });

@@ -2,8 +2,8 @@
 // 문구 · 수치는 data/characters.ts, 상태 변화(피해 · 처치 · 보상)는 game.ts가 맡는다.
 
 import { CHARACTERS } from '../data/characters';
-import { distances } from './cards';
-import { RULES } from './rules';
+import { distances, handLimit, targetable } from './cards';
+import { hasRelic } from './relics';
 import type { Enemy, GameState, Player } from './types';
 
 /** Soda 연마: 스택 몇 개당 방어력 -1 */
@@ -18,7 +18,8 @@ function addStack(p: Player): boolean {
 
 /** 액티브 스킬을 쓴다. 재사용 대기시간을 걸고 효과를 켠다 */
 export function activateSkill(s: GameState, p: Player) {
-  p.skillCooldown = CHARACTERS[p.character].active.cooldown;
+  // 보조 배터리: 재사용 대기 -1
+  p.skillCooldown = Math.max(0, CHARACTERS[p.character].active.cooldown - (hasRelic(p, 'battery') ? 1 : 0));
   switch (p.character) {
     case 'mutbyeol':
       // 1라운드 동안 = 다음 자기 차례가 시작될 때까지
@@ -36,18 +37,39 @@ export function skillTargets(s: GameState, p: Player): number[] | null {
   if (!target || range === undefined) return null;
   const dist = distances(s.board, p.tile);
   const near = (tile: number) => (dist.get(tile) ?? Infinity) <= range;
-  if (target === 'enemy') return s.enemies.filter((e) => near(e.tile)).map((e) => e.id);
+  if (target === 'enemy') return s.enemies.filter((e) => targetable(s, e) && near(e.tile)).map((e) => e.id);
   // 모나 역조공: 손패에 자리가 있는 다른 아군
   return s.players
-    .filter((o) => o.id !== p.id && !o.ko && near(o.tile) && o.hand.length < RULES.handLimit)
+    .filter((o) => o.id !== p.id && !o.ko && near(o.tile) && o.hand.length < handLimit(o))
     .map((o) => o.id);
 }
 
-/** 이 플레이어와 싸울 때 에너미의 방어력 (Soda: 연마 · 조나단 러시로 깎인다) */
+/** 이 플레이어와 싸울 때 에너미의 방어력 (Soda: 연마 · 조나단 러시로 깎인다). 그로기인 보스는 0 */
 export function enemyDefAgainst(s: GameState, p: Player, enemy: Enemy): number {
+  if (enemy.isBoss && s.bossState.groggy > 0) return 0;
   let down = s.turn.battle.enemyDefDown;
   if (p.character === 'soda') down += Math.floor(p.stacks / POLISH_PER_DEF);
-  return Math.max(0, enemy.def - down);
+  return Math.max(0, enemy.def + bossDefBonus(s, enemy) - down);
+}
+
+/** 보스 규칙으로 오르는 방어력: 지켜 주는 미니언 (호드 필러) · 꺼진 난로 (게부라) */
+export function bossDefBonus(s: GameState, enemy: Enemy): number {
+  if (!enemy.isBoss) return 0;
+  const passive = s.boss.passive;
+  let bonus = 0;
+  if (passive?.guard) bonus += passive.guard.def * s.enemies.filter((e) => e.kind === passive.guard!.kind).length;
+  if (passive?.heater && s.bossState.heater === 0) bonus += 2;
+  return bonus;
+}
+
+/** 보스가 실제로 받는 피해: 성유물 +vuln · 그로기 +1 · 방패 부위(초록) 절반 */
+export function bossDamageTaken(s: GameState, amount: number): number {
+  if (amount <= 0) return 0;
+  const st = s.bossState;
+  let dmg = amount + st.vuln + (st.groggy > 0 ? 1 : 0);
+  const partId = st.parts.length ? st.parts[st.part % st.parts.length] : null;
+  if (partId === 'green') dmg = Math.ceil(dmg / 2);
+  return dmg;
 }
 
 /** 에너미를 쓰러뜨렸을 때 오르는 캐릭터 스택. 올랐으면 true (Soda 연마: 방어력 0인 적) */

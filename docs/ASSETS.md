@@ -87,8 +87,8 @@ isolated on a plain solid #00FF00 green background, no ground shadow
 | 3차 | 에너미 전투 포즈, UI 아이콘, 아이템, 로고 | ✅ 제작·적용 |
 | 캐릭터 때 | 캐릭터 메인 일러스트, 보드 말, 전투 포즈 | ✅ 뭇별 제작·적용 |
 | **4차** | 로비 · 캐릭터 화면 배경, 스킬 아이콘 | ✅ 5종 제작·등록 |
-| **5차** | 카드 39장, 상점 칸 | 상점 칸 · 카드 17장 ✅, 카드 22장 ⏳ |
-| 캐릭터 | Soda · 모나 | ✅ 사용자가 직접 |
+| **5차** | 카드 39장, 상점 칸 | ✅ 제작·등록 |
+| 캐릭터 | Soda · 모나 | ✅ 23종 제작·등록 |
 | 이후 | 보스, 에너미 추가, 유물 아이콘 | 보스 · 유물 시스템 |
 
 ### 2차 프롬프트
@@ -198,7 +198,7 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 
 ## 4. 보드
 
-### 칸 (8종)
+### 칸 (9종)
 
 | 파일 | 칸 | 윗면 | 상태 |
 |---|---|---|---|
@@ -210,6 +210,7 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 | `tiles/heal.png` | 회복 | 응급 키트 | ✅ |
 | `tiles/warp.png` | 워프 | 전송 게이트 | ✅ |
 | `tiles/empty.png` | 빈 칸 | 아무것도 없는 발판 | ✅ |
+| `tiles/event.png` | 이벤트 | 물음표 상자 · 뽑기 캡슐 | ❌ 요청 |
 
 - 크기 **512×512**, **투명 PNG**.
 - **발판 모양 · 두께 · 테두리는 모든 칸이 같게**, 윗면 소품만 다르게 한다. 1차 칸 3종이 기준이다.
@@ -256,16 +257,92 @@ clean flat top surface, same shape and thickness as a matching tile set, top sur
 - 보드 위에서는 40px 정도의 동그란 배지로 줄어든다. **얼굴 · 실루엣이 가운데에 크게** 있어야 작게 봐도 알아볼 수 있다.
 - 무섭기보다 귀엽고 만만한 쪽이 파티 게임에 어울린다.
 
-### 이후
+### 6차 요청 — 보스 12종 · 새 에너미 11종 · 보드 표식 (지금은 이모지)
+
+보스는 블루 아카이브 총력전 보스 ([BOSSES.md](BOSSES.md)). 그림이 오면 [src/ui/assets.ts](../src/ui/assets.ts)의 `BOSS_ART` · `ENEMY_ART` · `MARK_ART`에 넣는다.
+
+**보스** — `bosses/<id>/`
 
 | 파일 | 용도 | 크기 |
 |---|---|---|
-| `enemies/<id>/...` | 에너미 추가 (기믹이 다양한 에너미들) | 위와 같음 |
-| `bosses/<id>/...` | 최종 보스. 포즈 구성은 에너미와 같고 더 크고 화려하게 | 1024×1024 |
+| `portrait.png` | 총력전 고르기 화면 · HUD 얼굴 · 보스 스킬 컷인 (동그랗게 잘림) | 768×768 |
+| `token.png` | 보드 위 배지 (52px) | 512×512 |
+| `encounter.png` | 인카운터 화면 | 1024×1024 |
+| `phase2.png` | 2페이즈 모습이 다른 보스만 (비나 잠행 · 쿠로 · 와카모 호버크래프트) | 768×768 |
+
+id: `binah` 비나 · `chesed` 케세드 · `shirokuro` 시로 · `hieronymus` 히에로니무스 · `kaiten` 카이텐 FX Mk.0 · `perorodzilla` 페로로지라 · `hod` 호드 · `goz` 고즈 · `wakamo` 와카모 · `kurokage` 묘귀 쿠로카게 · `gregorius` 그레고리오 · `geburah` 게부라
+
+**에너미** — `enemies/<id>/idle.png` (위와 같은 규칙)
+
+| id | 이름 | 특징 |
+|---|---|---|
+| `thief` | 헬멧단 좀도둑 | 코인 주머니를 들고 도망치는 모습 |
+| `elite` | 스케반 간부 | 불량배보다 크고 강해 보이게 |
+| `automaton` | 오토마타 병사 | 케세드의 기계 병사. 자폭 램프 |
+| `kaitenger` | 카이텐저 | 초밥 전대 (5색이면 좋음) |
+| `perorominion` | 페로로 미니언 | 작은 페로로 |
+| `pillar` | 인베이드 필러 | 호드의 기둥. 움직이지 않음 |
+| `slumpia` | 슬럼피아 병사 | 놀이공원 병사 |
+| `missile` | 미사일 유도 장치 | 와카모의 장치 |
+| `myoukiPiece` | 묘귀의 조각 | 검은 고양이 조각 |
+| `incarnation` | 묘귀의 화신 | 쫓아와서 터지는 검은 고양이 |
+
+`gozClone`(고즈 분신)은 보스 그림을 그대로 쓴다.
+
+**보드 표식** — `marks/<kind>.png`, 256×256 투명, 30px 동그란 배지
+
+`bomb` 폭탄 · `relicGreen` 초록 성유물 · `relicRed` 빨강 성유물 · `hat` 마술 모자 · `organ` 파이프 오르간 · `heater` 난로 · `fire` 불길
+
+**효과음** — ✅ Kenney CC0 14종 `sfx/<id>.ogg` → [SYSTEMS.md](SYSTEMS.md#효과음)
+
+### 7차 요청 — 유물 아이콘 76 · 맵 칸 12 · 찻주전자 병정
+
+그림이 오면 [src/ui/assets.ts](../src/ui/assets.ts)의 `RELIC_FILES` · `TILE_ART` · `ENEMY_ART`에 넣는다. 지금은 이모지.
+
+**유물** — `relics/<file>.png`, 256×256 투명 · 판 위 28px · 고르기 화면 72px
+
+- 등급만 다른 유물은 1장 (`gloves` = 기본 · 쓸 만함 · 훌륭함). 테두리 색 (파랑 · 보라 · 금)은 코드.
+- 물건 하나를 크게, 배경 없이. 블루 아카이브 아이템 아이콘 풍.
+
+공통 44: `gloves` 🥊 권투 글러브 · `skates` 🛼 롤러스케이트 · `cookie` 🍪 샌드 쿠키 · `helmet` ⛑️ 오토바이 헬멧 · `adrenaline` 💉 아드레날린 · `battery` 🔋 보조 배터리 · `membership` ✉️ 회원 추천장 · `backpack` 🎒 큰 배낭 · `tome` 📖 마법서 · `smartwatch` ⌚ 스마트워치 · `piggy` 🐷 돼지 저금통 · `feather` 🪶 우아한 깃털 · `satellite` 🛰️ 탐사 위성 · `flashlight` 🔦 손전등 · `bank` 💳 은행 카드 · `die8` 🎲 8면 주사위 · `atm` 🏧 ATM · `hammer` 🔨 스타코인 해머 · `fan` 🪭 손선풍기 · `spray` 🧴 마킹 스프레이 · `targetBoard` 🎯 과녁판 · `sight` 🔭 표준 조준경 · `eagleEye` 🦅 매의 눈 조준경 · `darts` ✴️ 닌자 표창 · `quiver` 🏹 마법 화살통 · `knife` 🔪 커터칼 · `medkit` 🩹 구급상자 · `vitamin` 💊 비타민 · `candy` 🍬 맛있는 사탕 · `stew` 🍲 고급 스튜 · `buffer` 🛡️ 완충 방패 · `badge` 🎖️ 우정 배지 · `shootingStar` 🌠 유성 · `bookmark` 🔖 책갈피 · `whetstone` 🪨 숫돌 · `endless` ♾️ 무한 순환 · `recycler` ♻️ 에너지 회수기 · `eBlade` ⚡ 전기 칼날 · `airbag` 🎈 에어백 · `shockGloves` 🧤 전격 장갑 · `warpEngine` 🚀 워프 엔진 · `eCore` 🔌 전기 코어 · `perpetual` ⚙️ 영구 기관 · `emGun` 🔫 전자기총
+
+| 맵 전용 32 | |
+|---|---|
+| 무한 도서관 | `magnifier` 🔍 돋보기 · `hannaDoll` 🧸 한나 인형 |
+| 백귀야행 골목 | `chronometer` ⏱️ 크로노미터 · `revivalDoll` 🪆 부활 인형 · `candyCard` 🍭 사탕 적립 카드 |
+| 슬럼피아 놀이공원 | `snakePlush` 🐍 뱀 인형 · `carpPlush` 🎏 잉어 인형 · `ragingCharm` 🌊 성난 파도 부적 · `seafoodSoup` 🍜 몽롱한 해물탕 · `twinCarps` 🐟 얽힌 쌍잉어 · `infiniteSerpent` ♾️ 무한의 뱀 |
+| 카이텐 특촬 결승 무대 | `taser` ⚡ 테이저 · `wristband` 🩳 스포츠 손목 밴드 · `pocketWatch` ⌚ 제때 회중시계 · `pocketWatch-broken` ⌚ 고장 난 회중시계 · `adaptiveCore` 🔷 적응형 코어 · `entTerminal` 🎮 엔터테인먼트 단말 · `consciousness` 🧠 근원 의식 |
+| 트리니티 고성당 | `cursedSword` 🗡️ 저주받은 검 · `revengeHalberd` 🔱 복수의 미늘창 · `piercingGun` 🔫 관통총 |
+| 여름 해변 리조트 | `ironAnchor` ⚓ 쇠닻 · `trident` 🔱 삼지창 · `dreamliner` 🛥️ 드림라이너 모형 |
+| 설원 전초 기지 | `lovebird` 🕊️ 원앙 옥패 · `peacockFan` 🪶 공작 깃털 부채 · `featherBracelet` 🎐 오색 깃털 팔찌 |
+| 슬럼피아 서커스 거리 | `grandGong` 🥁 큰 징 · `redEnvelope` 🧧 세뱃돈 봉투 |
+| 지하 대성당 학원 | `teaCake` 🍰 찻잔 케이크 · `ancientStaff` 🪄 고대의 지팡이 · `swordShield` 🛡️ 고급 검과 방패 |
+
+**맵 칸** — `tiles/<file>.png`, 512×512 투명 · 다른 칸과 같은 발판
+
+| 파일 | 칸 | 윗면 |
+|---|---|---|
+| `sand` | ⏳ 유사 | 모래 소용돌이 |
+| `boost` | ⏩ 가속 | 화살표 발판 |
+| `conveyor` | ⏭️ 컨베이어 | 롤러 벨트 |
+| `current` | 🌊 해류 | 물살 |
+| `assault` | 🚪 돌격문 | 붉은 경고등 셔터 |
+| `trap` | ⚠️ 함정 | 덫 · 압정 |
+| `ice` | 🧊 빙판 | 얼음 |
+| `clue` | 🔍 단서 | 돋보기와 쪽지 |
+| `clock` | 🕰️ 시계탑 | 작은 시계탑 |
+| `stage` | 🔦 스포트라이트 | 조명이 비친 무대 |
+| `candy` | 🍭 사탕 자판기 | 사탕 뽑기 기계 |
+| `detention` | 📝 반성실 | 반성문 책상 |
+| `event` | ❓ 이벤트 | 물음표 상자 |
+
+**에너미** — `enemies/teapot/idle.png` 찻주전자 병정 (지하 대성당 학원 돌격문)
+
+**맵 배경** — 필요 없음 (맵은 코드로 그린다: [src/ui/mapScenery.ts](../src/ui/mapScenery.ts))
 
 ---
 
-## 6. 카드 — 5차 요청 (⏳ 지금 필요, 카드 39장 + 상점 칸 1장)
+## 6. 카드 — 5차 요청 (✅ 카드 39장 + 상점 칸 1장)
 
 덱 시스템([DESIGN.md](DESIGN.md) 11번)의 카드 그림. 질주 · 더블 주사위 · 붕대는 이미 있으니 그 3장과 나란히 놓았을 때 어울리게 뽑는다.
 
@@ -353,7 +430,7 @@ isolated on transparent background, no text, no letters, no frame, no border
 
 ## 6-1. 캐릭터 — Soda · 모나
 
-캐릭터 그림은 사용자가 직접 뽑는다. 파일 이름 · 규격은 [3. 캐릭터](#3-캐릭터--캐릭터-시스템을-만들-때)와 뭇별과 같게 `characters/soda/`, `characters/mona/`에 둔다. 오기 전까지 게임에는 임시 실루엣이 들어간다.
+`characters/soda/` · `characters/mona/` — 스탠딩 · 보드 말 · 초상화 · 전투 6종 · 스킬 아이콘. Soda: 남색 차이나 드레스 · 청록 리본 · 단일 포니테일 · 안경 · 초록 구슬 지팡이.
 
 ---
 
@@ -397,3 +474,34 @@ isolated on transparent background, no text, no letters, no frame, no border
 2026-10-23 추가 요청: 인카운터 에너미 3장·전투 무대·옥상 배경·충격·연기 7종을 제작해 기존 인카운터/아레나 화면에 등록했습니다. 원본·프롬프트·변환 스크립트·검증 기록은 `assets-raw/battle-assets/`에 보관합니다. 배경 원본은 1672×941이며 최종 적용 크기 1920×1080으로 변환했습니다.
 
 2026-10-23 로비 추가분: 광장·동아리방 배경 2장과 뭇별 스킬 아이콘 3종을 제작했습니다. `LOBBY_ART`와 `CHARACTER_ART.mutbyeol`에 등록했으며 원본·프롬프트·검증 기록은 `assets-raw/lobby-assets/`에 있습니다. 신규 로비·캐릭터 상세 화면은 별도 구현 대상입니다.
+
+
+## 2026-10-24 제작분
+
+| 에셋 | 수량 | 상태 |
+|---|---:|---|
+| 카드 | 39 | ✅ |
+| 상점 칸 | 1 | ✅ |
+| Soda | 11 | ✅ |
+| 모나 | 12 | ✅ |
+
+`assets-raw/expansion-2026-10-24/` · `public/assets/gallery.html#soda`
+
+## 메모리얼 · 스킨
+
+| 에셋 | 규격 | 수량 |
+|---|---|---:|
+| 뭇별 · Soda · 모나 메모리얼 | 1920 × 1080 WebP | 3 |
+| Soda · 라이더 | 스탠딩 · 보드 말 · 초상화 · 전투 · 스킬 | 11 |
+| Soda · 기본 | 마법사 | 11 |
+
+`characters/mutbyeol/memorial/night-v3/original.webp` · `characters/soda/memorial/scene-v6-swim.webp` · `characters/mona/memorial/scene-v4.webp` ✅
+
+`characters/soda/skins/rider/` · `memorials.html`
+
+`assets-raw/character-memorials-2026-10-24/`
+
+| 애니메이션 | 경로 | 원화 |
+|---|---|---|
+| Soda | memorial-soda.html | scene-v6-swim.webp |
+| 모나 | memorial-mona.html | scene-v4.webp |

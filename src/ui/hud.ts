@@ -7,17 +7,24 @@ import {
   deckBudget,
   deckPoints,
   distances,
+  handLimit,
 } from '../engine/cards';
+import { KEYWORD_INFO, RARITY_NAME, RELICS, type RelicId } from '../data/relics';
+import { relicPrice } from '../engine/game';
+import { taskProgress } from '../engine/relics';
 import { currentPlayer, describeGimmick } from '../engine/game';
 import { skillTargets } from '../engine/skills';
 import { RULES } from '../engine/rules';
-import type { Action, CardId, GameState, Player } from '../engine/types';
+import type { Action, CardId, GameState, MapRes, Player } from '../engine/types';
+import { MAP_RES_INFO } from '../data/board';
 import { tileLabel } from './boardView';
 import { campusVector } from './campusMap';
 import { esc } from './html';
 import { CHARACTERS } from '../data/characters';
-import { CHARACTER_ART, UI_ART } from './assets';
+import { CHARACTER_ART, RELIC_ART, UI_ART } from './assets';
 import { cardFace } from './cardView';
+import { bossBar } from './bossHud';
+import { openBossInfo, openSettings } from './modal';
 
 export interface HudHandlers {
   dispatch(action: Action): void;
@@ -55,7 +62,7 @@ export function renderHud(
   el.innerHTML = `
     <div class="hud-top">
       ${roundBadge(state)}
-      ${progressTrack(state)}
+      <div class="hud-center">${progressTrack(state)}${bossBar(state)}</div>
       <div class="hud-tools">
         <button class="icon-btn ${logOpen ? 'on' : ''}" data-action="log" title="기록">📜</button>
       </div>
@@ -67,12 +74,13 @@ export function renderHud(
     ${deckOpen && canEditDeck(state, currentPlayer(state)) ? deckEditor(state) : ''}
     ${state.phase.kind === 'shop' ? shopPanel(state) : ''}
     ${picking !== null ? targetPicker(state, picking) : ''}
+    ${!busy && showRelicPicker(state) ? relicPicker(state) : ''}
     <aside class="hud-log ${logOpen ? 'open' : ''}">
       <h3>기록</h3>
       <ol>${state.log.map((line) => `<li>${esc(line)}</li>`).join('')}</ol>
     </aside>`;
 
-  el.querySelectorAll<HTMLButtonElement>('button:not([data-action="log"]):not([data-action="menu"])').forEach(
+  el.querySelectorAll<HTMLButtonElement>('button:not([data-action="log"]):not([data-action="menu"]):not([data-action="boss-info"])').forEach(
     (b) => (b.disabled ||= busy),
   );
   const log = el.querySelector('.hud-log ol')!;
@@ -82,8 +90,11 @@ export function renderHud(
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!btn || btn.disabled) return;
     const player = state.current;
-    const { action, card, path, add, remove, buy, target, value, gift, send } = btn.dataset;
-    if (action === 'roll') h.dispatch({ type: 'ROLL', player });
+    const { action, card, path, add, remove, buy, target, value, gift, send, relic } = btn.dataset;
+    if (relic) h.dispatch({ type: 'PICK_RELIC', player, relic: relic as RelicId });
+    else if (action === 'reroll-relic') h.dispatch({ type: 'REROLL_RELIC', player });
+    else if (action === 'buy-relic') h.dispatch({ type: 'BUY_RELIC', player });
+    else if (action === 'roll') h.dispatch({ type: 'ROLL', player });
     else if (action === 'skill') {
       if (skillTargets(state, currentPlayer(state))) {
         picking = SKILL_PICK;
@@ -93,9 +104,9 @@ export function renderHud(
       } else h.dispatch({ type: 'USE_SKILL', player });
     } else if (action === 'end') h.dispatch({ type: 'END_TURN', player });
     else if (action === 'new') h.newGame();
-    else if (action === 'menu') {
-      if (confirm('지금 게임을 그만두고 새 게임을 시작할까요?')) h.newGame();
-    } else if (action === 'log') h.toggleLog();
+    else if (action === 'menu') openSettings({ exit: h.newGame });
+    else if (action === 'boss-info') openBossInfo(state.boss);
+    else if (action === 'log') h.toggleLog();
     else if (action === 'deck') h.toggleDeck();
     else if (add) h.dispatch({ type: 'EDIT_DECK', player, add: add as CardId });
     else if (remove) h.dispatch({ type: 'EDIT_DECK', player, remove: remove as CardId });
@@ -213,14 +224,92 @@ function playerCard(state: GameState, p: Player): string {
       <div class="pc-avatar"><img src="${CHARACTER_ART[p.character].portrait}" alt="" draggable="false"><span>${p.id + 1}</span></div>
       <div class="pc-hp"><img class="hp-icon" src="${UI_ART.heart}" alt="HP"><b>${p.hp}</b>/${p.maxHp}</div>
       <div class="pc-body">
-        <div class="pc-name">${esc(p.name)}${p.ko ? ` <span class="ko-tag">KO · ${p.reviveRound}R 부활</span>` : ''}</div>
+        <div class="pc-name">${p.cpu ? '<span class="cpu-tag">CPU</span>' : ''}${esc(p.name)}${p.ko ? ` <span class="ko-tag">KO · ${p.reviveRound}R 부활</span>` : ''}</div>
         <div class="pc-row">
           <span class="coin" title="${cost !== undefined ? `${p.level + 1}성까지 코인 ${cost}` : '3성'}"><img class="ui-icon" src="${UI_ART.coin}" alt="코인"> <b>${p.coins}</b></span>
           ${levelBadge(p.level)}
           <span class="hand-count" title="손패"><img class="card-back-icon" src="${UI_ART.cardBack}" alt="손패">${p.hand.length}</span>
         </div>
+        ${statusChips(p)}
+        ${relicRow(p)}
       </div>
     </li>`;
+}
+
+/** 유물 아이콘 줄 + 힐 · 스타라이트 · 에너지 스택 */
+function relicRow(p: Player): string {
+  const stacks = [
+    p.healStacks ? `<i class="rs heal" title="${esc(`힐 ${p.healStacks} · ${KEYWORD_INFO.heal.text}`)}">💚${p.healStacks}</i>` : '',
+    p.starlight ? `<i class="rs star" title="${esc(`스타라이트 ${p.starlight} · ${KEYWORD_INFO.starlight.text}`)}">✦${p.starlight}</i>` : '',
+    p.energy ? `<i class="rs energy" title="${esc(`에너지 ${p.energy} · ${KEYWORD_INFO.energy.text}`)}">⚡${p.energy}</i>` : '',
+    ...(Object.entries(p.mapRes ?? {}) as [MapRes, number][])
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `<i class="rs res-${k}" title="${esc(`${MAP_RES_INFO[k].name} ${n} · ${MAP_RES_INFO[k].text}`)}">${MAP_RES_INFO[k].icon}${n}</i>`),
+  ].join('');
+  const icons = p.relics
+    .map((id) => `<i class="ri r-${RELICS[id].rarity}" title="${esc(`${RELICS[id].name} · ${RELICS[id].text}`)}">${relicIcon(id)}</i>`)
+    .join('');
+  if (!stacks && !icons) return '';
+  return `<div class="pc-relics">${stacks}${icons}</div>`;
+}
+
+function relicIcon(id: RelicId): string {
+  const art = RELIC_ART[id];
+  return art ? `<img src="${art}" alt="">` : RELICS[id].icon;
+}
+
+function showRelicPicker(state: GameState): boolean {
+  const p = currentPlayer(state);
+  const k = state.phase.kind;
+  return !!p.relicOffer && !p.cpu && (k === 'preRoll' || k === 'endTurn' || k === 'shop');
+}
+
+/** 유물 3개 중 하나 (아스트랄 파티 강화 칩 고르기). 테두리 색 = 등급, 아래 띠 = 키워드 */
+function relicPicker(state: GameState): string {
+  const p = currentPlayer(state);
+  const offer = p.relicOffer!;
+  const cards = offer.ids
+    .map((id) => {
+      const r = RELICS[id];
+      const kw = r.keyword ? KEYWORD_INFO[r.keyword] : null;
+      return `
+      <button class="relic-card r-${r.rarity}" data-relic="${id}">
+        <span class="rc-rarity">${RARITY_NAME[r.rarity]}</span>
+        <span class="relic-icon">${relicIcon(id)}</span>
+        <b>${esc(r.name)}</b>
+        <small>${esc(r.text)}</small>
+        ${kw ? `<span class="rc-kw kw-${r.keyword}" title="${esc(kw.text)}">${kw.icon} ${kw.name}</span>` : ''}
+      </button>`;
+    })
+    .join('');
+  const rerolls = p.relicVars.rerolls ?? 0;
+  return `
+    <div class="relic-pick" style="--c:${p.color}">
+      <div class="relic-panel">
+        <div class="ba-band">${esc(p.name)} · 유물</div>
+        <div class="relic-row">${cards}</div>
+        ${rerolls ? `<div class="relic-foot"><button class="ba-btn ba-btn--sky" data-action="reroll-relic">다시 뽑기 · ${rerolls}</button></div>` : ''}
+      </div>
+    </div>`;
+}
+
+/** 카드 강화 · 보스 약화 (턴 수는 자기 차례 시작마다 줄어든다) */
+function statusChips(p: Player): string {
+  const st = p.status;
+  const chips: string[] = [];
+  const chip = (cls: string, text: string, tip: string) => chips.push(`<i class="st-chip ${cls}" title="${esc(tip)}">${text}</i>`);
+  if (st.atkUp) chip('buff', `⚔+${st.atkUp.amount}`, `공격력 +${st.atkUp.amount} · ${st.atkUp.turns}턴`);
+  if (st.defUp) chip('buff', `🛡+${st.defUp.amount}`, `방어력 +${st.defUp.amount} · ${st.defUp.turns}턴`);
+  if (st.regen) chip('buff', `♥+${st.regen.amount}`, `차례마다 체력 +${st.regen.amount} · ${st.regen.turns}턴`);
+  if (st.nextBattleAtk) chip('buff', `⚔+${st.nextBattleAtk}`, `다음 전투 공격력 +${st.nextBattleAtk}`);
+  if (st.extend) chip('buff', '보충', '쓰러지면 다음 차례에 부활');
+  if (st.atkDown) chip('debuff', `⚔-${st.atkDown.amount}`, `공격력 -${st.atkDown.amount} · ${st.atkDown.turns}턴`);
+  if (st.defDown) chip('debuff', `🛡-${Math.min(st.defDown.amount, 9)}`, `방어력 -${st.defDown.amount} · ${st.defDown.turns}턴`);
+  if (st.erode) chip('debuff', '위압', '차례 시작마다 체력 -1 · 회복하면 해제');
+  if (st.curse) chip('debuff hot', `저주 ${st.curse}`, '보스 차례에 주변 1칸 3 피해 · 그때 체력이 가득 차 있으면 해제');
+  if (st.skipTurn) chip('debuff', '기절', '다음 차례 쉼');
+  if (st.slow) chip('debuff', `👟-${st.slow}`, `다음 이동 -${st.slow}`);
+  return chips.length ? `<div class="pc-status">${chips.join('')}</div>` : '';
 }
 
 /** 지금 차례인 플레이어: 원작처럼 왼쪽 아래에 캐릭터 일러스트를 크게 + 공격력 · 방어력 */
@@ -238,8 +327,17 @@ function currentCard(state: GameState): string {
           ${c.stack ? `<span class="me-stack" title="${esc(c.passive.description)}">${c.stack.name} ${p.stacks}/${c.stack.max}</span>` : ''}
           ${p.potential && c.potential ? `<span class="me-pot" title="${esc(c.potential.description)}">잠재 해방</span>` : ''}
         </div>
+        ${taskLine(state, p)}
       </div>
     </div>`;
+}
+
+/** 임무: 마치면 유물 (원작 Tasks) */
+function taskLine(state: GameState, p: Player): string {
+  const prog = taskProgress(state, p);
+  if (!prog) return '';
+  const w = Math.min(100, (prog.value / prog.def.goal) * 100);
+  return `<div class="me-task" title="임무 · 마치면 유물"><span>임무</span><b>${esc(prog.def.text)}</b><i><b style="width:${w}%"></b></i><em>${Math.min(prog.value, prog.def.goal)}/${prog.def.goal}</em></div>`;
 }
 
 /** 원작의 분홍 "스킬" 버튼. 재사용 대기 중이면 남은 라운드, 효과 중이면 표시 */
@@ -318,7 +416,7 @@ function shopPanel(state: GameState): string {
   if (state.phase.kind !== 'shop') return '';
   const p = currentPlayer(state);
   const { offers, free } = state.phase;
-  const full = p.hand.length >= RULES.handLimit;
+  const full = p.hand.length >= handLimit(p);
   const items = offers
     .map((o, i) => {
       const price = free ? 0 : o.price;
@@ -351,6 +449,11 @@ function shopPanel(state: GameState): string {
       <div class="shop-panel">
         <div class="ba-band">상점${free ? ' · 첫 구매 무료' : ''}</div>
         <div class="shop-items">${items}</div>
+        <div class="ba-band ba-band--sub">유물</div>
+        <div class="relic-buy">
+          <button class="ba-btn ba-btn--yellow" data-action="buy-relic" ${p.coins >= relicPrice(p) && !p.relicOffer ? '' : 'disabled'}>유물 고르기 · <img src="${UI_ART.coin}" alt="">${relicPrice(p)}</button>
+          <span>${p.relics.length}개</span>
+        </div>
         <div class="ba-band ba-band--sub">송금</div>
         <div class="send-row">${allies}</div>
         <div class="shop-foot">
@@ -376,7 +479,7 @@ function targetPicker(state: GameState, handIndex: number): string {
         return pickerPanel(active.name, allies);
       }
       // 줄 카드 1~2장
-      const room = RULES.handLimit - state.players[giftTo].hand.length;
+      const room = handLimit(state.players[giftTo]) - state.players[giftTo].hand.length;
       const cards = p.hand
         .map(
           (h, i) =>
@@ -427,7 +530,7 @@ function enemyOption(state: GameState, id: number, distance: number): string {
 
 function allyOption(state: GameState, id: number, distance: number): string {
   const o = state.players[id];
-  return `<button class="pick-target" data-target="${id}" style="--c:${o.color}"><img class="pick-face" src="${CHARACTER_ART[o.character].portrait}" alt=""><b>${esc(o.name)}</b><span><img class="card-back-icon" src="${UI_ART.cardBack}" alt="">${o.hand.length}/${RULES.handLimit}</span><small>${distance}칸</small></button>`;
+  return `<button class="pick-target" data-target="${id}" style="--c:${o.color}"><img class="pick-face" src="${CHARACTER_ART[o.character].portrait}" alt=""><b>${esc(o.name)}</b><span><img class="card-back-icon" src="${UI_ART.cardBack}" alt="">${o.hand.length}/${handLimit(o)}</span><small>${distance}칸</small></button>`;
 }
 
 function pickerPanel(title: string, options: string, extra = ''): string {

@@ -2,6 +2,25 @@
 // trpg-vtt의 연출 모음(src/components/session/fxevents.css · FxEvents.tsx)을 바닐라 DOM으로 옮기고 학원 도시 색으로 바꿨다.
 // 연출은 한 번에 하나씩 순서대로 재생하고, 화면을 누르면 건너뛴다.
 
+import { pace } from './settings';
+import { sfx, type SfxId } from './sound';
+
+/** 연출마다 나는 소리 */
+const FX_SOUND: Partial<Record<FxKind, SfxId>> = {
+  encounter: 'boss',
+  round: 'turn',
+  turn: 'turn',
+  skill: 'card',
+  card: 'card',
+  dice: 'dice',
+  warning: 'warning',
+  boss: 'boss',
+  levelup: 'levelup',
+  ko: 'ko',
+  victory: 'victory',
+  defeat: 'defeat',
+};
+
 export type FxKind =
   | 'encounter'
   | 'round'
@@ -11,6 +30,8 @@ export type FxKind =
   | 'dice'
   | 'banner'
   | 'warning'
+  /** 보스 차례: 보스 얼굴 + 행동 이름 */
+  | 'boss'
   | 'levelup'
   | 'ko'
   | 'victory'
@@ -26,6 +47,7 @@ const DUR: Record<FxKind, number> = {
   dice: 1500,
   banner: 2000,
   warning: 2800,
+  boss: 2100,
   levelup: 2400,
   ko: 1700,
   victory: 3600,
@@ -89,6 +111,8 @@ function markup(spec: FxSpec): string {
       return spec.html ?? '';
     case 'warning':
       return `<div class="fxe-hazard fxe-hazard--top"></div><div class="fxe-hazard fxe-hazard--bottom"></div>${big(text)}${sub}`;
+    case 'boss':
+      return `<div class="fxe-boss-band"><div class="fxe-boss-face">${spec.html ?? ''}</div><div class="fxe-boss-text"><div class="fxe-boss-tag">${escapeHtml(spec.face?.label ?? 'BOSS SKILL')}</div>${big(text)}${sub}</div></div>`;
     case 'levelup':
     case 'victory':
       return `<div class="fxe-rays"></div><div class="fxe-sparkle"></div>${big(letters(spec.text))}${sub}`;
@@ -111,13 +135,16 @@ export class FxLayer {
   }
 
   private run(spec: FxSpec): Promise<void> {
-    const ms = DUR[spec.kind];
+    // 주사위는 CSS 애니메이션 길이가 정해져 있어서 줄이지 않는다
+    const ms = spec.kind === 'dice' ? DUR.dice : pace(DUR[spec.kind]);
     const el = document.createElement('div');
     el.className = `fxe fxe--${spec.kind}`;
     el.style.setProperty('--dur', `${ms}ms`);
     if (spec.color) el.style.setProperty('--fx', spec.color);
     el.innerHTML = markup(spec);
     this.root.append(el);
+    const sound = FX_SOUND[spec.kind];
+    if (sound) sfx(sound);
 
     return new Promise((resolve) => {
       const done = () => {
@@ -132,11 +159,22 @@ export class FxLayer {
 
   /** 말 머리 위에 숫자가 떠올랐다 사라진다 (기다리지 않는다) */
   float(point: { x: number; y: number }, text: string, kind: FloatKind, delay = 0) {
+    const sound: Partial<Record<FloatKind, SfxId>> = { coin: 'coin', hurt: 'hurt', heal: 'heal' };
+    if (sound[kind]) setTimeout(() => sfx(sound[kind]!), delay);
     const el = document.createElement('span');
     el.className = `fx-float fx-float--${kind}`;
     el.style.left = `${point.x}px`;
     el.style.top = `${point.y}px`;
     el.style.animationDelay = `${delay}ms`;
+    el.textContent = text;
+    el.onanimationend = () => el.remove();
+    this.root.append(el);
+  }
+
+  /** 화면 위쪽에 잠깐 떴다 사라지는 한 줄 (기다리지 않는다) */
+  toast(text: string) {
+    const el = document.createElement('div');
+    el.className = 'fx-toast';
     el.textContent = text;
     el.onanimationend = () => el.remove();
     this.root.append(el);

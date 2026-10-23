@@ -1,17 +1,61 @@
 // 카드 · 덱 규칙 중 상태를 바꾸지 않는 부분 (검사 · 섞기 · 거리). 효과 자체는 game.ts의 cardEffect.
 
 import { CARDS } from '../data/cards';
+import { cardPlayLimit, relicRange } from './relics';
 import { CHARACTERS } from '../data/characters';
 import type { Rng } from './rng';
 import { RULES } from './rules';
-import type { BattleMods, Board, CardId, GameState, HandCard, Player, PlayerStatus } from './types';
+import type { BattleMods, Board, CardId, Enemy, GameState, HandCard, Player, PlayerStatus } from './types';
 
 export function freshBattleMods(): BattleMods {
-  return { costUsed: 0, atk: 0, def: 0, evadeDice: 0, attackDice: 1, atkMult: 1, enemyDefDown: 0, noCounter: false };
+  return {
+    costUsed: 0,
+    atk: 0,
+    def: 0,
+    evadeDice: 0,
+    attackDice: 1,
+    sumDice: false,
+    atkMult: 1,
+    enemyDefDown: 0,
+    noCounter: false,
+  };
 }
 
 export function freshStatus(): PlayerStatus {
-  return { regen: null, atkUp: null, defUp: null, extend: false, nextBattleAtk: 0, nextMoveDice: 0, skipTurn: false };
+  return {
+    regen: null,
+    atkUp: null,
+    defUp: null,
+    extend: false,
+    nextBattleAtk: 0,
+    nextMoveDice: 0,
+    skipTurn: false,
+    defDown: null,
+    atkDown: null,
+    erode: false,
+    curse: 0,
+    slow: 0,
+  };
+}
+
+/** 카드 · 보스 약화로 바뀐 공격력 / 방어력 */
+export function statusAtk(p: Player): number {
+  const res = p.mapRes ?? {};
+  return (p.status.atkUp?.amount ?? 0) - (p.status.atkDown?.amount ?? 0) + (res.problem ? 2 : 0) + ((res.mind ?? 0) >= 3 ? 1 : 0);
+}
+
+export function statusDef(p: Player): number {
+  return (p.status.defUp?.amount ?? 0) - (p.status.defDown?.amount ?? 0) - (p.mapRes?.problem ? 2 : 0);
+}
+
+/** 손패 한도 */
+export function handLimit(_p: Player): number {
+  return RULES.handLimit;
+}
+
+/** 고르거나 부딪힐 수 있는 에너미인지 (땅속에 숨은 보스는 안 된다) */
+export function targetable(s: GameState, e: Enemy): boolean {
+  return !(e.isBoss && s.bossState.hidden);
 }
 
 export function shuffle<T>(list: T[], rng: Rng): T[] {
@@ -62,6 +106,13 @@ export function deckBudget(p: Player): number {
   return CHARACTERS[p.character].deckPoints;
 }
 
+/** 카드를 쓸 때 내는 코인. 성에 따라 오르는 카드도 있다 (전술적 후퇴) */
+export function cardCoinCost(id: CardId, p: Player): number {
+  const info = CARDS[id];
+  if (!info.cost) return 0;
+  return Math.max(info.cost, (info.costPerLevel ?? 0) * p.level);
+}
+
 /** 이번 인카운터의 전투 코스트 (아스트랄 파티 코옵: 3 + 성) */
 export function battleBudget(p: Player): number {
   return RULES.battleCostBase + p.level;
@@ -95,7 +146,8 @@ export function cardTargets(s: GameState, p: Player, id: CardId): number[] | nul
   if (!info.target) return null;
   if (info.target === 'enemy') {
     const dist = distances(s.board, p.tile);
-    return s.enemies.filter((e) => (dist.get(e.tile) ?? Infinity) <= info.range!).map((e) => e.id);
+    const range = info.range! + relicRange(p);
+    return s.enemies.filter((e) => targetable(s, e) && (dist.get(e.tile) ?? Infinity) <= range).map((e) => e.id);
   }
   return s.players.filter((o) => !o.ko && (info.target === 'ally' || o.id !== p.id)).map((o) => o.id);
 }
@@ -111,10 +163,12 @@ export function cardBlocker(s: GameState, p: Player, hand: HandCard): string | n
     if (s.turn.battle.costUsed + info.battleCost! > battleBudget(p)) return '전투 코스트 부족';
   } else {
     if (phase !== 'preRoll') return '주사위 전에 쓰는 카드';
-    if (s.turn.cardPlayed) return '턴마다 1장';
+    const limit = cardPlayLimit(s, p);
+    if (s.turn.cardsPlayed >= limit) return `턴마다 ${limit}장`;
   }
   if (p.level < info.level) return `${info.level}성 필요`;
-  if (info.cost && p.coins < info.cost) return `코인 ${info.cost} 필요`;
+  const cost = cardCoinCost(hand.card, p);
+  if (cost && p.coins < cost) return `코인 ${cost} 필요`;
 
   const targets = cardTargets(s, p, hand.card);
   if (targets && targets.length === 0) return info.target === 'enemy' ? `${info.range}칸 안에 에너미 없음` : '대상 없음';

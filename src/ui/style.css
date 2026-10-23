@@ -293,6 +293,7 @@ button.seat-char:hover {
 .board-area {
   padding: 84px 24px 40px;
   isolation: isolate;
+  background: var(--map-sky, transparent);
 }
 .campus-scenery {
   position: absolute;
@@ -406,6 +407,18 @@ button.seat-char:hover {
 .tile.kind-heal { --mark: #ff8fbf; }
 .tile.kind-warp { --mark: #38d0e6; }
 .tile.kind-base { --mark: var(--yellow); }
+.tile.kind-sand { --mark: #e0b46a; }
+.tile.kind-boost { --mark: #4fd1a5; }
+.tile.kind-conveyor { --mark: #8fa3b8; }
+.tile.kind-current { --mark: #38b6e6; }
+.tile.kind-assault { --mark: #e8405f; }
+.tile.kind-trap { --mark: #ff8a3c; }
+.tile.kind-ice { --mark: #a9d8ff; }
+.tile.kind-clue { --mark: #c9a97c; }
+.tile.kind-clock { --mark: #8a5aff; }
+.tile.kind-stage { --mark: #ffd166; }
+.tile.kind-candy { --mark: #ff6fae; }
+.tile.kind-detention { --mark: #5d6598; }
 
 /* 그림이 준비된 칸만 교체하고, 칸 이름과 선택 영역은 유지한다. */
 .tile.has-art,

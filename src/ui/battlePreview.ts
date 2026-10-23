@@ -1,5 +1,7 @@
 import { CARDS, type BattleBonus } from '../data/cards';
 import { enemyDefAgainst, evadeDice } from '../engine/skills';
+import { statusAtk, statusDef } from '../engine/cards';
+import { markBonus, relicAttack } from '../engine/relics';
 import type { CardId, Enemy, GameState, Player } from '../engine/types';
 
 /** 원작처럼 카드를 내기 전에 보여 주는 예상 범위 */
@@ -15,9 +17,14 @@ export interface Preview {
 /** n개 굴려 높은 눈을 쓸 때, 그 눈이 r 이하일 확률 */
 const atMost = (r: number, n: number) => (Math.max(0, Math.min(6, r)) / 6) ** n;
 
-/** n개 굴린 높은 눈의 분포 [1..6] */
-function bestOf(n: number): number[] {
-  return [1, 2, 3, 4, 5, 6].map((r) => atMost(r, n) - atMost(r - 1, n));
+/** n개 굴린 높은 눈의 분포 [눈, 확률] */
+function bestOf(n: number): [number, number][] {
+  return [1, 2, 3, 4, 5, 6].map((r) => [r, atMost(r, n) - atMost(r - 1, n)]);
+}
+
+/** 주사위 2개 합의 분포 [합, 확률] (액셀) */
+function sumOfTwo(): [number, number][] {
+  return Array.from({ length: 11 }, (_, i) => [i + 2, (6 - Math.abs(i + 2 - 7)) / 36]);
 }
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -32,22 +39,25 @@ export function attackPreview(s: GameState, p: Player, enemy: Enemy, card: CardI
   const b = s.turn.battle;
   const e = extra(card);
   const mult = e.mult ?? b.atkMult;
-  const baseAtk = p.atk + (p.status.atkUp?.amount ?? 0) + b.atk;
+  const baseAtk = p.atk + statusAtk(p) + b.atk + relicAttack(p, enemy);
   const [lo, hi] = e.atk ?? [0, 0];
   const atkLo = Math.floor((baseAtk + lo) * mult);
   const atkHi = Math.floor((baseAtk + hi) * mult);
   const dice = b.attackDice + (e.attackDice ?? 0);
-  const mine: [number, number] = [atkLo + 1, atkHi + 6];
+  const sum = b.sumDice || !!e.sumDice;
+  const mine: [number, number] = sum ? [atkLo + 2, atkHi + 12] : [atkLo + 1, atkHi + 6];
   const result: string[] = [];
 
   if (enemy.defense === 'block') {
     const def = enemyDefAgainst(s, p, enemy);
-    const dmg: [number, number] = [Math.max(1, mine[0] - (def + 6)), Math.max(1, mine[1] - (def + 1))];
+    const mark = markBonus(enemy);
+    const dmg: [number, number] = [Math.max(1, mine[0] - (def + 6)) + mark, Math.max(1, mine[1] - (def + 1)) + mark];
     result.push(`예상 피해 <b>${span(dmg)}</b>`);
     return { mine: { label: '내 공격', range: mine }, theirs: { label: '적 방어', text: span([def + 1, def + 6]) }, result };
   }
   // 회피형: 적 주사위가 내 공격 주사위보다 크거나 6이면 빗나간다
-  const hit = bestOf(dice).reduce((sum, pr, i) => sum + pr * atMost(Math.min(i + 1, 5), 1), 0);
+  const rolls = sum ? sumOfTwo() : bestOf(dice);
+  const hit = rolls.reduce((acc, [r, pr]) => acc + pr * atMost(Math.min(r, 5), 1), 0);
   result.push(`명중 <b>${pct(hit)}</b>`, `피해 <b>${span(mine)}</b>`);
   return { mine: { label: '내 공격', range: mine }, theirs: { label: '적 회피', text: '주사위' }, result };
 }
@@ -57,7 +67,7 @@ export function defendPreview(s: GameState, p: Player, enemy: Enemy, attackRoll:
   const b = s.turn.battle;
   const e = extra(card);
   const value = attackRoll + enemy.atk;
-  const def = p.def + (p.status.defUp?.amount ?? 0) + b.def;
+  const def = p.def + statusDef(p) + b.def;
   const [lo, hi] = e.def ?? [0, 0];
   const block: [number, number] = [def + lo + 1, def + hi + 6];
   const taken: [number, number] = [Math.max(1, value - block[1]), Math.max(1, value - block[0])];

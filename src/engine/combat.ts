@@ -14,7 +14,7 @@ export interface Fighter {
  *   (원작처럼 6은 상대가 6이어도 피한다)
  *   예) 공격력 2 + 주사위 3 → 4 · 5 · 6이 나오면 회피 성공
  * evadeDice: 회피할 때 굴릴 주사위 수. 여러 개면 가장 높은 눈을 쓴다 (뭇별 액티브)
- * opts.attackDice: 공격 주사위 수, 높은 눈을 쓴다 (액셀)
+ * opts.attackDice: 공격 주사위 수, 높은 눈을 쓴다. opts.sumDice면 더한다 (액셀)
  * opts.attackRoll: 이미 굴려 둔 공격 주사위 (반격은 에너미가 먼저 굴린다)
  */
 export function resolveAttack(
@@ -23,10 +23,11 @@ export function resolveAttack(
   mode: DefenseMode,
   rng: Rng,
   evadeDice = 1,
-  opts: { attackDice?: number; attackRoll?: number } = {},
+  opts: { attackDice?: number; sumDice?: boolean; attackRoll?: number } = {},
 ): AttackResult {
+  const rolls = () => Array.from({ length: Math.max(1, opts.attackDice ?? 1) }, () => rng.d6());
   const attackRoll =
-    opts.attackRoll ?? Math.max(...Array.from({ length: Math.max(1, opts.attackDice ?? 1) }, () => rng.d6()));
+    opts.attackRoll ?? (opts.sumDice ? rolls().reduce((a, b) => a + b, 0) : Math.max(...rolls()));
   const attackValue = attackRoll + attacker.atk;
 
   if (mode === 'block') {

@@ -1,8 +1,17 @@
 import { DEFAULT_BOARD } from '../data/board';
-import { PLACEHOLDER_BOSS } from '../data/bosses';
+import { MAPS } from '../data/maps';
+import { currentIntent } from '../engine/boss';
 import { canEditDeck } from '../engine/cards';
 import { applyAction, createGame, currentPlayer, RuleError, type PlayerSetup } from '../engine/game';
-import type { Action, GameState } from '../engine/types';
+import type { DifficultyId } from '../data/difficulty';
+import type { Action, BossDef, BossTurn, EnemyKind, GameState } from '../engine/types';
+import { loadAccount, saveAccount } from '../meta/account';
+import { applyMatch, matchRewards } from '../meta/rules';
+import { bossFace } from './bossHud';
+import { showResult } from './resultView';
+import { clearGame, saveGame } from './saveGame';
+import { wait } from './settings';
+import { cpuAction } from './cpu';
 import { CARDS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
 import { CHARACTER_ART } from './assets';
@@ -12,7 +21,6 @@ import { diceHtml } from './dice';
 import { BoardView } from './boardView';
 import { FxLayer } from './fx';
 import { deltaEvents, resultEvents, turnEvents, type FxEvent } from './fxEvents';
-import { esc } from './html';
 import { renderHud, type HudHandlers } from './hud';
 
 /**
@@ -20,13 +28,26 @@ import { renderHud, type HudHandlers } from './hud';
  * 상태는 여기 하나뿐이고, 행동은 전부 applyAction을 거친다 (온라인 모드에서는 이 자리에 네트워크가 들어간다).
  * 화면: 맵이 화면을 꽉 채우고, 그 위에 HUD → 전투 화면 → 연출(컷인 · 띠) 순으로 겹친다.
  */
-export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: () => void) {
-  let state: GameState = createGame({
-    board: DEFAULT_BOARD,
-    boss: PLACEHOLDER_BOSS,
-    players,
-    seed: (Math.random() * 2 ** 32) >>> 0,
-  });
+export interface HotseatOptions {
+  players: PlayerSetup[];
+  boss: BossDef;
+  difficulty: DifficultyId;
+  /** 이어하기: 저장해 둔 판 */
+  resume?: GameState;
+}
+
+export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit: () => void; retry: () => void }) {
+  const { players } = opts;
+  const onExit = on.exit;
+  let state: GameState =
+    opts.resume ??
+    createGame({
+      board: (opts.boss.map && MAPS[opts.boss.map]) || DEFAULT_BOARD,
+      boss: opts.boss,
+      players,
+      difficulty: opts.difficulty,
+      seed: (Math.random() * 2 ** 32) >>> 0,
+    });
   let busy = false;
   let logOpen = false;
   let deckOpen = false;
@@ -64,13 +85,15 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   async function present(s: GameState, ev: FxEvent) {
     const p = 'player' in ev ? s.players[ev.player] : undefined;
     switch (ev.type) {
-      case 'round':
+      case 'round': {
+        const next = currentIntent(s);
         await fx.play({
           kind: 'round',
           text: `ROUND ${String(ev.round).padStart(2, '0')}`,
-          sub: `진행도 ${s.progress} / ${s.boss.defeatAt}`,
+          sub: `진행도 ${s.progress} / ${s.boss.defeatAt}${next ? ` · 보스 다음 행동 「${next.name}」` : ''}`,
         });
         break;
+      }
       case 'turn':
         fx.ping(board.tokenPoint(ev.player), p!.color);
         await fx.play({
@@ -114,7 +137,8 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   }
 
   /** 기믹 알림: 보스 등장은 경고 연출, 나머지는 가로 띠. 승패 알림은 gameOver 연출이 대신한다 */
-  let lastNotice = 0;
+  // 이어하기: 이미 본 알림은 다시 띄우지 않는다
+  let lastNotice = opts.resume ? Math.max(0, ...state.notices.map((n) => n.seq)) : 0;
   async function showNotices(s: GameState) {
     for (const n of s.notices) {
       if (n.seq <= lastNotice) continue;
@@ -128,6 +152,23 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     }
   }
 
+  /** 보스 차례: 행동 컷인 → 에너미 이동 · 맞은 말 → 결과 한 줄 */
+  let lastBossTurn = state.bossTurn?.seq ?? 0;
+  async function playBossTurn(s: GameState, turn: BossTurn) {
+    lastBossTurn = turn.seq;
+    if (turn.move) {
+      await fx.play({
+        kind: 'boss',
+        text: turn.move,
+        sub: turn.broken ? '저지됨 · 그로기' : turn.text,
+        face: { label: turn.broken ? 'BREAK' : 'BOSS SKILL' },
+        html: bossFace(s.boss, s.bossState.phase),
+      });
+    }
+    await board.playBossTurn(s, turn);
+    if (turn.lines.length) fx.toast(turn.lines.join(' · '));
+  }
+
   /** 보스와 만나면 인카운터 화면 전에 BOSS BATTLE 컷인 (일반 에너미는 원작처럼 바로 FIGHT 화면) */
   async function encounterCutin(prev: GameState, s: GameState) {
     const b = s.battles.at(-1);
@@ -136,6 +177,44 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   }
 
   // ───────── 진행 ─────────
+
+  /** 도감: 처음 본 에너미 · 보스를 계정에 적는다 */
+  const seen = new Set<string>();
+  function noteSeen(s: GameState) {
+    const fresh = s.enemies.filter((e) => !seen.has(e.isBoss ? `boss:${s.boss.id}` : e.kind));
+    if (fresh.length === 0) return;
+    const acc = loadAccount();
+    for (const e of fresh) {
+      seen.add(e.isBoss ? `boss:${s.boss.id}` : e.kind);
+      if (e.isBoss) {
+        if (!acc.seenBosses.includes(s.boss.id)) acc.seenBosses.push(s.boss.id);
+      } else if (!acc.seenEnemies.includes(e.kind as EnemyKind)) acc.seenEnemies.push(e.kind as EnemyKind);
+    }
+    saveAccount(acc);
+  }
+
+  /** 끝난 판: 보상을 한 번만 넣고 결과 화면 */
+  let finished = false;
+  function finish(s: GameState) {
+    if (finished) return;
+    finished = true;
+    clearGame();
+    const acc = loadAccount();
+    const before = Object.fromEntries(Object.entries(acc.students).map(([id, x]) => [id, x.affection]));
+    const rewards = matchRewards(s, acc);
+    applyMatch(acc, s, rewards);
+    saveAccount(acc);
+    showResult(gameEl, s, rewards, before, {
+      lobby: () => {
+        cleanup.abort();
+        onExit();
+      },
+      retry: () => {
+        cleanup.abort();
+        on.retry();
+      },
+    });
+  }
 
   // 말이 도착할 때까지는 이전 상태를 보여 준다 (결과 스포 방지)
   let shownState = state;
@@ -199,6 +278,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     // 연출 순서: 진행 중이던 전투 마무리 → 말 이동 → 숫자 · 레벨업 · KO → 기믹 알림
     //          → 승패 → 라운드 · 차례 컷인 → 새로 만난 에너미와 전투 시작
     await battle.playPending(state);
+    if (state.bossTurn && state.bossTurn.seq > lastBossTurn) await playBossTurn(state, state.bossTurn);
     await board.show(state);
     floats(deltaEvents(prev, state));
     for (const ev of resultEvents(prev, state)) {
@@ -215,20 +295,30 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     busy = false;
     draw(state, false);
     battle.renderChoices(state, false);
+    noteSeen(state);
+    if (state.phase.kind !== 'gameOver') saveGame(state, players);
+    if (cpuTurn()) return;
 
     // 원작처럼 이동이 끝나고 할 일이 없으면 턴을 알아서 넘긴다 (내 거점에 멈췄으면 덱 정비를 할 수 있게 기다린다)
-    if (state.phase.kind === 'endTurn' && !canEditDeck(state, currentPlayer(state))) {
-      await new Promise((r) => setTimeout(r, 700));
+    if (state.phase.kind === 'endTurn' && !canEditDeck(state, currentPlayer(state)) && !currentPlayer(state).relicOffer) {
+      await wait(700);
       if (state.phase.kind === 'endTurn' && !busy) dispatch({ type: 'END_TURN', player: state.current });
     }
 
-    if (state.phase.kind === 'gameOver') {
-      board.showMessage(
-        state.phase.result === 'victory'
-          ? `<div>🎉</div>VICTORY<small>${esc(state.boss.name)} 처치</small>`
-          : `<div>💫</div>DEFEATED<small>진행도 ${state.progress} / ${state.boss.defeatAt}</small>`,
-      );
-    }
+    if (state.phase.kind === 'gameOver') finish(state);
+  }
+
+  /** CPU 차례면 화면을 잠그고 잠깐 뒤 대신 고른다 */
+  function cpuTurn(): boolean {
+    const p = currentPlayer(state);
+    if (!p.cpu || state.phase.kind === 'gameOver' || cleanup.signal.aborted) return false;
+    draw(state, true);
+    battle.renderChoices(state, true);
+    void wait(650).then(() => {
+      if (busy || cleanup.signal.aborted || state.phase.kind === 'gameOver') return;
+      dispatch(cpuAction(state));
+    });
+    return true;
   }
 
   board.onTileClick = (tileId) => {
@@ -256,5 +346,8 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     await present(state, { type: 'turn', player: state.current });
     busy = false;
     draw(state, false);
+    noteSeen(state);
+    saveGame(state, players);
+    cpuTurn();
   })();
 }

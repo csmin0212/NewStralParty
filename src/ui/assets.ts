@@ -1,4 +1,5 @@
-import type { CardId, CharacterId, Enemy, TileKind } from '../engine/types';
+import { RELIC_IDS, relicFamily, type RelicId } from '../data/relics';
+import type { CardId, CharacterId, Enemy, MarkKind, TileKind } from '../engine/types';
 
 const root = `${import.meta.env.BASE_URL}assets/`;
 
@@ -22,6 +23,22 @@ export const ENEMY_ART: Partial<Record<Enemy['kind'], string>> = {
   drone: `${root}enemies/drone/idle.webp`,
   delinquent: `${root}enemies/delinquent/idle.webp`,
 };
+
+/**
+ * 보스 그림 (docs/ASSETS.md 보스 요청). 보스 id별로
+ *   token: 보드 위 둥근 배지 · portrait: 고르기 화면 · HUD 얼굴 · encounter: 인카운터 화면 · phase2: 2페이즈 모습
+ * 없으면 이모지 아이콘으로 그린다
+ */
+export const BOSS_ART: Record<string, { token?: string; portrait?: string; encounter?: string; phase2?: string }> = {};
+
+/** 유물 아이콘 (docs/ASSETS.md 유물 요청). 없으면 이모지 */
+const RELIC_FILES: string[] = [];
+export const RELIC_ART: Partial<Record<RelicId, string>> = Object.fromEntries(
+  RELIC_IDS.filter((id) => RELIC_FILES.includes(relicFamily(id))).map((id) => [id, `${root}relics/${relicFamily(id)}.webp`]),
+);
+
+/** 보드 표식 아이콘 (폭탄 · 성유물 · 모자 · 오르간 · 난로 · 불길). 없으면 이모지 */
+export const MARK_ART: Partial<Record<MarkKind, string>> = {};
 
 /** 인카운터 화면 가득 나오는 큰 그림 (docs/ASSETS.md 3차 요청). 없으면 idle 그림을 크게 쓴다 */
 export const ENEMY_ENCOUNTER_ART: Partial<Record<Enemy['kind'], string>> = {
@@ -56,17 +73,39 @@ export const CARD_ART: Partial<Record<CardId, string>> = {
   cookie: `${root}cards/cookie.webp`,
   cake: `${root}cards/cake.webp`,
   pudding: `${root}cards/pudding.webp`,
-  extend: `${root}cards/extend.webp`,
-  notes: `${root}cards/notes.webp`,
   poisonCure: `${root}cards/poison-cure.webp`,
+  notes: `${root}cards/notes.webp`,
+  extend: `${root}cards/extend.webp`,
   kingPower: `${root}cards/king-power.webp`,
   immovable: `${root}cards/immovable.webp`,
   hurry: `${root}cards/hurry.webp`,
   feast: `${root}cards/feast.webp`,
   share: `${root}cards/share.webp`,
   backup: `${root}cards/backup.webp`,
+  dinner: `${root}cards/dinner.webp`,
+  allOut: `${root}cards/all-out.webp`,
   revival: `${root}cards/revival.webp`,
   slingshot: `${root}cards/slingshot.webp`,
+  laser: `${root}cards/laser.webp`,
+  brick: `${root}cards/brick.webp`,
+  blast: `${root}cards/blast.webp`,
+  railgun: `${root}cards/railgun.webp`,
+  atkM: `${root}cards/atk-m.webp`,
+  atkL: `${root}cards/atk-l.webp`,
+  atkG: `${root}cards/atk-g.webp`,
+  onFire: `${root}cards/on-fire.webp`,
+  magnum: `${root}cards/magnum.webp`,
+  shadowRaid: `${root}cards/shadow-raid.webp`,
+  gawu: `${root}cards/gawu.webp`,
+  charge: `${root}cards/charge.webp`,
+  fullAttack: `${root}cards/full-attack.webp`,
+  accel: `${root}cards/accel.webp`,
+  defM: `${root}cards/def-m.webp`,
+  defL: `${root}cards/def-l.webp`,
+  defG: `${root}cards/def-g.webp`,
+  rainbow: `${root}cards/rainbow.webp`,
+  retreat: `${root}cards/retreat.webp`,
+  shieldCounter: `${root}cards/shield-counter.webp`,
 };
 
 export const UI_ART = {
@@ -95,6 +134,18 @@ export const MEMORIAL_ART = {
     eyesClosed: `${root}characters/mutbyeol/memorial/night-v3/eyes-closed.webp`,
     original: `${root}characters/mutbyeol/memorial/night-v3/original.webp`,
   },
+};
+
+export const CHARACTER_MEMORIAL_ART: Record<CharacterId, string> = {
+  mutbyeol: `${root}characters/mutbyeol/memorial/night-v3/original.webp`,
+  soda: `${root}characters/soda/memorial/scene-v6-swim.webp`,
+  mona: `${root}characters/mona/memorial/scene-v4.webp`,
+};
+
+export const CHARACTER_MEMORIAL_ANIMATION: Partial<Record<CharacterId, string>> = {
+  mutbyeol: `${import.meta.env.BASE_URL}memorial.html`,
+  soda: `${import.meta.env.BASE_URL}memorial-soda.html`,
+  mona: `${import.meta.env.BASE_URL}memorial-mona.html`,
 };
 
 /** 제작된 캐릭터 그림. 캐릭터 선택·플레이어 배정 시스템에서 id로 참조한다. */
@@ -165,6 +216,32 @@ export const CHARACTER_ART: Record<CharacterId, CharacterArt> = {
       block: `${root}characters/mona/battle-block.webp`,
       evade: `${root}characters/mona/battle-evade.webp`,
       down: `${root}characters/mona/battle-down.webp`,
+    },
+  },
+};
+
+const sodaRiderRoot = `${root}characters/soda/skins/rider/`;
+export const CHARACTER_SKINS: Partial<Record<CharacterId, Record<string, { name: string; art: CharacterArt }>>> = {
+  soda: {
+    default: { name: '마법사', art: CHARACTER_ART.soda },
+    rider: {
+      name: '라이더',
+      art: {
+        ...CHARACTER_ART.soda,
+        main: `${sodaRiderRoot}main.webp`,
+        token: `${sodaRiderRoot}token.webp`,
+        portrait: `${sodaRiderRoot}portrait.webp`,
+        skillActive: `${sodaRiderRoot}skill-active.webp`,
+        skillPassive: `${sodaRiderRoot}skill-passive.webp`,
+        poses: {
+          idle: `${sodaRiderRoot}battle-idle.webp`,
+          attack: `${sodaRiderRoot}battle-attack.webp`,
+          hit: `${sodaRiderRoot}battle-hit.webp`,
+          block: `${sodaRiderRoot}battle-block.webp`,
+          evade: `${sodaRiderRoot}battle-evade.webp`,
+          down: `${sodaRiderRoot}battle-down.webp`,
+        },
+      },
     },
   },
 };

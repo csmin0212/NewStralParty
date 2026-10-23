@@ -8,6 +8,7 @@ import { esc } from './html';
 import {
   BATTLE_ART,
   CHARACTER_ART,
+  BOSS_ART,
   ENEMY_ART,
   ENEMY_ENCOUNTER_ART,
   ENEMY_POSES,
@@ -15,6 +16,8 @@ import {
   type CharacterPose,
   type EnemyPose,
 } from './assets';
+import { wait as sleep } from './settings';
+import { sfx } from './sound';
 
 export type BattleChoice =
   | { type: 'ENCOUNTER'; choice: 'attack' | 'release' }
@@ -23,7 +26,6 @@ export type BattleChoice =
 
 type Side = 'player' | 'enemy';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** 인카운터 화면에 흩뿌리는 만화풍 글자 (원작의 FIGHT! DUEL! 決斗!) — [글자, 왼쪽%, 위%, 기울기, 크기 배율] */
 const WORDS: [string, number, number, number, number][] = [
@@ -98,8 +100,12 @@ export class BattleView {
 
     const p = state.players[record.player];
     const e = record.enemy;
-    const idle = ENEMY_ART[e.kind];
-    const big = ENEMY_ENCOUNTER_ART[e.kind] ?? idle;
+    // 보스 (고즈 분신 포함)는 보스 그림 (2페이즈면 2페이즈 그림)
+    const bossArt = e.isBoss || e.kind === 'gozClone' ? BOSS_ART[state.boss.id] : undefined;
+    const idle = bossArt
+      ? ((state.bossState.phase === 2 ? bossArt.phase2 : undefined) ?? bossArt.portrait ?? bossArt.token)
+      : ENEMY_ART[e.kind];
+    const big = (bossArt ? bossArt.encounter : ENEMY_ENCOUNTER_ART[e.kind]) ?? idle;
     const poses = CHARACTER_ART[p.character].poses;
     this.character = p.character;
     for (const src of [...Object.values(ENEMY_POSES[e.kind] ?? {}), ...Object.values(poses), BATTLE_ART.impact, BATTLE_ART.smoke]) {
@@ -422,6 +428,7 @@ export class BattleView {
 
   /** 맞으면 충격, 피하면 연기. 그림이 오면 그림을, 없으면 CSS 모양을 쓴다 */
   private burst(side: Side, kind: 'impact' | 'smoke') {
+    sfx(kind === 'impact' ? 'hurt' : 'step');
     const el = this.unit(side).querySelector<HTMLElement>('.impact')!;
     const art = BATTLE_ART[kind];
     el.innerHTML = art ? `<img src="${art}" alt="">` : '';

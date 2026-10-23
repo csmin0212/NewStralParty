@@ -26,6 +26,8 @@ export interface CardInfo {
   limit: 0 | 1 | 2 | 3;
   /** 쓸 때 내는 코인 */
   cost?: number;
+  /** 성마다 늘어나는 코인 비용 (실제 비용 = max(cost, 성 × costPerLevel)) */
+  costPerLevel?: number;
   /** 전투 카드가 쓰는 전투 코스트 */
   battleCost?: number;
   /** 대상: 아군 1명(자신 포함 여부) 또는 에너미 1마리 */
@@ -46,6 +48,8 @@ export interface BattleBonus {
   /** 공격 · 회피 주사위 개수 추가 (높은 눈) */
   attackDice?: number;
   evadeDice?: number;
+  /** 공격 주사위 2개를 더한다 (액셀) */
+  sumDice?: boolean;
   /** 최종 공격력 배수 */
   mult?: number;
   noCounter?: boolean;
@@ -70,7 +74,7 @@ const card = (id: CardId, name: string, type: CardType, icon: string, text: stri
 
 export const CARDS: Record<CardId, CardInfo> = {
   // ── 부스트 ──
-  dash: card('dash', '질주', 'boost', '💨', '이동 +2', '기본'),
+  dash: card('dash', '질주', 'boost', '💨', '이동 +2', '원작 없음 (docs/CARD_BALANCE.md)', { limit: 2 }),
   doubleDice: card('doubleDice', '더블 주사위', 'boost', '🎲', '이동 주사위 2개', 'OJ Dash! (3★)', { cost: 3 }),
   tripleDice: card('tripleDice', '트리플 주사위', 'boost', '🎰', '이동 주사위 3개 · 다음 차례 쉼', 'OJ Overtime (Lv3 10★)', {
     level: 2, points: 2, limit: 1, cost: 5,
@@ -92,7 +96,7 @@ export const CARDS: Record<CardId, CardInfo> = {
   // ── 지원 ──
   hurry: card('hurry', '서둘러', 'support', '⏩', '아군 다음 이동 주사위 2개', 'AP 加急加快', { target: 'ally' }),
   feast: card('feast', '호화 만찬', 'support', '🍱', '아군과 그 3칸 안 아군 체력 +3', 'AP 奢华大餐', { level: 1, points: 2, limit: 2, target: 'ally' }),
-  share: card('share', '너도 나도', 'support', '🤝', '나와 아군 카드 1장씩', 'AP 你有我有', { target: 'otherAlly' }),
+  share: card('share', '너도 나도', 'support', '🤝', '나와 아군 카드 1장씩', 'AP 你有我有', { points: 2, target: 'otherAlly' }),
   backup: card('backup', '지원 요청', 'support', '📍', '아군 칸으로 순간이동', 'AP 支援', { level: 1, points: 2, limit: 2, target: 'otherAlly' }),
 
   // ── 이벤트 ──
@@ -103,9 +107,13 @@ export const CARDS: Record<CardId, CardInfo> = {
   revival: card('revival', '긴급 호출', 'event', '📞', '쓰러진 아군 모두 부활 · 체력 절반', 'OJ Forced Revival (Lv3 30★, 코옵 1장)', {
     level: 3, points: 5, limit: 1, cost: 15,
   }),
-  slingshot: card('slingshot', '새총', 'event', '🪃', '10칸 안 에너미 2 피해', 'AP 皮筋弹弓', { target: 'enemy', range: 10 }),
+  slingshot: card('slingshot', '새총', 'event', '🪃', '10칸 안 에너미 2 피해', 'AP 皮筋弹弓 (PvP 카드를 몬스터용으로)', {
+    level: 1, points: 2, target: 'enemy', range: 10,
+  }),
   laser: card('laser', '레이저', 'event', '🔦', '6칸 안 에너미 3 피해', 'AP 对怪激光', { level: 1, points: 2, target: 'enemy', range: 6 }),
-  brick: card('brick', '벽돌', 'event', '🧱', '3칸 안 에너미 5 피해', 'AP 对怪板砖', { level: 2, points: 2, target: 'enemy', range: 3 }),
+  brick: card('brick', '벽돌', 'event', '🧱', '3칸 안 에너미 5 피해', 'AP 对怪板砖', {
+    level: 2, points: 2, limit: 2, target: 'enemy', range: 3,
+  }),
   blast: card('blast', '정밀 폭파', 'event', '💣', '6칸 안 에너미와 그 2칸 안 에너미 4 피해', 'AP 定向爆破', {
     level: 3, points: 5, limit: 2, cost: 10, target: 'enemy', range: 6,
   }),
@@ -125,11 +133,11 @@ export const CARDS: Record<CardId, CardInfo> = {
   magnum: card('magnum', '매그넘', 'battle', '🔫', '체력 1을 내고 공격력 +2', 'OJ Big Magnum (Lv3 20★)', {
     timing: 'attack', battleCost: 1, level: 2, points: 2, battle: { atk: [2, 2] },
   }),
-  shadowRaid: card('shadowRaid', '그림자 습격', 'battle', '🌑', '공격력 +3 · 반격 없음', 'AP 暗影突袭', {
+  shadowRaid: card('shadowRaid', '그림자 습격', 'battle', '🌑', '공격력 +3 · 반격 없음 (보스 제외)', 'AP 暗影突袭', {
     timing: 'attack', battleCost: 2, level: 1, points: 2, limit: 2, battle: { atk: [3, 3], noCounter: true },
   }),
-  gawu: card('gawu', '명검', 'battle', '🗡', '공격력 +1~20', 'AP 名刀：嘎呜切 (코스트 4, 1성)', {
-    timing: 'attack', battleCost: 4, level: 1, points: 5, limit: 1, battle: { atk: [1, 20] },
+  gawu: card('gawu', '명검', 'battle', '🗡', '공격력 +1~20', 'AP 名刀：嘎呜切 (코스트 4, 1성 → 2성)', {
+    timing: 'attack', battleCost: 4, level: 2, points: 5, limit: 1, battle: { atk: [1, 20] },
   }),
   charge: card('charge', '축적', 'battle', '🌀', '공격력 +5 · 「전력 공격」 획득', 'AP 蓄力 (코스트 5, 2성)', {
     timing: 'attack', battleCost: 5, level: 2, points: 5, limit: 1, battle: { atk: [5, 5] },
@@ -137,8 +145,8 @@ export const CARDS: Record<CardId, CardInfo> = {
   fullAttack: card('fullAttack', '전력 공격', 'battle', '💥', '공격력 +6 · 최종 공격력 ×1.5', 'AP 全力攻击', {
     timing: 'attack', battleCost: 3, limit: 0, battle: { atk: [6, 6], mult: 1.5 },
   }),
-  accel: card('accel', '액셀', 'battle', '🎯', '공격 주사위 2개 중 높은 눈', 'OJ Accel Hyper (Lv4 30★, 1장)', {
-    timing: 'attack', battleCost: 3, level: 3, points: 5, limit: 1, battle: { attackDice: 1 },
+  accel: card('accel', '액셀', 'battle', '🎯', '공격 주사위 2개를 더한다', 'OJ Accel Hyper (Lv4 30★, 1장)', {
+    timing: 'attack', battleCost: 3, level: 3, points: 5, limit: 1, battle: { sumDice: true },
   }),
 
   // ── 전투: 반격을 받을 때 ──
@@ -150,8 +158,8 @@ export const CARDS: Record<CardId, CardInfo> = {
   rainbow: card('rainbow', '무지개 원', 'battle', '🌈', '회피 주사위 +1', 'OJ Rainbow-Colored Circle (Lv2 5★)', {
     timing: 'defend', battleCost: 2, level: 1, points: 2, battle: { evadeDice: 1 },
   }),
-  retreat: card('retreat', '전술적 후퇴', 'battle', '🏃', '반격을 받지 않고 이탈', 'OJ Tactical Retreat (Lv1 레벨×5★)', {
-    timing: 'defend', battleCost: 1, points: 2, cost: 3, battle: { escape: true },
+  retreat: card('retreat', '전술적 후퇴', 'battle', '🏃', '반격을 받지 않고 이탈 · 코인 성 × 3 (최소 3)', 'OJ Tactical Retreat (Lv1 레벨×5★)', {
+    timing: 'defend', battleCost: 1, points: 2, cost: 3, costPerLevel: 3, battle: { escape: true },
   }),
   shieldCounter: card('shieldCounter', '실드 카운터', 'battle', '↩', '에너미에게 (공격력 − 내 방어력, 최소 1) 피해 · 반격을 받지 않는다', 'OJ Shield Counter (Lv4 20★, 1장)', {
     timing: 'defend', battleCost: 4, level: 3, points: 5, limit: 1, battle: { escape: true },
