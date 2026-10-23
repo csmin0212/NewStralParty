@@ -5,7 +5,7 @@ export type TileKind =
   | 'coinPlus'
   | 'coinMinus'
   | 'card'
-  | 'monster'
+  | 'spawn'
   | 'heal'
   | 'warp'
   | 'base';
@@ -22,11 +22,18 @@ export interface Tile {
   warpTo?: number;
 }
 
+export interface EnemySpawn {
+  tile: number;
+  enemy: EnemyKind;
+}
+
 export interface Board {
   name: string;
   tiles: Tile[];
   /** 본부 칸: 시작 · 레벨업 · 부활 지점 */
   baseTile: number;
+  /** 에너미가 나타나는 지점. 한 칸에는 에너미가 하나만 선다 */
+  enemySpawns: EnemySpawn[];
 }
 
 export type CardId = 'dash' | 'doubleDice' | 'bandage';
@@ -48,9 +55,57 @@ export interface Player {
   ko: boolean;
 }
 
+export type EnemyKind = 'slime' | 'goblin' | 'bat';
+
+export type DefenseMode = 'block' | 'evade';
+
+/** 보드 위의 에너미 하나. 스탯은 종류에서 복사해 오고, 이후 버프 등으로 바뀔 수 있다 */
+export interface Enemy {
+  id: number;
+  kind: EnemyKind;
+  tile: number;
+  hp: number;
+  maxHp: number;
+  atk: number;
+  def: number;
+  eva: number;
+  /** 반격형이면 공격받고 살아남았을 때 1회 반격한다 */
+  counter: boolean;
+  /** 공격받을 때 쓰는 방어 방식 */
+  defense: DefenseMode;
+  reward: number;
+}
+
+export interface AttackResult {
+  mode: DefenseMode;
+  attackRoll: number;
+  attackValue: number;
+  defenseRoll: number;
+  defenseValue: number;
+  damage: number;
+}
+
+export type BattleEvent =
+  | { type: 'attack'; attacker: 'player' | 'enemy'; result: AttackResult; targetHp: number }
+  | { type: 'enemyDefeated'; reward: number }
+  | { type: 'playerKO'; coinsLost: number }
+  | { type: 'release' };
+
+/** 인카운터 한 번의 기록. 화면은 events를 순서대로 연출한다 */
+export interface Battle {
+  seq: number;
+  player: number;
+  /** 인카운터 시작 시점의 에너미 */
+  enemy: Enemy;
+  events: BattleEvent[];
+  done: boolean;
+}
+
 export type Phase =
   | { kind: 'preRoll' }
   | { kind: 'choosePath'; stepsLeft: number; options: number[] }
+  | { kind: 'encounter'; enemy: number; stepsLeft: number }
+  | { kind: 'defend'; enemy: number; stepsLeft: number }
   | { kind: 'endTurn' }
   | { kind: 'gameOver'; winner: number };
 
@@ -72,11 +127,15 @@ export interface Move {
 export interface GameState {
   board: Board;
   players: Player[];
+  enemies: Enemy[];
+  nextEnemyId: number;
   current: number;
   round: number;
   phase: Phase;
   turn: TurnInfo;
   lastMove: Move | null;
+  /** 최근 인카운터 기록 (한 행동 안에서 전투가 끝나고 다음 전투가 시작될 수 있어서 몇 개 남겨 둔다) */
+  battles: Battle[];
   log: string[];
   /** 시드 기반 RNG의 현재 상태. 주사위·랜덤은 전부 여기서 나온다 */
   rngState: number;
@@ -87,4 +146,6 @@ export type Action =
   | { type: 'PLAY_CARD'; player: number; handIndex: number }
   | { type: 'ROLL'; player: number }
   | { type: 'CHOOSE_PATH'; player: number; to: number }
+  | { type: 'ENCOUNTER'; player: number; choice: 'attack' | 'release' }
+  | { type: 'DEFEND'; player: number; mode: DefenseMode }
   | { type: 'END_TURN'; player: number };

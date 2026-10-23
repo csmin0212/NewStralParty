@@ -97,6 +97,12 @@ function actions(state: GameState): string {
         <p class="muted">보드에서 빛나는 칸을 눌러도 돼요</p>`;
     }
 
+    case 'encounter':
+    case 'defend':
+      return `
+        <h2>${who}: ⚔ 전투 중</h2>
+        <p class="muted">전투 창에서 선택하세요</p>`;
+
     case 'endTurn':
       return `
         <h2>${who}의 차례</h2>

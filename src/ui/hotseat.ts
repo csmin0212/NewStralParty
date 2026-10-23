@@ -1,6 +1,7 @@
 import { DEFAULT_BOARD } from '../data/board';
 import { applyAction, createGame, RuleError, type PlayerSetup } from '../engine/game';
 import type { Action, GameState } from '../engine/types';
+import { BattleView } from './battleView';
 import { BoardView } from './boardView';
 import { esc } from './html';
 import { renderPanel, type PanelHandlers } from './panel';
@@ -20,7 +21,10 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
 
   root.innerHTML = `<div class="game"><main class="board-area"></main><aside class="panel"></aside></div>`;
   const panel = root.querySelector<HTMLElement>('.panel')!;
-  const board = new BoardView(root.querySelector('.board-area')!, state.board, state);
+  const boardArea = root.querySelector<HTMLElement>('.board-area')!;
+  const board = new BoardView(boardArea, state.board, state);
+  const battle = new BattleView(boardArea);
+  battle.onChoice = (choice) => dispatch({ ...choice, player: state.current });
 
   const handlers: PanelHandlers = {
     dispatch,
@@ -48,10 +52,17 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     state = next;
     busy = true;
     renderPanel(panel, prev, true, handlers);
+    battle.renderChoices(state, true);
     if (action.type === 'ROLL') board.showDice(state.turn.dice, state.turn.extraSteps);
+
+    // 연출 순서: 진행 중이던 전투 마무리 → 말 이동 → 새로 만난 에너미와 전투 시작
+    await battle.playPending(state);
     await board.show(state);
+    await battle.openIfNew(state);
+
     busy = false;
     renderPanel(panel, state, false, handlers);
+    battle.renderChoices(state, false);
 
     if (state.phase.kind === 'gameOver') {
       const winner = state.players[state.phase.winner];
@@ -70,7 +81,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     (e) => {
       if (e.code !== 'Space' || e.repeat) return;
       e.preventDefault();
-      panel.querySelector<HTMLButtonElement>('[data-primary]:not(:disabled)')?.click();
+      root.querySelector<HTMLButtonElement>('[data-primary]:not(:disabled)')?.click();
     },
     { signal: cleanup.signal },
   );

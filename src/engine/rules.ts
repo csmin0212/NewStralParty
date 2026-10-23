@@ -17,7 +17,8 @@ export const RULES = {
   bandageHeal: 4,
 
   baseStats: { hp: 10, atk: 1, def: 1, eva: 1 },
-  monster: { name: '슬라임', hp: 2, atk: 2, def: 0, eva: 0, reward: 10 },
+  /** 남겨 둘 인카운터 기록 수 */
+  battleHistory: 3,
 
   logLimit: 50,
 };

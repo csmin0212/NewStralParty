@@ -5,7 +5,7 @@ export const TILE_INFO: Record<TileKind, { name: string; icon: string }> = {
   coinPlus: { name: '코인+', icon: '🪙' },
   coinMinus: { name: '코인-', icon: '💸' },
   card: { name: '카드', icon: '🃏' },
-  monster: { name: '몬스터', icon: '👾' },
+  spawn: { name: '둥지', icon: '🕳️' },
   heal: { name: '회복', icon: '❤️' },
   warp: { name: '워프', icon: '🌀' },
   base: { name: '본부', icon: '🏠' },
@@ -24,7 +24,7 @@ export const TILE_INFO: Record<TileKind, { name: string; icon: string }> = {
  *   ↑           ↓                  ↓
  *  18 ← 17 ← 16 ← 15 ← 14 ← 13 ← 12 ← 11
  *
- * 지름길(22~24)은 짧지만 몬스터가 많다. 12번 워프는 20번으로 날아간다.
+ * 지름길(22~24)은 짧지만 에너미가 많다. 12번 워프는 20번으로 날아간다.
  */
 export const DEFAULT_BOARD: Board = {
   name: '첫 번째 섬',
@@ -40,20 +40,26 @@ export const DEFAULT_BOARD: Board = {
     { id: 7, kind: 'coinPlus', x: 7, y: 0, next: [8] },
     { id: 8, kind: 'card', x: 7, y: 1, next: [9] },
     { id: 9, kind: 'coinPlus', x: 7, y: 2, next: [10] },
-    { id: 10, kind: 'monster', x: 7, y: 3, next: [11] },
+    { id: 10, kind: 'spawn', x: 7, y: 3, next: [11] },
     { id: 11, kind: 'coinPlus', x: 7, y: 4, next: [12] },
     { id: 12, kind: 'warp', x: 6, y: 4, next: [13], warpTo: 20 },
     { id: 13, kind: 'coinMinus', x: 5, y: 4, next: [14] },
     { id: 14, kind: 'card', x: 4, y: 4, next: [15] },
     { id: 15, kind: 'coinPlus', x: 3, y: 4, next: [16] },
     { id: 16, kind: 'empty', x: 2, y: 4, next: [17] },
-    { id: 17, kind: 'monster', x: 1, y: 4, next: [18] },
+    { id: 17, kind: 'spawn', x: 1, y: 4, next: [18] },
     { id: 18, kind: 'coinPlus', x: 0, y: 4, next: [19] },
     { id: 19, kind: 'heal', x: 0, y: 3, next: [20] },
     { id: 20, kind: 'card', x: 0, y: 2, next: [21] },
     { id: 21, kind: 'coinMinus', x: 0, y: 1, next: [0] },
-    { id: 22, kind: 'monster', x: 3, y: 1, next: [23] },
+    { id: 22, kind: 'spawn', x: 3, y: 1, next: [23] },
     { id: 23, kind: 'coinPlus', x: 3, y: 2, next: [24] },
-    { id: 24, kind: 'monster', x: 3, y: 3, next: [15] },
+    { id: 24, kind: 'spawn', x: 3, y: 3, next: [15] },
+  ],
+  enemySpawns: [
+    { tile: 10, enemy: 'goblin' },
+    { tile: 17, enemy: 'slime' },
+    { tile: 22, enemy: 'bat' },
+    { tile: 24, enemy: 'goblin' },
   ],
 };

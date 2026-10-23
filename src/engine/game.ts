@@ -2,10 +2,21 @@
 // applyAction(state, action) → 새 state. 입력 state는 건드리지 않는다.
 
 import { CARD_IDS } from '../data/cards';
+import { ENEMIES } from '../data/enemies';
 import { resolveAttack } from './combat';
 import { createRng, type Rng } from './rng';
 import { RULES } from './rules';
-import type { Action, Board, CardId, GameState, Player, TurnInfo } from './types';
+import type {
+  Action,
+  Battle,
+  Board,
+  CardId,
+  DefenseMode,
+  Enemy,
+  GameState,
+  Player,
+  TurnInfo,
+} from './types';
 
 export class RuleError extends Error {}
 
@@ -47,16 +58,20 @@ export function createGame({ board, players, seed }: GameOptions): GameState {
       hand: [],
       ko: false,
     })),
+    enemies: [],
+    nextEnemyId: 0,
     current: 0,
     round: 1,
     phase: { kind: 'preRoll' },
     turn: freshTurn(),
     lastMove: null,
+    battles: [],
     log: [],
     rngState: seed >>> 0,
     seq: 0,
   };
   log(state, '── 1라운드 ──');
+  respawnEnemies(state);
   beginTurn(state);
   return state;
 }
@@ -81,6 +96,12 @@ export function applyAction(state: GameState, action: Action): GameState {
       break;
     case 'CHOOSE_PATH':
       choosePath(s, rng, action.to);
+      break;
+    case 'ENCOUNTER':
+      encounter(s, rng, action.choice);
+      break;
+    case 'DEFEND':
+      defend(s, rng, action.mode);
       break;
     case 'END_TURN':
       endTurn(s);
@@ -112,6 +133,12 @@ export function validateBoard(board: Board): string[] {
   });
   if (!exists(board.baseTile)) problems.push('본부 칸이 없음');
   else if (board.tiles[board.baseTile].kind !== 'base') problems.push('본부 칸의 종류가 base가 아님');
+
+  const spawnTiles = board.enemySpawns.map((sp) => sp.tile);
+  for (const tile of spawnTiles) {
+    if (!exists(tile)) problems.push(`에너미 스폰 칸 ${tile}이 없음`);
+  }
+  if (new Set(spawnTiles).size !== spawnTiles.length) problems.push('에너미 스폰 칸이 겹침');
   return problems;
 }
 
@@ -159,14 +186,85 @@ function roll(s: GameState, rng: Rng) {
 function choosePath(s: GameState, rng: Rng, to: number) {
   if (s.phase.kind !== 'choosePath') throw new RuleError('지금은 길을 고를 수 없습니다');
   if (!s.phase.options.includes(to)) throw new RuleError('갈 수 없는 방향입니다');
-  const p = currentPlayer(s);
-  const path = [p.tile];
-  const stepsLeft = s.phase.stepsLeft;
+  const path = [currentPlayer(s).tile];
+  const left = s.phase.stepsLeft - 1;
 
-  s.phase = { kind: 'preRoll' }; // move()가 다시 정한다
-  stepTo(s, to);
-  path.push(to);
-  move(s, rng, stepsLeft - 1, path);
+  s.phase = { kind: 'preRoll' }; // enter() / move()가 다시 정한다
+  if (enter(s, to, path, left)) {
+    recordMove(s, path);
+    return;
+  }
+  move(s, rng, left, path);
+}
+
+/** 인카운터: 공격하거나 놓아준다 */
+function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
+  if (s.phase.kind !== 'encounter') throw new RuleError('지금은 인카운터 중이 아닙니다');
+  const { stepsLeft } = s.phase;
+  const enemy = findEnemy(s, s.phase.enemy);
+  const battle = currentBattle(s);
+  const p = currentPlayer(s);
+  const name = ENEMIES[enemy.kind].name;
+
+  if (choice === 'release') {
+    battle.events.push({ type: 'release' });
+    log(s, `  ${name} 놓아주기`);
+    finishBattle(s, rng, stepsLeft);
+    return;
+  }
+
+  const hit = resolveAttack(p, enemy, enemy.defense, rng);
+  enemy.hp = Math.max(0, enemy.hp - hit.damage);
+  battle.events.push({ type: 'attack', attacker: 'player', result: hit, targetHp: enemy.hp });
+  log(s, `  ${p.name}의 공격 ${hit.attackValue} vs ${defenseName(hit.mode)} ${hit.defenseValue} → ${hit.damage} 피해`);
+
+  if (enemy.hp === 0) {
+    s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
+    p.coins += enemy.reward;
+    battle.events.push({ type: 'enemyDefeated', reward: enemy.reward });
+    log(s, `  ${name} 처치! 코인 +${enemy.reward}`);
+    finishBattle(s, rng, stepsLeft);
+    return;
+  }
+
+  if (enemy.counter) {
+    s.phase = { kind: 'defend', enemy: enemy.id, stepsLeft };
+    log(s, `  ${name}의 반격이 온다!`);
+    return;
+  }
+  finishBattle(s, rng, stepsLeft);
+}
+
+/** 반격을 방어 또는 회피로 받는다 */
+function defend(s: GameState, rng: Rng, mode: DefenseMode) {
+  if (s.phase.kind !== 'defend') throw new RuleError('지금은 반격을 받을 때가 아닙니다');
+  const { stepsLeft } = s.phase;
+  const enemy = findEnemy(s, s.phase.enemy);
+  const battle = currentBattle(s);
+  const p = currentPlayer(s);
+
+  const hit = resolveAttack(enemy, p, mode, rng);
+  battle.events.push({
+    type: 'attack',
+    attacker: 'enemy',
+    result: hit,
+    targetHp: Math.max(0, p.hp - hit.damage),
+  });
+  log(
+    s,
+    `  ${ENEMIES[enemy.kind].name}의 반격 ${hit.attackValue} vs ${defenseName(mode)} ${hit.defenseValue} → ${hit.damage} 피해`,
+  );
+
+  const coinsBefore = p.coins;
+  damage(s, p, hit.damage);
+  if (p.ko) {
+    // KO 되면 이동도 끝
+    battle.events.push({ type: 'playerKO', coinsLost: coinsBefore - p.coins });
+    battle.done = true;
+    s.phase = { kind: 'endTurn' };
+    return;
+  }
+  finishBattle(s, rng, stepsLeft);
 }
 
 function endTurn(s: GameState) {
@@ -175,6 +273,7 @@ function endTurn(s: GameState) {
   if (s.current === 0) {
     s.round += 1;
     log(s, `── ${s.round}라운드 ──`);
+    respawnEnemies(s);
   }
   beginTurn(s);
 }
@@ -199,7 +298,7 @@ function beginTurn(s: GameState) {
   p.coins += RULES.turnIncome;
 }
 
-/** steps칸 이동. 갈림길에서 멈추면 choosePath 단계로 넘어간다 */
+/** steps칸 이동. 갈림길이나 에너미를 만나면 멈추고 해당 단계로 넘어간다 */
 function move(s: GameState, rng: Rng, steps: number, path: number[]) {
   const p = currentPlayer(s);
   let left = steps;
@@ -211,9 +310,11 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
       recordMove(s, path);
       return;
     }
-    stepTo(s, tile.next[0]);
-    path.push(p.tile);
     left -= 1;
+    if (enter(s, tile.next[0], path, left)) {
+      recordMove(s, path);
+      return;
+    }
   }
 
   // 이동 도중 레벨 3을 달성하면 그 자리에서 게임 끝
@@ -222,6 +323,18 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
     s.phase = { kind: 'endTurn' };
   }
   recordMove(s, path);
+}
+
+/** 한 칸 들어간다. 그 칸에 에너미가 있으면 인카운터를 시작하고 true */
+function enter(s: GameState, tileId: number, path: number[], stepsLeft: number): boolean {
+  stepTo(s, tileId);
+  path.push(tileId);
+  if (s.phase.kind === 'gameOver') return false;
+
+  const enemy = s.enemies.find((e) => e.tile === tileId);
+  if (!enemy) return false;
+  startEncounter(s, enemy, stepsLeft);
+  return true;
 }
 
 /** 한 칸 이동. 본부는 지나가기만 해도 레벨업 판정 */
@@ -255,6 +368,7 @@ function land(s: GameState, rng: Rng, path: number[]) {
   switch (tile.kind) {
     case 'empty':
     case 'base':
+    case 'spawn':
       break;
     case 'coinPlus':
       p.coins += RULES.coinPlus;
@@ -268,9 +382,6 @@ function land(s: GameState, rng: Rng, path: number[]) {
     }
     case 'card':
       drawCard(s, p, rng.pick(CARD_IDS));
-      break;
-    case 'monster':
-      fightMonster(s, p, rng);
       break;
     case 'heal': {
       const healed = heal(p, RULES.heal);
@@ -296,22 +407,60 @@ function drawCard(s: GameState, p: Player, card: CardId) {
   log(s, `${p.name}: 🃏 카드 1장 획득`);
 }
 
-/** 몬스터와 한 번씩 주고받는다. 3단계(전투) 전까지는 플레이어 방어를 자동으로 '방어'로 처리 */
-function fightMonster(s: GameState, p: Player, rng: Rng) {
-  const m = RULES.monster;
-  log(s, `${p.name}: 👾 ${m.name} 등장! (HP ${m.hp})`);
+// ───────────────────────── 에너미 · 전투 ─────────────────────────
 
-  const hit = resolveAttack(p, m, 'block', rng);
-  log(s, `  공격 ${hit.attackValue} vs 방어 ${hit.defenseValue} → ${hit.damage} 피해`);
-  if (hit.damage >= m.hp) {
-    p.coins += m.reward;
-    log(s, `  ${m.name} 처치! 코인 +${m.reward}`);
-    return;
+/**
+ * 빈 스폰 지점에 에너미를 놓는다.
+ * 임시 규칙: 라운드가 바뀔 때마다 다시 채운다. 보스 기믹 시간표가 생기면 그쪽으로 옮긴다.
+ */
+function respawnEnemies(s: GameState) {
+  for (const spawn of s.board.enemySpawns) {
+    if (s.enemies.some((e) => e.tile === spawn.tile)) continue;
+    const info = ENEMIES[spawn.enemy];
+    s.enemies.push({
+      id: s.nextEnemyId++,
+      kind: spawn.enemy,
+      tile: spawn.tile,
+      hp: info.hp,
+      maxHp: info.hp,
+      atk: info.atk,
+      def: info.def,
+      eva: info.eva,
+      counter: info.counter,
+      defense: info.defense,
+      reward: info.reward,
+    });
+    log(s, `${info.icon} ${info.name} 등장`);
   }
+}
 
-  const back = resolveAttack(m, p, 'block', rng);
-  log(s, `  ${m.name}의 반격 ${back.attackValue} vs 방어 ${back.defenseValue} → ${back.damage} 피해`);
-  damage(s, p, back.damage);
+function startEncounter(s: GameState, enemy: Enemy, stepsLeft: number) {
+  s.phase = { kind: 'encounter', enemy: enemy.id, stepsLeft };
+  s.seq += 1;
+  s.battles.push({ seq: s.seq, player: s.current, enemy: structuredClone(enemy), events: [], done: false });
+  if (s.battles.length > RULES.battleHistory) s.battles.shift();
+  log(s, `${currentPlayer(s).name}: ⚔ ${ENEMIES[enemy.kind].name} 인카운터!`);
+}
+
+/** 전투를 마치고 남은 칸만큼 이어서 이동 */
+function finishBattle(s: GameState, rng: Rng, stepsLeft: number) {
+  currentBattle(s).done = true;
+  s.phase = { kind: 'preRoll' }; // move()가 다시 정한다
+  move(s, rng, stepsLeft, [currentPlayer(s).tile]);
+}
+
+function findEnemy(s: GameState, id: number): Enemy {
+  const enemy = s.enemies.find((e) => e.id === id);
+  if (!enemy) throw new Error(`에너미 ${id}가 없음`);
+  return enemy;
+}
+
+function currentBattle(s: GameState): Battle {
+  return s.battles[s.battles.length - 1];
+}
+
+function defenseName(mode: DefenseMode): string {
+  return mode === 'block' ? '방어' : '회피';
 }
 
 function damage(s: GameState, p: Player, amount: number) {

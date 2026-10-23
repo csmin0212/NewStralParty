@@ -1,20 +1,10 @@
 import type { Rng } from './rng';
+import type { AttackResult, DefenseMode } from './types';
 
 export interface Fighter {
   atk: number;
   def: number;
   eva: number;
-}
-
-export type DefenseMode = 'block' | 'evade';
-
-export interface AttackResult {
-  mode: DefenseMode;
-  attackRoll: number;
-  attackValue: number;
-  defenseRoll: number;
-  defenseValue: number;
-  damage: number;
 }
 
 /**

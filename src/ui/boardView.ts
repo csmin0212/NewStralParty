@@ -1,4 +1,5 @@
 import { TILE_INFO } from '../data/board';
+import { ENEMIES } from '../data/enemies';
 import type { Board, GameState } from '../engine/types';
 import { esc } from './html';
 
@@ -18,6 +19,7 @@ export class BoardView {
   private readonly tileEls: HTMLElement[];
   private readonly tokenEls: HTMLElement[];
   private readonly diceEl: HTMLElement;
+  private readonly enemyEls = new Map<number, HTMLElement>();
   /** 화면에 표시 중인 각 플레이어의 칸 */
   private shown: number[];
   private lastSeq = 0;
@@ -80,6 +82,7 @@ export class BoardView {
 
     this.shown = state.players.map((p) => p.tile);
     this.layoutTokens(state.current);
+    this.renderEnemies(state);
     this.highlight(state);
   }
 
@@ -97,7 +100,37 @@ export class BoardView {
     }
     this.shown = state.players.map((p) => p.tile);
     this.layoutTokens(state.current);
+    this.renderEnemies(state);
     this.highlight(state);
+  }
+
+  /** 에너미는 칸 오른쪽 위에 배지로 붙는다 (말은 칸 가운데) */
+  private renderEnemies(state: GameState) {
+    const alive = new Set(state.enemies.map((e) => e.id));
+    for (const [id, el] of this.enemyEls) {
+      if (alive.has(id)) continue;
+      this.enemyEls.delete(id);
+      el.classList.add('gone');
+      setTimeout(() => el.remove(), 400);
+    }
+
+    for (const enemy of state.enemies) {
+      const info = ENEMIES[enemy.kind];
+      let el = this.enemyEls.get(enemy.id);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'enemy';
+        el.innerHTML = `<span class="face">${info.icon}</span><i class="ehp"><b></b></i>`;
+        this.el.append(el);
+        this.enemyEls.set(enemy.id, el);
+      }
+      const tile = this.board.tiles[enemy.tile];
+      el.style.left = `${PAD + tile.x * UNIT + TILE - 8}px`;
+      el.style.top = `${PAD + tile.y * UNIT + 8}px`;
+      el.classList.toggle('counter', enemy.counter);
+      el.title = `${info.name} HP ${enemy.hp}/${enemy.maxHp}${enemy.counter ? ' · 반격형' : ''}`;
+      el.querySelector<HTMLElement>('.ehp b')!.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+    }
   }
 
   showDice(dice: number[], extra: number) {

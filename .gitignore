@@ -1,4 +1,6 @@
 node_modules
 dist
 *.local
+# 뽑아 온 원본 에셋 (정리된 것은 public/assets/에)
+assets-raw/
 .DS_Store
