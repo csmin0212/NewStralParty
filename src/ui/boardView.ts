@@ -5,7 +5,7 @@ import { CHARACTER_ART, ENEMY_ART, TILE_ART } from './assets';
 import { campusLayout, campusScenery } from './campusMap';
 
 const TILE = 70; // 칸 크기(px)
-const STEP_MS = 180;
+const STEP_MS = 230;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -17,7 +17,6 @@ export class BoardView {
   private readonly el: HTMLElement;
   private readonly tileEls: HTMLElement[];
   private readonly tokenEls: HTMLElement[];
-  private readonly diceEl: HTMLElement;
   private readonly enemyEls = new Map<number, HTMLElement>();
   private readonly layout: ReturnType<typeof campusLayout>;
   /** 화면에 표시 중인 각 플레이어의 칸 */
@@ -58,7 +57,7 @@ export class BoardView {
       const art = CHARACTER_ART[p.character]?.token;
       if (art) {
         tok.classList.add('has-art');
-        tok.innerHTML = `<img class="token-art" src="${art}" alt="" draggable="false"><b>${p.id + 1}</b>`;
+        tok.innerHTML = `<img class="token-art" src="${art}" alt="" draggable="false"><b>${p.id + 1}</b><i class="steps"></i>`;
       } else {
         tok.textContent = String(p.id + 1);
       }
@@ -67,9 +66,19 @@ export class BoardView {
       return tok;
     });
 
-    this.diceEl = document.createElement('div');
-    this.diceEl.className = 'dice-pop';
-    this.el.append(this.diceEl);
+    // 거점: 자리 색 깃발
+    for (const p of state.players) {
+      const flag = document.createElement('div');
+      flag.className = 'home-flag';
+      flag.style.setProperty('--c', p.color);
+      const c = this.layout.centers[p.home];
+      flag.style.left = `${c.x - 26}px`;
+      flag.style.top = `${c.y - 30}px`;
+      flag.style.zIndex = String(Math.round(c.y) + 1);
+      flag.innerHTML = `<i></i><b>${p.id + 1}</b>`;
+      flag.title = `${p.name}의 거점`;
+      this.el.append(flag);
+    }
 
     // 화면 크기에 맞춰 보드 전체를 확대/축소한다. HUD가 차지할 여백은 .board-area의 padding으로 CSS가 정한다
     const fit = document.createElement('div');
@@ -98,11 +107,28 @@ export class BoardView {
     const move = state.lastMove;
     if (move && move.seq > this.lastSeq) {
       this.lastSeq = move.seq;
-      for (const tileId of move.path.slice(1)) {
+      // 원작처럼 한 칸마다 폴짝, 머리 위에 남은 칸 수
+      const tok = this.tokenEls[move.player];
+      const steps = tok.querySelector<HTMLElement>('.steps');
+      const path = move.path.slice(1);
+      for (const [i, tileId] of path.entries()) {
         this.shown[move.player] = tileId;
         this.layoutTokens(move.player);
+        tok.classList.remove('hop');
+        void tok.offsetWidth;
+        tok.classList.add('hop');
+        if (steps) {
+          const left = path.length - 1 - i;
+          steps.textContent = left > 0 ? String(left) : '';
+          steps.classList.toggle('show', left > 0);
+        }
         await sleep(STEP_MS);
       }
+      tok.classList.remove('hop');
+      steps?.classList.remove('show');
+      this.tileEls[path.at(-1)!]?.classList.remove('landed');
+      void this.el.offsetWidth;
+      this.tileEls[path.at(-1)!]?.classList.add('landed');
     }
     this.shown = state.players.map((p) => p.tile);
     this.layoutTokens(state.current);
@@ -142,14 +168,6 @@ export class BoardView {
       el.querySelector('.ename')!.innerHTML = `${esc(enemy.name)} <small>⚔${enemy.atk}</small>`;
       el.querySelector('.ehp-text')!.textContent = `${enemy.hp}/${enemy.maxHp}`;
     }
-  }
-
-  showDice(dice: number[], extra: number) {
-    const bonus = extra > 0 ? `<small>+${extra}</small>` : '';
-    this.diceEl.innerHTML = `🎲 ${dice.map((d) => `<b>${d}</b>`).join(' ')}${bonus}`;
-    this.diceEl.classList.remove('pop');
-    void this.diceEl.offsetWidth; // 애니메이션 재시작
-    this.diceEl.classList.add('pop');
   }
 
   /** 연출용: 플레이어 말의 화면 좌표 (말 머리 위) */

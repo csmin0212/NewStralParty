@@ -25,6 +25,8 @@ export const RULES = {
   /** 상점: 카드 3장, 장당 3코인 */
   shopOffers: 3,
   shopPrice: 3,
+  /** 상점 송금 단위 */
+  transferCoins: 5,
 
   /** KO 되면 다음 라운드를 쉬고 그다음 라운드에 부활: 쓰러진 라운드 + 2 */
   reviveAfterRounds: 2,

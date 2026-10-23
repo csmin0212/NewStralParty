@@ -407,6 +407,7 @@
 .fx-float--hurt { color: #ff3d5e; }
 .fx-float--heal { color: #17c47c; }
 .fx-float--level { color: var(--sky-deep); font-size: 18px; }
+.fx-float--card { color: #8a6cf0; }
 @keyframes fx-float {
   0% { opacity: 0; scale: 2; translate: -50% 0; }
   15% { opacity: 1; scale: 1; }

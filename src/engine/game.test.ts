@@ -1135,3 +1135,45 @@ describe('모나', () => {
     expect(t2.players[0].hand).toHaveLength(hand2);
   });
 });
+
+describe('거점', () => {
+  it('자리마다 거점에서 시작한다', () => {
+    const s = newGame(DEFAULT_BOARD, { players: 4 });
+    expect(s.players.map((p) => [p.tile, p.home])).toEqual([
+      [0, 0],
+      [7, 7],
+      [11, 11],
+      [18, 18],
+    ]);
+    expect(validateBoard(DEFAULT_BOARD)).toEqual([]);
+  });
+
+  it('내 거점에서만 레벨업 · 덱 정비', () => {
+    const board: Board = { ...ring(empties(9)), homeTiles: [0, 3] };
+    board.tiles[3] = { ...board.tiles[3], kind: 'base' };
+    let s = newGame(board);
+    s.players[0].coins = 50;
+    s = rollExactly(s, 3); // 0번이 1번의 거점(3)에 멈춘다
+    expect(s.players[0].level).toBe(0);
+    expect(() => applyAction(s, { type: 'EDIT_DECK', player: 0, add: 'cookie' })).toThrow(RuleError);
+  });
+});
+
+describe('송금', () => {
+  it('상점에서 아군에게 코인 5', () => {
+    let s = newGame(ring(['empty', 'shop', ...empties(6)]));
+    s.players[0].coins = 12;
+    s = rollExactly(s, 2);
+    const before = s.players[1].coins;
+    s = applyAction(s, { type: 'SEND_COINS', player: 0, to: 1 });
+    expect([s.players[0].coins, s.players[1].coins]).toEqual([7, before + 5]);
+    expect(() => applyAction(s, { type: 'SEND_COINS', player: 0, to: 0 })).toThrow(RuleError);
+    s.players[0].coins = 4;
+    expect(() => applyAction(s, { type: 'SEND_COINS', player: 0, to: 1 })).toThrow(RuleError);
+  });
+
+  it('상점 밖에서는 못 보낸다', () => {
+    const s = newGame(ring(empties(6)));
+    expect(() => applyAction(s, { type: 'SEND_COINS', player: 0, to: 1 })).toThrow(RuleError);
+  });
+});

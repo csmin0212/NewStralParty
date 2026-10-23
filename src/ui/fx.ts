@@ -2,7 +2,19 @@
 // trpg-vtt의 연출 모음(src/components/session/fxevents.css · FxEvents.tsx)을 바닐라 DOM으로 옮기고 학원 도시 색으로 바꿨다.
 // 연출은 한 번에 하나씩 순서대로 재생하고, 화면을 누르면 건너뛴다.
 
-export type FxKind = 'encounter' | 'round' | 'turn' | 'skill' | 'card' | 'banner' | 'warning' | 'levelup' | 'ko' | 'victory' | 'defeat';
+export type FxKind =
+  | 'encounter'
+  | 'round'
+  | 'turn'
+  | 'skill'
+  | 'card'
+  | 'dice'
+  | 'banner'
+  | 'warning'
+  | 'levelup'
+  | 'ko'
+  | 'victory'
+  | 'defeat';
 
 /** 연출마다 전체 길이(ms). CSS의 --dur로도 넘어간다 */
 const DUR: Record<FxKind, number> = {
@@ -11,6 +23,7 @@ const DUR: Record<FxKind, number> = {
   turn: 1600,
   skill: 1700,
   card: 1200,
+  dice: 1500,
   banner: 2000,
   warning: 2800,
   levelup: 2400,
@@ -32,11 +45,11 @@ export interface FxSpec {
   face?: { label: string; image?: string };
   /** 스킬 컷인에 크게 들어오는 캐릭터 메인 일러스트 */
   art?: string;
-  /** 카드 연출에 띄울 카드 앞면 (cardFace) */
+  /** 카드 앞면 (cardFace) · 주사위 (diceHtml) 같은 미리 만든 내용 */
   html?: string;
 }
 
-export type FloatKind = 'coin' | 'hurt' | 'heal' | 'level';
+export type FloatKind = 'coin' | 'hurt' | 'heal' | 'level' | 'card';
 
 /** 글자마다 <span style="--i:n">으로 나눠서 한 글자씩 튀어나오게 한다 */
 function letters(text: string): string {
@@ -72,6 +85,8 @@ function markup(spec: FxSpec): string {
     }
     case 'card':
       return `<div class="fxe-card">${spec.html ?? ''}</div>`;
+    case 'dice':
+      return spec.html ?? '';
     case 'warning':
       return `<div class="fxe-hazard fxe-hazard--top"></div><div class="fxe-hazard fxe-hazard--bottom"></div>${big(text)}${sub}`;
     case 'levelup':

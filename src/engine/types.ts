@@ -28,6 +28,8 @@ export interface Board {
   tiles: Tile[];
   /** 본부 칸: 시작 · 레벨업 지점 */
   baseTile: number;
+  /** 플레이어 거점 (자리 순서대로). 게임을 시작하는 칸이자 레벨업 · 덱 정비 칸. 없으면 모두 본부 */
+  homeTiles?: number[];
   /** 에너미가 소환되는 지점. 다 차 있으면 다른 빈 칸에 나온다 */
   spawnTiles: number[];
   /** 보스가 나타나는 칸 */
@@ -106,6 +108,8 @@ export interface Player {
   def: number;
   /** 주사위를 굴릴 때마다 더 가는 칸 수 (이동거리) */
   move: number;
+  /** 내 거점 칸: 여기서 시작하고, 지나가거나 멈추면 레벨업 · 덱 정비 */
+  home: number;
   /** 카드 효과로 붙은 상태 */
   status: PlayerStatus;
   /** 내 덱 구성 (최대 10장). 뽑을 더미 · 버린 더미 · 손패를 오가며 내 덱 안에서만 돈다 */
@@ -324,6 +328,8 @@ export type Action =
   /** target: 아군이면 플레이어 id, 에너미면 에너미 id · value: 리모컨 주사위 눈 */
   | { type: 'PLAY_CARD'; player: number; handIndex: number; target?: number; value?: number }
   | { type: 'BUY_CARD'; player: number; offer: number }
+  /** 상점에서 아군에게 코인 송금 (한 번에 5) */
+  | { type: 'SEND_COINS'; player: number; to: number }
   | { type: 'LEAVE_SHOP'; player: number }
   | { type: 'ROLL'; player: number }
   | { type: 'CHOOSE_PATH'; player: number; to: number }

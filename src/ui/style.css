@@ -310,7 +310,6 @@ button.seat-char:hover {
   opacity: .65;
 }
 .board .warp-link { opacity: .28; }
-.board .dice-pop { z-index: 5000; }
 .board .board-overlay { z-index: 6000; }
 .board .tile:focus-visible {
   outline: 3px solid var(--sky-deep);
@@ -383,6 +382,14 @@ button.seat-char:hover {
 .tile .label {
   font-size: 11px;
   font-weight: 700;
+  /* 원작처럼 평소에는 그림만. 마우스를 올리거나 갈림길에서 고를 때만 이름 */
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.tile:hover .label,
+.tile.choice .label {
+  opacity: 1;
 }
 /* 그림 없는 칸도 그림 칸(비스듬히 내려다본 발판)처럼 납작한 타원으로. 중심은 말 위치와 맞춘다 */
 .tile:not(.has-art) {
@@ -637,42 +644,6 @@ button.seat-char:hover {
 }
 @keyframes enemy-in {
   from { opacity: 0; scale: 0.4; }
-}
-
-.dice-pop {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  translate: -50% -50%;
-  font-size: 30px;
-  font-weight: 900;
-  padding: 10px 22px;
-  border-radius: 16px;
-  background: var(--surface);
-  border: 1px solid var(--white);
-  box-shadow: var(--shadow);
-  pointer-events: none;
-  opacity: 0;
-  z-index: 10;
-}
-.dice-pop b {
-  color: var(--sky-deep);
-  font-style: italic;
-}
-.dice-pop small {
-  font-size: 20px;
-  margin-left: 6px;
-  color: var(--muted);
-}
-.dice-pop.pop {
-  animation: dice-pop 1.4s ease-out;
-}
-@keyframes dice-pop {
-  0% { opacity: 0; scale: 0.6; }
-  15% { opacity: 1; scale: 1.1; }
-  25% { scale: 1; }
-  75% { opacity: 1; }
-  100% { opacity: 0; }
 }
 
 .board-overlay {

@@ -82,7 +82,7 @@ export function renderHud(
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!btn || btn.disabled) return;
     const player = state.current;
-    const { action, card, path, add, remove, buy, target, value, gift } = btn.dataset;
+    const { action, card, path, add, remove, buy, target, value, gift, send } = btn.dataset;
     if (action === 'roll') h.dispatch({ type: 'ROLL', player });
     else if (action === 'skill') {
       if (skillTargets(state, currentPlayer(state))) {
@@ -100,6 +100,7 @@ export function renderHud(
     else if (add) h.dispatch({ type: 'EDIT_DECK', player, add: add as CardId });
     else if (remove) h.dispatch({ type: 'EDIT_DECK', player, remove: remove as CardId });
     else if (buy !== undefined) h.dispatch({ type: 'BUY_CARD', player, offer: Number(buy) });
+    else if (send !== undefined) h.dispatch({ type: 'SEND_COINS', player, to: Number(send) });
     else if (action === 'leave-shop') h.dispatch({ type: 'LEAVE_SHOP', player });
     else if (action === 'cancel-pick') {
       picking = null;
@@ -214,7 +215,7 @@ function playerCard(state: GameState, p: Player): string {
       <div class="pc-body">
         <div class="pc-name">${esc(p.name)}${p.ko ? ` <span class="ko-tag">KO · ${p.reviveRound}R 부활</span>` : ''}</div>
         <div class="pc-row">
-          <span class="coin"><img class="ui-icon" src="${UI_ART.coin}" alt="코인"> <b>${p.coins}</b>${cost !== undefined ? `<small>/${cost}</small>` : ''}</span>
+          <span class="coin" title="${cost !== undefined ? `${p.level + 1}성까지 코인 ${cost}` : '3성'}"><img class="ui-icon" src="${UI_ART.coin}" alt="코인"> <b>${p.coins}</b></span>
           ${levelBadge(p.level)}
           <span class="hand-count" title="손패"><img class="card-back-icon" src="${UI_ART.cardBack}" alt="손패">${p.hand.length}</span>
         </div>
@@ -331,12 +332,32 @@ function shopPanel(state: GameState): string {
         </div>`;
     })
     .join('');
+  // 송금: 아군에게 코인 5씩
+  const canSend = p.coins >= RULES.transferCoins;
+  const allies = state.players
+    .filter((o) => o.id !== p.id)
+    .map(
+      (o) => `
+        <button class="send-btn" data-send="${o.id}" style="--c:${o.color}" ${canSend ? '' : 'disabled'} title="${esc(o.name)}에게 코인 ${RULES.transferCoins}">
+          <img class="send-face" src="${CHARACTER_ART[o.character].portrait}" alt="">
+          <span><b>${esc(o.name)}</b><small><img src="${UI_ART.coin}" alt="">${o.coins}</small></span>
+          <em>+${RULES.transferCoins}</em>
+        </button>`,
+    )
+    .join('');
+  const { stepsLeft } = state.phase;
   return `
     <div class="shop-overlay">
       <div class="shop-panel">
         <div class="ba-band">상점${free ? ' · 첫 구매 무료' : ''}</div>
         <div class="shop-items">${items}</div>
-        <div class="shop-foot"><span class="shop-coins"><img src="${UI_ART.coin}" alt="">${p.coins}</span>${full ? '<span class="shop-full">손패가 가득 참</span>' : ''}</div>
+        <div class="ba-band ba-band--sub">송금</div>
+        <div class="send-row">${allies}</div>
+        <div class="shop-foot">
+          <span class="shop-coins"><img src="${UI_ART.coin}" alt="">${p.coins}</span>
+          ${full ? '<span class="shop-full">손패가 가득 참</span>' : ''}
+          <button class="ba-btn ba-btn--sky shop-leave" data-action="leave-shop" data-primary>나가기${stepsLeft > 0 ? ` · ${stepsLeft}칸 더` : ''}</button>
+        </div>
       </div>
     </div>`;
 }
@@ -428,7 +449,6 @@ function deckButton(state: GameState): string {
 function actionArea(state: GameState): string {
   const p = currentPlayer(state);
   const phase = state.phase;
-  const cardInfo = `<span class="card-count">카드 ${state.turn.cardPlayed ? 1 : 0}/1</span>`;
 
   switch (phase.kind) {
     case 'preRoll': {
@@ -437,7 +457,7 @@ function actionArea(state: GameState): string {
         state.turn.extraSteps > 0 ? `+${state.turn.extraSteps}칸` : '',
       ].filter(Boolean);
       return `
-        <div class="action-info">${mods.length ? `<span class="mods">${mods.join(' · ')}</span>` : ''}${deckButton(state)}${skillButton(state)}${cardInfo}</div>
+        <div class="action-info">${mods.length ? `<span class="mods">${mods.join(' · ')}</span>` : ''}${deckButton(state)}${skillButton(state)}</div>
         <button class="go-btn" data-action="roll" data-primary>
           <span class="go-dice">🎲</span><b>이동</b><small>GO GO GO</small>
         </button>`;
@@ -464,7 +484,7 @@ function actionArea(state: GameState): string {
       return `<button class="go-btn wait" disabled><b>전투 중</b><small>BATTLE</small></button>`;
 
     case 'shop':
-      return `<button class="go-btn end" data-action="leave-shop" data-primary><b>나가기</b><small>${phase.stepsLeft > 0 ? `${phase.stepsLeft}칸 더` : 'EXIT'}</small></button>`;
+      return `<button class="go-btn wait" disabled><b>상점</b><small>SHOP</small></button>`;
 
     case 'endTurn': {
       const result = p.ko ? `K.O. · ${p.reviveRound}R 부활` : `${tileLabel(state.board, p.tile)} 도착`;

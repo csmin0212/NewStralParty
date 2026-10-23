@@ -139,7 +139,7 @@ export function cardBlocker(s: GameState, p: Player, hand: HandCard): string | n
   return null;
 }
 
-/** 덱 정비는 본부 칸에서, 주사위 전이나 턴을 끝내기 전에만 */
+/** 덱 정비는 내 거점 칸에서, 주사위 전이나 턴을 끝내기 전에만 */
 export function canEditDeck(s: GameState, p: Player): boolean {
-  return p.tile === s.board.baseTile && (s.phase.kind === 'preRoll' || s.phase.kind === 'endTurn');
+  return p.tile === p.home && (s.phase.kind === 'preRoll' || s.phase.kind === 'endTurn');
 }

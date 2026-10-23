@@ -7,6 +7,7 @@ export type FxEvent =
   | { type: 'skill'; player: number }
   | { type: 'coins'; player: number; delta: number }
   | { type: 'hp'; player: number; delta: number }
+  | { type: 'cards'; player: number; delta: number }
   | { type: 'levelUp'; player: number; level: number }
   | { type: 'ko'; player: number }
   | { type: 'revive'; player: number }
@@ -35,6 +36,8 @@ export function deltaEvents(prev: GameState, next: GameState): FxEvent[] {
     if (p.coins !== before.coins) events.push({ type: 'coins', player: i, delta: p.coins - before.coins });
     // KO는 따로 크게 보여 주므로 HP 변화는 살아 있을 때만
     if (p.hp !== before.hp && !p.ko && !before.ko) events.push({ type: 'hp', player: i, delta: p.hp - before.hp });
+    // 손패가 늘었을 때만 (쓴 카드는 카드 연출이 따로 있다)
+    if (p.hand.length > before.hand.length) events.push({ type: 'cards', player: i, delta: p.hand.length - before.hand.length });
   });
   return events;
 }

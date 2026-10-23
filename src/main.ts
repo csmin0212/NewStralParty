@@ -3,6 +3,7 @@ import './ui/fx.css';
 import './ui/battle.css';
 import './ui/lobby.css';
 import './ui/cards.css';
+import './ui/ingame.css';
 import { BACKGROUND_ART } from './ui/assets';
 import { renderCharacterScreen } from './ui/characterScreen';
 import { renderDeckScreen } from './ui/deckScreen';

@@ -83,13 +83,15 @@ export function createGame({ board, boss, players, seed }: GameOptions): GameSta
     boss,
     players: players.map((p, id) => {
       const c = CHARACTERS[p.character];
+      const home = board.homeTiles?.[id] ?? board.baseTile;
       return {
         id,
         name: p.name,
         color: p.color,
         character: p.character,
         potential: p.potential ?? false,
-        tile: board.baseTile,
+        tile: home,
+        home,
         coins: c.startCoins,
         level: 0,
         hp: c.hp,
@@ -156,6 +158,9 @@ export function applyAction(state: GameState, action: Action): GameState {
       break;
     case 'BUY_CARD':
       buyCard(s, action.offer);
+      break;
+    case 'SEND_COINS':
+      sendCoins(s, action.to);
       break;
     case 'LEAVE_SHOP':
       leaveShop(s, rng);
@@ -235,6 +240,10 @@ export function validateBoard(board: Board): string[] {
   }
   if (!exists(board.bossTile)) problems.push('보스 칸이 없음');
   else if (board.bossTile === board.baseTile) problems.push('보스 칸이 본부와 같음');
+  for (const tile of board.homeTiles ?? []) {
+    if (!exists(tile)) problems.push(`거점 칸 ${tile}이 없음`);
+    else if (board.tiles[tile].kind !== 'base') problems.push(`거점 칸 ${tile}의 종류가 base가 아님`);
+  }
   return problems;
 }
 
@@ -360,7 +369,7 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       const from = p.tile;
       p.tile = ally!.tile;
       recordMove(s, [from, p.tile]);
-      if (p.tile === s.board.baseTile) tryLevelUp(s, p);
+      if (p.tile === p.home) tryLevelUp(s, p);
       break;
     }
 
@@ -516,10 +525,10 @@ function statusDef(p: Player): number {
   return p.status.defUp?.amount ?? 0;
 }
 
-/** 본부에서 덱 정비: 카드 1장 넣기 / 빼기. 넣은 카드는 뽑을 더미 아무 데나 섞여 들어간다 */
+/** 거점에서 덱 정비: 카드 1장 넣기 / 빼기. 넣은 카드는 뽑을 더미 아무 데나 섞여 들어간다 */
 function editDeck(s: GameState, rng: Rng, add?: CardId, remove?: CardId) {
   const p = currentPlayer(s);
-  if (!canEditDeck(s, p)) throw new RuleError('덱 정비는 본부에서만 할 수 있습니다');
+  if (!canEditDeck(s, p)) throw new RuleError('덱 정비는 내 거점에서만 할 수 있습니다');
   if (add) {
     if (!canAddToDeck(p.deck, add, deckBudget(p))) throw new RuleError('더 넣을 수 없는 카드입니다');
     p.deck.push(add);
@@ -563,6 +572,18 @@ function buyCard(s: GameState, offerIndex: number) {
   s.phase.free = false;
   p.hand.push({ card: offer.card, shop: true });
   log(s, `${p.name}: 「${CARDS[offer.card].name}」 구매${price ? ` (코인 ${price})` : ' (무료)'}`);
+}
+
+/** 상점에서 아군에게 코인 5 송금 */
+function sendCoins(s: GameState, to: number) {
+  if (s.phase.kind !== 'shop') throw new RuleError('송금은 상점에서만 할 수 있습니다');
+  const p = currentPlayer(s);
+  const ally = s.players[to];
+  if (!ally || ally.id === p.id) throw new RuleError('보낼 아군을 골라야 합니다');
+  if (p.coins < RULES.transferCoins) throw new RuleError(`코인 ${RULES.transferCoins} 필요`);
+  p.coins -= RULES.transferCoins;
+  ally.coins += RULES.transferCoins;
+  log(s, `${p.name}: 💌 ${ally.name}에게 코인 ${RULES.transferCoins} 송금`);
 }
 
 function leaveShop(s: GameState, rng: Rng) {
@@ -934,7 +955,7 @@ function enter(s: GameState, rng: Rng, tileId: number, path: number[], stepsLeft
   const p = currentPlayer(s);
   p.tile = tileId;
   path.push(tileId);
-  if (tileId === s.board.baseTile) tryLevelUp(s, p);
+  if (tileId === p.home) tryLevelUp(s, p);
 
   const enemy = s.enemies.find((e) => e.tile === tileId);
   if (enemy) {
@@ -948,12 +969,12 @@ function enter(s: GameState, rng: Rng, tileId: number, path: number[], stepsLeft
   return false;
 }
 
-/** 본부를 지나가거나 도착하면 코인을 내고 레벨업 */
+/** 내 거점을 지나가거나 도착하면 코인을 내고 레벨업 */
 function tryLevelUp(s: GameState, p: Player) {
   const cost = RULES.levelUpCost[p.level];
   if (cost === undefined) return;
   if (p.coins < cost) {
-    log(s, `${p.name}: 본부 도착 — ${p.level + 1}성까지 코인 ${cost - p.coins} 부족`);
+    log(s, `${p.name}: 거점 도착 — ${p.level + 1}성까지 코인 ${cost - p.coins} 부족`);
     return;
   }
   p.coins -= cost;

@@ -1,12 +1,14 @@
 import { DEFAULT_BOARD } from '../data/board';
 import { PLACEHOLDER_BOSS } from '../data/bosses';
-import { applyAction, createGame, RuleError, type PlayerSetup } from '../engine/game';
+import { canEditDeck } from '../engine/cards';
+import { applyAction, createGame, currentPlayer, RuleError, type PlayerSetup } from '../engine/game';
 import type { Action, GameState } from '../engine/types';
 import { CARDS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
 import { CHARACTER_ART } from './assets';
 import { BattleView } from './battleView';
 import { cardFace } from './cardView';
+import { diceHtml } from './dice';
 import { BoardView } from './boardView';
 import { FxLayer } from './fx';
 import { deltaEvents, resultEvents, turnEvents, type FxEvent } from './fxEvents';
@@ -48,12 +50,13 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
   function floats(events: FxEvent[]) {
     const perPlayer = new Map<number, number>();
     for (const ev of events) {
-      if (ev.type !== 'coins' && ev.type !== 'hp') continue;
+      if (ev.type !== 'coins' && ev.type !== 'hp' && ev.type !== 'cards') continue;
       const n = perPlayer.get(ev.player) ?? 0;
       perPlayer.set(ev.player, n + 1);
       const sign = ev.delta > 0 ? '+' : '';
       const point = board.tokenPoint(ev.player);
       if (ev.type === 'coins') fx.float(point, `${sign}${ev.delta} 코인`, 'coin', n * 220);
+      else if (ev.type === 'cards') fx.float(point, `+${ev.delta} 카드`, 'card', n * 220);
       else fx.float(point, `${sign}${ev.delta} HP`, ev.delta > 0 ? 'heal' : 'hurt', n * 220);
     }
   }
@@ -105,6 +108,7 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
         break;
       case 'coins':
       case 'hp':
+      case 'cards':
         break; // floats()에서 처리
     }
   }
@@ -177,8 +181,15 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     busy = true;
     draw(prev, true);
     battle.renderChoices(state, true);
-    if (action.type === 'ROLL') board.showDice(state.turn.dice, state.turn.extraSteps);
     if (action.type === 'USE_SKILL') await present(state, { type: 'skill', player: action.player });
+    // 주사위: 화면 가운데에서 굴린 뒤 말이 움직인다
+    if (action.type === 'ROLL') {
+      await fx.play({
+        kind: 'dice',
+        text: '',
+        html: diceHtml(state.turn.dice, state.turn.extraSteps, state.turn.fixedMove !== null),
+      });
+    }
     // 주사위 전 카드는 가운데에 크게 보여 준다 (전투 카드는 전투 화면에서)
     const played = state.lastCard;
     if (played && played.seq !== prev.lastCard?.seq && CARDS[played.card].type !== 'battle') {
@@ -204,6 +215,12 @@ export function startHotseat(root: HTMLElement, players: PlayerSetup[], onExit: 
     busy = false;
     draw(state, false);
     battle.renderChoices(state, false);
+
+    // 원작처럼 이동이 끝나고 할 일이 없으면 턴을 알아서 넘긴다 (내 거점에 멈췄으면 덱 정비를 할 수 있게 기다린다)
+    if (state.phase.kind === 'endTurn' && !canEditDeck(state, currentPlayer(state))) {
+      await new Promise((r) => setTimeout(r, 700));
+      if (state.phase.kind === 'endTurn' && !busy) dispatch({ type: 'END_TURN', player: state.current });
+    }
 
     if (state.phase.kind === 'gameOver') {
       board.showMessage(
