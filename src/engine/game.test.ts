@@ -5,9 +5,10 @@ import { CHARACTERS } from '../data/characters';
 import { PLACEHOLDER_BOSS } from '../data/bosses';
 import { ENEMIES } from '../data/enemies';
 import { canAddToDeck, cardTargets, deckPoints, validateDeck } from './cards';
+import { onEnemyDefeated } from './skills';
 import { applyAction, createGame, RuleError, validateBoard } from './game';
 import { RULES } from './rules';
-import type { Board, BossDef, CardId, EnemyKind, GameState, Gimmick, TileKind } from './types';
+import type { Board, BossDef, CardId, CharacterId, EnemyKind, GameState, Gimmick, TileKind } from './types';
 
 /** 기믹 없는 테스트용 보스 */
 const TEST_BOSS: BossDef = {
@@ -42,13 +43,13 @@ function ring(kinds: TileKind[], opts: { spawnTiles?: number[]; bossTile?: numbe
 
 function newGame(
   board: Board,
-  opts: { players?: number; seed?: number; boss?: BossDef; potential?: boolean } = {},
+  opts: { players?: number; seed?: number; boss?: BossDef; potential?: boolean; character?: CharacterId } = {},
 ): GameState {
-  const { players = 2, seed = 42, boss = TEST_BOSS, potential = false } = opts;
+  const { players = 2, seed = 42, boss = TEST_BOSS, potential = false, character = 'mutbyeol' } = opts;
   const setups = Array.from({ length: players }, (_, i) => ({
     name: `P${i + 1}`,
     color: '#fff',
-    character: 'mutbyeol' as const,
+    character,
     potential,
   }));
   return createGame({ board, boss, players: setups, seed });
@@ -521,7 +522,7 @@ describe('뭇별', () => {
   it('잠재 능력: 해방했으면 회피 성공 시 그 몬스터에게 공격력만큼 피해', () => {
     const on = counterCase({ potential: true }, (evaded) => evaded).after;
     expect(on.enemies[0].hp).toBe(100 - MUT.atk);
-    expect(on.battles.at(-1)!.events).toContainEqual({ type: 'skill', name: MUT.potential.name, damage: MUT.atk, targetHp: 100 - MUT.atk });
+    expect(on.battles.at(-1)!.events).toContainEqual({ type: 'skill', name: MUT.potential!.name, damage: MUT.atk, targetHp: 100 - MUT.atk });
 
     const off = counterCase({ potential: false }, (evaded) => evaded).after;
     expect(off.enemies[0].hp).toBe(100);
@@ -940,5 +941,169 @@ describe('카드', () => {
     base.players[1].reviveRound = 5;
     const rev = play(give(base, 'revival'));
     expect(rev.players[1]).toMatchObject({ ko: false, hp: Math.ceil(MUT.hp / 2) });
+  });
+});
+
+describe('Soda', () => {
+  const SODA = CHARACTERS.soda;
+  const sodaGame = (players = 1) => newGame(ring(empties(12)), { players, character: 'soda' });
+  const rush = (s: GameState, target: number) => applyAction(s, { type: 'USE_SKILL', player: s.current, target });
+  const lastAttack = (s: GameState) => {
+    const hit = s.battles.at(-1)!.events.filter((e) => e.type === 'attack').at(-1)!;
+    if (hit.type !== 'attack') throw new Error();
+    return hit.result;
+  };
+
+  it('시작 능력치: 체력 9 · 공격력 2 · 방어력 1 · 코인 12', () => {
+    const p = sodaGame(2).players[1]; // 첫 차례 수입을 받지 않은 쪽
+    expect(p).toMatchObject({ character: 'soda', hp: 9, maxHp: 9, atk: 2, def: 1, coins: 12, stacks: 0 });
+  });
+
+  it('성장: 1성 공격력 +1 · 최대 체력 +2 / 2성 없음 / 3성 공격력 +1 · 방어력 +1 · 이동거리 +1', () => {
+    let s = sodaGame();
+    s.players[0].coins = 100;
+    s = rollExactly(s, 13); // 한 바퀴 돌아 본부
+    expect(s.players[0]).toMatchObject({ level: 1, atk: 3, maxHp: 11, def: 1 });
+    s.players[0].tile = 0;
+    s.phase = { kind: 'preRoll' };
+    s = rollExactly(s, 13);
+    expect(s.players[0]).toMatchObject({ level: 2, atk: 3, maxHp: 11, def: 1, move: 0 });
+    s.players[0].tile = 0;
+    s.phase = { kind: 'preRoll' };
+    s = rollExactly(s, 13);
+    expect(s.players[0]).toMatchObject({ level: 3, atk: 4, def: 2, move: 1 });
+  });
+
+  it('조나단 러시: 7칸 안 상대에게 워프해 전투, 이 전투 동안 상대 방어력 -2, 끝나면 그 칸에서 차례 끝', () => {
+    let s = withEnemy(withEnemy(sodaGame(), 'robot', 6), 'drone', 3);
+    const [robot, drone] = s.enemies;
+    robot.hp = 99;
+    robot.def = 3;
+    s.enemies.push({ ...robot, id: 99, tile: 9 }); // 9번은 뒤로 4칸 → 사거리 안
+    expect(() => applyAction(s, { type: 'USE_SKILL', player: 0 })).toThrow(RuleError); // 대상 필요
+    s = rush(s, robot.id);
+    expect(s.players[0].tile).toBe(6);
+    expect(s.phase).toEqual({ kind: 'encounter', enemy: robot.id, stepsLeft: 0 });
+    expect(s.players[0].skillCooldown).toBe(SODA.active.cooldown);
+    s = attack(s);
+    expect(lastAttack(s).defenseValue).toBe(lastAttack(s).defenseRoll + 1); // 방어력 3 - 2
+    expect(s.phase.kind).toBe('endTurn');
+    expect(drone.id).toBeDefined();
+  });
+
+  it('조나단 러시: 7칸 밖이나 재사용 대기 중에는 못 쓴다', () => {
+    let s = withEnemy(sodaGame(), 'robot', 7); // 0 → 7: 앞으로 7칸, 뒤로 6칸
+    const far = withEnemy(newGame(ring(empties(20)), { players: 1, character: 'soda' }), 'robot', 10);
+    expect(() => rush(far, far.enemies[0].id)).toThrow(RuleError);
+    s.players[0].skillCooldown = 1;
+    expect(() => rush(s, s.enemies[0].id)).toThrow(RuleError);
+  });
+
+  it('연마: 방어력 0인 적을 처치하면 스택 +1 (최대 6), 2개당 상대 방어력 -1', () => {
+    let s = withEnemy(sodaGame(), 'robot', 2);
+    s.enemies[0].hp = 1;
+    s.enemies[0].def = 0;
+    s = attack(rollExactly(s, 3));
+    expect(s.players[0].stacks).toBe(1);
+    expect(s.battles.at(-1)!.events.some((e) => e.type === 'skill' && e.name === SODA.passive.name)).toBe(true);
+
+    // 방어력이 남아 있는 적은 스택 없음
+    let t = withEnemy(sodaGame(), 'robot', 2);
+    t.enemies[0].hp = 1;
+    t.enemies[0].def = 5;
+    t.players[0].atk = 50;
+    t = attack(rollExactly(t, 3));
+    expect(t.players[0].stacks).toBe(0);
+
+    // 스택 4개 = 방어력 -2 → 방어력 2인 적은 0으로 보고 스택 +1, 최대 6
+    let u = withEnemy(sodaGame(), 'robot', 2);
+    u.players[0].stacks = 4;
+    u.enemies[0].hp = 99;
+    u.enemies[0].def = 2;
+    u = attack(rollExactly(u, 3));
+    expect(lastAttack(u).defenseValue).toBe(lastAttack(u).defenseRoll);
+    u.players[0].stacks = 6;
+    expect(onEnemyDefeated(u.players[0], 0)).toBe(false);
+    expect(u.players[0].stacks).toBe(6);
+  });
+});
+
+describe('모나', () => {
+  const MONA = CHARACTERS.mona;
+  /** 0번 모나, 1번 뭇별 */
+  const monaGame = () => {
+    const s = createGame({
+      board: ring(empties(14)),
+      boss: TEST_BOSS,
+      players: [
+        { name: 'M', color: '#fff', character: 'mona' },
+        { name: 'B', color: '#fff', character: 'mutbyeol' },
+      ],
+      seed: 42,
+    });
+    s.players[0].hand = [{ card: 'slingshot' }, { card: 'cake' }, { card: 'dash' }];
+    s.players[1].hand = [];
+    return s;
+  };
+  const gift = (s: GameState, target: number, cards: number[]) =>
+    applyAction(s, { type: 'USE_SKILL', player: 0, target, cards });
+
+  it('시작 능력치: 체력 9 · 공격력 1 · 방어력 1 · 코인 6 · 성장 1성 방어력 +1 · 최대 체력 +2', () => {
+    const s = monaGame();
+    expect(s.players[0]).toMatchObject({ character: 'mona', maxHp: 9, atk: 1, def: 1, coins: 6 + RULES.turnIncome });
+    expect(MONA.stars).toEqual([{ def: 1, maxHp: 2 }, {}, { atk: 1, def: 1, move: 1 }]);
+  });
+
+  it('역조공: 손패 1~2장을 10칸 안 아군에게 주고, 팬만큼 뽑는다', () => {
+    const s0 = monaGame();
+    s0.players[0].stacks = 2;
+    expect(() => gift(s0, 1, [])).toThrow(RuleError);
+    expect(() => gift(s0, 1, [0, 1, 2])).toThrow(RuleError);
+    expect(() => gift(s0, 0, [0])).toThrow(RuleError); // 자기 자신
+    const s = gift(s0, 1, [0, 2]);
+    expect(s.players[1].hand).toEqual([
+      { card: 'dash', from: 0 },
+      { card: 'slingshot', from: 0 },
+    ]);
+    expect(s.players[0].hand).toHaveLength(1 + 2); // 케이크 + 팬 2장
+    expect(s.players[0].skillCooldown).toBe(MONA.active.cooldown);
+  });
+
+  it('10칸 밖 아군에게는 못 준다', () => {
+    const s = monaGame();
+    s.players[1].tile = 12; // 뒤로 3칸
+    expect(() => gift(s, 1, [0])).not.toThrow();
+    const far = createGame({
+      board: ring(empties(30)),
+      boss: TEST_BOSS,
+      players: [
+        { name: 'M', color: '#fff', character: 'mona' },
+        { name: 'B', color: '#fff', character: 'mutbyeol' },
+      ],
+      seed: 1,
+    });
+    far.players[1].tile = 15;
+    expect(() => applyAction(far, { type: 'USE_SKILL', player: 0, target: 1, cards: [0] })).toThrow(RuleError);
+  });
+
+  it('준 카드를 아군이 쓰면 팬 +1 (최대 5), 카드는 모나의 버린 더미로, 효과 카드 피해 + 팬', () => {
+    let s = gift(monaGame(), 1, [0]);
+    s.players[0].stacks = 3;
+    s = applyAction(rollExactly(s, 1), { type: 'END_TURN', player: 0 });
+    expect(s.current).toBe(1);
+    s = withEnemy(s, 'robot', s.players[1].tile + 1);
+    s.enemies[0].hp = 20;
+    const discardBefore = s.players[0].discard.length;
+    s = applyAction(s, { type: 'PLAY_CARD', player: 1, handIndex: 0, target: s.enemies[0].id });
+    expect(s.enemies[0].hp).toBe(20 - (2 + 3)); // 새총 2 + 팬 3
+    expect(s.players[0].stacks).toBe(4);
+    expect(s.players[0].discard).toHaveLength(discardBefore + 1);
+    expect(s.players[1].discard).not.toContain('slingshot');
+
+    s.players[0].stacks = 5;
+    s.players[1].hand = [{ card: 'cookie', from: 0 }];
+    s.turn.cardPlayed = false;
+    s = applyAction(s, { type: 'PLAY_CARD', player: 1, handIndex: 0 });
+    expect(s.players[0].stacks).toBe(5);
   });
 });

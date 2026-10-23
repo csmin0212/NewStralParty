@@ -1,4 +1,5 @@
-import type { CardId, Enemy, TileKind } from '../engine/types';
+import type { CardId, CharacterId, Enemy, TileKind } from '../engine/types';
+import { placeholderFigure } from './placeholderArt';
 
 const root = `${import.meta.env.BASE_URL}assets/`;
 
@@ -68,19 +69,36 @@ export const LOBBY_ART = {
   room: `${root}lobby/room.webp`,
 };
 
-/** 뭇별 전용 로비의 같은 좌표계로 정렬된 레이어. public/memorial.html에서 시연한다. */
+/** 승인한 밤 도시 시안의 레이어. public/memorial.html에서 시연한다. */
 export const MEMORIAL_ART = {
   mutbyeol: {
-    background: `${root}characters/mutbyeol/memorial/background.webp`,
-    character: `${root}characters/mutbyeol/memorial/character.webp`,
-    foreground: `${root}characters/mutbyeol/memorial/foreground.webp`,
-    original: `${root}characters/mutbyeol/memorial/original.webp`,
+    background: `${root}characters/mutbyeol/memorial/night-v3/background.webp`,
+    character: `${root}characters/mutbyeol/memorial/night-v3/body.webp`,
+    hairBack: `${root}characters/mutbyeol/memorial/night-v3/hair-back.webp`,
+    eyesClosed: `${root}characters/mutbyeol/memorial/night-v3/eyes-closed.webp`,
+    original: `${root}characters/mutbyeol/memorial/night-v3/original.webp`,
   },
 };
 
 /** 제작된 캐릭터 그림. 캐릭터 선택·플레이어 배정 시스템에서 id로 참조한다. */
 export type CharacterPose = 'idle' | 'attack' | 'hit' | 'block' | 'evade' | 'down';
-export const CHARACTER_ART = {
+export interface CharacterArt {
+  name: string;
+  color: string;
+  main: string;
+  token: string;
+  portrait: string;
+  /** 스킬 아이콘. 없으면 글자 아이콘 */
+  skillActive?: string;
+  skillPassive?: string;
+  potential?: string;
+  poses: Record<CharacterPose, string>;
+}
+
+/** Soda · 모나: 그림이 오기 전까지 임시 실루엣 (docs/ASSETS.md 6차 요청) */
+const sodaSquare = placeholderFigure('S', '#7FA8E8', 'square');
+const monaSquare = placeholderFigure('M', '#F28BB5', 'square');
+export const CHARACTER_ART: Record<CharacterId, CharacterArt> = {
   mutbyeol: {
     name: '뭇별',
     color: '#8EDBD9',
@@ -97,6 +115,22 @@ export const CHARACTER_ART = {
       block: `${root}characters/mutbyeol/battle-block.webp`,
       evade: `${root}characters/mutbyeol/battle-evade.webp`,
       down: `${root}characters/mutbyeol/battle-down.webp`,
-    } satisfies Record<CharacterPose, string>,
+    },
   },
-} as const;
+  soda: {
+    name: 'Soda',
+    color: '#7FA8E8',
+    main: placeholderFigure('S', '#7FA8E8', 'tall'),
+    token: sodaSquare,
+    portrait: sodaSquare,
+    poses: { idle: sodaSquare, attack: sodaSquare, hit: sodaSquare, block: sodaSquare, evade: sodaSquare, down: sodaSquare },
+  },
+  mona: {
+    name: '모나',
+    color: '#F28BB5',
+    main: placeholderFigure('M', '#F28BB5', 'tall'),
+    token: monaSquare,
+    portrait: monaSquare,
+    poses: { idle: monaSquare, attack: monaSquare, hit: monaSquare, block: monaSquare, evade: monaSquare, down: monaSquare },
+  },
+};

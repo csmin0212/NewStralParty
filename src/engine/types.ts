@@ -83,9 +83,11 @@ export interface HandCard {
   card: CardId;
   /** 상점에서 산 카드: 쓰면 사라지고 덱으로 돌아가지 않는다 */
   shop?: boolean;
+  /** 다른 플레이어가 준 카드 (모나 역조공): 준 사람 id. 쓰면 준 사람의 버린 더미로 */
+  from?: number;
 }
 
-export type CharacterId = 'mutbyeol';
+export type CharacterId = 'mutbyeol' | 'soda' | 'mona';
 
 export interface Player {
   id: number;
@@ -115,6 +117,8 @@ export interface Player {
   skillCooldown: number;
   /** 액티브 스킬 효과가 이 라운드의 자기 차례 시작까지 유지된다 (뭇별: 회피 주사위 2개) */
   skillActiveUntil: number | null;
+  /** 캐릭터 고유 스택 (Soda 연마 · 모나 팬) */
+  stacks: number;
   /** KO 상태. 쓰러진 자리에 누워 있다 */
   ko: boolean;
   /** KO 상태일 때, 이 라운드의 자기 차례에 부활한다 */
@@ -244,6 +248,8 @@ export interface BattleMods {
   attackDice: number;
   /** 최종 공격력 배수 (전력 공격) */
   atkMult: number;
+  /** 이번 전투 동안 에너미 방어력 감소 (Soda 조나단 러시) */
+  enemyDefDown: number;
   noCounter: boolean;
 }
 
@@ -323,7 +329,8 @@ export type Action =
   | { type: 'CHOOSE_PATH'; player: number; to: number }
   | { type: 'ENCOUNTER'; player: number; choice: 'attack' | 'release' }
   | { type: 'DEFEND'; player: number; mode: DefenseMode }
-  | { type: 'USE_SKILL'; player: number }
+  /** target: 대상을 고르는 액티브의 대상 (Soda: 에너미 id · 모나: 아군 id) · cards: 모나가 줄 손패 번호 */
+  | { type: 'USE_SKILL'; player: number; target?: number; cards?: number[] }
   /** 본부에서 덱 정비: 카드 1장 넣기 또는 빼기 */
   | { type: 'EDIT_DECK'; player: number; add?: CardId; remove?: CardId }
   | { type: 'END_TURN'; player: number };

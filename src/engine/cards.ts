@@ -7,7 +7,7 @@ import { RULES } from './rules';
 import type { BattleMods, Board, CardId, GameState, HandCard, Player, PlayerStatus } from './types';
 
 export function freshBattleMods(): BattleMods {
-  return { costUsed: 0, atk: 0, def: 0, evadeDice: 0, attackDice: 1, atkMult: 1, noCounter: false };
+  return { costUsed: 0, atk: 0, def: 0, evadeDice: 0, attackDice: 1, atkMult: 1, enemyDefDown: 0, noCounter: false };
 }
 
 export function freshStatus(): PlayerStatus {

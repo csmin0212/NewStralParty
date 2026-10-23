@@ -28,9 +28,13 @@ export interface CharacterDef {
   hyper?: { card: CardId; price: number };
   /** [1성, 2성, 3성]에 도달했을 때 오르는 능력치 */
   stars: [StatGrowth, StatGrowth, StatGrowth];
-  active: SkillText & { cooldown: number };
+  /** 대상을 고르는 액티브: 대상 종류와 사거리 (칸) */
+  active: SkillText & { cooldown: number; target?: 'enemy' | 'ally'; range?: number };
   passive: SkillText;
-  potential: SkillText;
+  /** 캐릭터 고유 스택 이름과 최대치 (Soda 연마 · 모나 팬) */
+  stack?: { name: string; max: number };
+  /** 정해진 캐릭터만 */
+  potential?: SkillText;
 }
 
 /**
@@ -61,6 +65,52 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
       name: '잠재 능력',
       description: '회피에 성공하면 그 몬스터에게 자신의 공격력만큼 피해를 준다.',
     },
+  },
+  soda: {
+    id: 'soda',
+    name: 'Soda',
+    color: '#7FA8E8',
+    hp: 9,
+    atk: 2,
+    def: 1,
+    startCoins: 12,
+    deckPoints: 15,
+    stars: [{ atk: 1, maxHp: 2 }, {}, { atk: 1, def: 1, move: 1 }],
+    active: {
+      name: '조나단 러시',
+      cooldown: 3,
+      target: 'enemy',
+      range: 7,
+      description: '7칸 내의 상대를 향해 워프해 배틀한다. 이 배틀 동안 상대는 방어력 2를 잃는다.',
+    },
+    passive: {
+      name: '연마',
+      description: '방어력이 0인 적을 처치하면 [연마] 스택 +1 (최대 6). [연마] 2개당 상대 방어력 -1.',
+    },
+    stack: { name: '연마', max: 6 },
+  },
+  mona: {
+    id: 'mona',
+    name: '모나',
+    color: '#F28BB5',
+    hp: 9,
+    atk: 1,
+    def: 1,
+    startCoins: 6,
+    deckPoints: 15,
+    stars: [{ def: 1, maxHp: 2 }, {}, { atk: 1, def: 1, move: 1 }],
+    active: {
+      name: '역조공',
+      cooldown: 3,
+      target: 'ally',
+      range: 10,
+      description: "손패의 카드 1~2장을 10칸 내 아군에게 준 뒤, '팬' 스택만큼 카드를 뽑는다.",
+    },
+    passive: {
+      name: '팬섭 해 버릴거야!',
+      description: "아군에게 준 카드를 아군이 사용하면 '팬' +1 (최대 5). 아군에게 준 효과 카드의 피해 + '팬'.",
+    },
+    stack: { name: '팬', max: 5 },
   },
 };
 

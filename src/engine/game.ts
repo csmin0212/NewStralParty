@@ -19,7 +19,16 @@ import { ENEMIES } from '../data/enemies';
 import { resolveAttack } from './combat';
 import { createRng, type Rng } from './rng';
 import { RULES } from './rules';
-import { activateSkill, evadeDice, onEvadeSuccess } from './skills';
+import {
+  activateSkill,
+  enemyDefAgainst,
+  evadeDice,
+  giftDamageBonus,
+  onEnemyDefeated,
+  onEvadeSuccess,
+  onGiftUsed,
+  skillTargets,
+} from './skills';
 import type {
   Action,
   Battle,
@@ -95,6 +104,7 @@ export function createGame({ board, boss, players, seed }: GameOptions): GameSta
         hand: [],
         skillCooldown: 0,
         skillActiveUntil: null,
+        stacks: 0,
         ko: false,
         reviveRound: null,
       };
@@ -166,7 +176,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       defend(s, rng, action.mode);
       break;
     case 'USE_SKILL':
-      useSkill(s);
+      useSkill(s, rng, action.target, action.cards);
       break;
     case 'END_TURN':
       endTurn(s, rng);
@@ -244,8 +254,9 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
   }
 
   p.hand.splice(handIndex, 1);
-  // 덱 카드는 버린 더미로 가서 다시 돈다. 상점 · 생성 카드는 쓰면 사라진다
-  if (!hand.shop) p.discard.push(hand.card);
+  // 덱 카드는 (받은 카드면 준 사람의) 버린 더미로 가서 다시 돈다. 상점 · 생성 카드는 쓰면 사라진다
+  const giver = hand.from !== undefined ? s.players[hand.from] : undefined;
+  if (!hand.shop) (giver ?? p).discard.push(hand.card);
   if (info.cost) p.coins -= info.cost;
   if (info.type === 'battle') s.turn.battle.costUsed += info.battleCost!;
   else s.turn.cardPlayed = true;
@@ -253,11 +264,15 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
   s.seq += 1;
   s.lastCard = { seq: s.seq, player: s.current, card: hand.card };
   log(s, `${p.name}: 🃏 「${info.name}」${info.cost ? ` (코인 ${info.cost})` : ''}`);
-  cardEffect(s, rng, p, hand.card, target, value);
+  cardEffect(s, rng, p, hand.card, target, value, giftDamageBonus(giver));
+  // 모나 패시브: 준 카드를 아군이 쓰면 팬 +1 (피해는 쓰기 전 팬으로 계산)
+  if (giver && onGiftUsed(giver, p)) {
+    log(s, `  ${giver.name}: 「${CHARACTERS[giver.character].passive.name}」 팬 ${giver.stacks}`);
+  }
 }
 
 /** 카드 효과 (data/cards.ts의 글과 맞춘다) */
-function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: number, value?: number) {
+function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: number, value?: number, bonus = 0) {
   const t = s.turn;
   const b = t.battle;
   const st = p.status;
@@ -366,22 +381,23 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       }
       notice(s, '📞 긴급 호출 — 쓰러진 아군 부활');
       break;
+    // bonus: 모나가 준 카드면 + 팬
     case 'slingshot':
-      strike(s, p, enemy!, 2);
+      strike(s, p, enemy!, 2 + bonus);
       break;
     case 'laser':
-      strike(s, p, enemy!, 3);
+      strike(s, p, enemy!, 3 + bonus);
       break;
     case 'brick':
-      strike(s, p, enemy!, 5);
+      strike(s, p, enemy!, 5 + bonus);
       break;
     case 'railgun':
-      strike(s, p, enemy!, 6);
+      strike(s, p, enemy!, 6 + bonus);
       break;
     case 'blast': {
       const dist = distances(s.board, enemy!.tile);
       for (const e of [...s.enemies]) {
-        if ((dist.get(e.tile) ?? Infinity) <= 2 && !isOver(s)) strike(s, p, e, 4);
+        if ((dist.get(e.tile) ?? Infinity) <= 2 && !isOver(s)) strike(s, p, e, 4 + bonus);
       }
       break;
     }
@@ -472,8 +488,10 @@ function strike(s: GameState, p: Player, enemy: Enemy, amount: number) {
   enemy.hp = Math.max(0, enemy.hp - amount);
   log(s, `  ${enemy.name}에게 ${amount} 피해 (체력 ${enemy.hp})`);
   if (enemy.hp > 0) return;
+  const def = enemyDefAgainst(s, p, enemy);
   s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
   p.coins += enemy.reward;
+  if (onEnemyDefeated(p, def)) log(s, `  ${p.name}: 「${CHARACTERS[p.character].passive.name}」 ${p.stacks}스택`);
   if (enemy.isBoss) {
     s.phase = { kind: 'gameOver', result: 'victory' };
     log(s, `🎉 ${enemy.name} 처치! 모두의 승리!`);
@@ -600,7 +618,8 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
 
   const mods = s.turn.battle;
   const atk = Math.floor((p.atk + statusAtk(p) + mods.atk) * mods.atkMult);
-  const hit = resolveAttack({ atk, def: p.def }, enemy, enemy.defense, rng, 1, { attackDice: mods.attackDice });
+  const foe = { atk: enemy.atk, def: enemyDefAgainst(s, p, enemy) };
+  const hit = resolveAttack({ atk, def: p.def }, foe, enemy.defense, rng, 1, { attackDice: mods.attackDice });
   enemy.hp = Math.max(0, enemy.hp - hit.damage);
   battle.events.push({ type: 'attack', attacker: 'player', result: hit, targetHp: enemy.hp });
   log(s, `  ${p.name}의 공격 ${hit.attackValue} vs ${defenseName(hit.mode)} ${hit.defenseValue} → ${hit.damage} 피해`);
@@ -668,8 +687,9 @@ function evadeSucceeded(s: GameState, p: Player, enemy: Enemy, battle: Battle): 
 
   if (effects.counterDamage > 0) {
     enemy.hp = Math.max(0, enemy.hp - effects.counterDamage);
-    battle.events.push({ type: 'skill', name: c.potential.name, damage: effects.counterDamage, targetHp: enemy.hp });
-    log(s, `  ${p.name}: 「${c.potential.name}」 ${enemy.name}에게 ${effects.counterDamage} 피해`);
+    const name = c.potential?.name ?? '잠재 능력';
+    battle.events.push({ type: 'skill', name, damage: effects.counterDamage, targetHp: enemy.hp });
+    log(s, `  ${p.name}: 「${name}」 ${enemy.name}에게 ${effects.counterDamage} 피해`);
     if (enemy.hp === 0) return defeatEnemy(s, p, enemy, battle);
   }
   return false;
@@ -678,9 +698,15 @@ function evadeSucceeded(s: GameState, p: Player, enemy: Enemy, battle: Battle): 
 /** 에너미 처치: 보상을 주고 판에서 치운다. 보스면 모두의 승리로 게임이 끝나고 true */
 function defeatEnemy(s: GameState, p: Player, enemy: Enemy, battle: Battle): boolean {
   const reward = enemy.reward;
+  const def = enemyDefAgainst(s, p, enemy);
   s.enemies = s.enemies.filter((e) => e.id !== enemy.id);
   p.coins += reward;
   battle.events.push({ type: 'enemyDefeated', reward });
+  if (onEnemyDefeated(p, def)) {
+    const name = CHARACTERS[p.character].passive.name;
+    battle.events.push({ type: 'skill', name });
+    log(s, `  ${p.name}: 「${name}」 ${p.stacks}스택`);
+  }
 
   if (enemy.isBoss) {
     battle.done = true;
@@ -694,15 +720,46 @@ function defeatEnemy(s: GameState, p: Player, enemy: Enemy, battle: Battle): boo
 }
 
 /** 액티브 스킬: 주사위를 굴리기 전에, 재사용 대기가 끝났을 때만 */
-function useSkill(s: GameState) {
+function useSkill(s: GameState, rng: Rng, target?: number, cards?: number[]) {
   if (s.phase.kind !== 'preRoll') throw new RuleError('스킬은 주사위를 굴리기 전에만 쓸 수 있습니다');
   const p = currentPlayer(s);
   if (s.turn.skillUsed) throw new RuleError('스킬은 턴마다 한 번만 쓸 수 있습니다');
   if (p.skillCooldown > 0) throw new RuleError(`재사용까지 ${p.skillCooldown}라운드 남았습니다`);
+  const targets = skillTargets(s, p);
+  if (targets && (target === undefined || !targets.includes(target))) throw new RuleError('사거리 안의 대상을 골라야 합니다');
+  if (p.character === 'mona') {
+    const picked = [...new Set(cards ?? [])];
+    if (picked.length < 1 || picked.length > 2 || picked.some((i) => !p.hand[i])) throw new RuleError('줄 카드를 1~2장 골라야 합니다');
+    if (s.players[target!].hand.length + picked.length > RULES.handLimit) throw new RuleError('아군 손패에 자리가 없습니다');
+  }
 
   activateSkill(s, p);
   s.turn.skillUsed = true;
-  log(s, `${p.name}: ✨ 액티브 스킬 「${CHARACTERS[p.character].active.name}」!`);
+  const name = CHARACTERS[p.character].active.name;
+  log(s, `${p.name}: ✨ 액티브 스킬 「${name}」!`);
+
+  if (p.character === 'soda') {
+    // 조나단 러시: 상대 칸으로 워프해 전투. 이 전투 동안 상대 방어력 -2, 전투가 끝나면 그 칸에서 차례를 마친다
+    const enemy = findEnemy(s, target!);
+    const from = p.tile;
+    p.tile = enemy.tile;
+    recordMove(s, [from, p.tile]);
+    startEncounter(s, enemy, 0);
+    s.turn.battle.enemyDefDown += 2;
+    currentBattle(s).events.push({ type: 'skill', name });
+  }
+
+  if (p.character === 'mona') {
+    // 역조공: 고른 카드를 아군에게 주고, 팬만큼 뽑는다
+    const ally = s.players[target!];
+    const picked = [...new Set(cards!)].sort((a, b) => b - a);
+    for (const i of picked) {
+      const [given] = p.hand.splice(i, 1);
+      ally.hand.push({ ...given, from: given.from ?? p.id });
+      log(s, `  ${ally.name}에게 「${CARDS[given.card].name}」`);
+    }
+    drawCards(s, p, rng, p.stacks);
+  }
 }
 
 function endTurn(s: GameState, rng: Rng) {

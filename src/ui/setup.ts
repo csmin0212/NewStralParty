@@ -41,10 +41,14 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
         <input data-name="${i}" maxlength="10" value="${esc(seat.name)}" />
         ${pick}
         <button class="seat-deck" data-deck="${i}" title="덱 바꾸기">${esc(decks[seat.deck].name)}</button>
-        <label class="seat-potential" title="${esc(c.potential.description)}">
+        ${
+          c.potential
+            ? `<label class="seat-potential" title="${esc(c.potential.description)}">
           <input type="checkbox" data-potential="${i}" ${seat.potential ? 'checked' : ''} />
           <span>잠재 능력</span>
-        </label>
+        </label>`
+            : '<span class="seat-potential"></span>'
+        }
       </li>`;
   };
 
@@ -97,7 +101,7 @@ export function renderSetup(root: HTMLElement, onStart: (players: PlayerSetup[])
           name: seat.name.trim() || `플레이어 ${i + 1}`,
           color: PLAYER_COLORS[i],
           character: seat.character,
-          potential: seat.potential,
+          potential: seat.potential && !!CHARACTERS[seat.character].potential,
           deck: decks[seat.deck].cards,
         })),
       );

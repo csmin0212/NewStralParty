@@ -88,6 +88,7 @@ isolated on a plain solid #00FF00 green background, no ground shadow
 | 캐릭터 때 | 캐릭터 메인 일러스트, 보드 말, 전투 포즈 | ✅ 뭇별 제작·적용 |
 | **4차** | 로비 · 캐릭터 화면 배경, 스킬 아이콘 | ✅ 5종 제작·등록 |
 | **5차** | 카드 39장, 상점 칸 | ⏳ 지금 필요 |
+| **6차** | Soda · 모나 캐릭터 그림 | ⏳ 외형 설정 필요 |
 | 이후 | 보스, 에너미 추가, 유물 아이콘 | 보스 · 유물 시스템 |
 
 ### 2차 프롬프트
@@ -347,6 +348,30 @@ isolated on transparent background, no text, no letters, no frame, no border
 | `tiles/shop.png` | 상점 | `a small white school store kiosk with a sky blue awning and a card display stand` |
 
 - 다 오면 [src/ui/assets.ts](../src/ui/assets.ts)의 `CARD_ART` · `TILE_ART`에 등록한다. 등록 전까지는 아이콘이 들어간다.
+
+---
+
+## 6-1. 캐릭터 — 6차 요청: Soda · 모나 (⏳ 외형 설정 필요)
+
+그림이 오기 전까지 화면에는 파란 실루엣이 들어간다. **외형 설정(머리 · 옷 · 소품 · 분위기)이나 참고 그림을 정해 주면** 뭇별과 같은 규격으로 뽑는다 ([3. 캐릭터](#3-캐릭터--캐릭터-시스템을-만들-때) 표).
+
+| 파일 | 용도 |
+|---|---|
+| `characters/soda/main.png` | 메인 일러스트 1024×1536 |
+| `characters/soda/token.png` | 보드 SD 말 512×512 |
+| `characters/soda/portrait.png` | 얼굴 512×512 |
+| `characters/soda/battle-{idle,attack,hit,block,evade,down}.png` | 전투 포즈 6종 768×768, 오른쪽을 본다 |
+| `characters/soda/skill-active.png` | 「조나단 러시」 아이콘 256×256 — 워프해 돌진하는 느낌 |
+| `characters/soda/skill-passive.png` | 「연마」 아이콘 256×256 — 칼날을 숫돌에 가는 느낌 |
+
+- Soda 대표 색은 임시로 `#7FA8E8` (하늘 파랑). 정해 주면 바꾼다.
+
+**모나**도 같은 목록을 `characters/mona/`에 뽑는다. 대표 색 임시 `#F28BB5` (분홍).
+
+| 파일 | 용도 |
+|---|---|
+| `characters/mona/skill-active.png` | 「역조공」 아이콘 — 선물 상자를 건네는 느낌 |
+| `characters/mona/skill-passive.png` | 「팬섭 해 버릴거야!」 아이콘 — 하트와 응원봉 |
 
 ---
 

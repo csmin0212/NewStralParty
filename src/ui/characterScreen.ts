@@ -85,9 +85,11 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
   const detailPanel = (current: Tab) => {
     const c = CHARACTERS[selected];
     const art = CHARACTER_ART[selected];
-    const tabs = TABS.map(
-      ([id, label]) => `<button class="ba-tab ${id === current ? 'on' : ''}" data-tab="${id}">${label}</button>`,
-    ).join('');
+    // 잠재 능력이 없는 캐릭터는 탭을 뺀다
+    if (current === 'potential' && !c.potential) current = 'skill';
+    const tabs = TABS.filter(([id]) => id !== 'potential' || c.potential)
+      .map(([id, label]) => `<button class="ba-tab ${id === current ? 'on' : ''}" data-tab="${id}">${label}</button>`)
+      .join('');
 
     let body = '';
     if (current === 'skill') {
@@ -119,7 +121,7 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
           <li class="base"><span class="stars">${starIcons(0)}</span><b>기본</b><span>체력 ${c.hp} · 공격력 ${c.atk} · 방어력 ${c.def}</span></li>
           ${rows}
         </ul>`;
-    } else if (current === 'potential') {
+    } else if (current === 'potential' && c.potential) {
       body = `
         <div class="ba-band">잠재 능력</div>
         ${skillCard('잠재', art.potential, c.potential.name, c.potential.description)}`;
@@ -169,10 +171,10 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
   render();
 }
 
-function skillCard(kind: string, icon: string, name: string, description: string, tag?: string): string {
+function skillCard(kind: string, icon: string | undefined, name: string, description: string, tag?: string): string {
   return `
     <div class="skill-card">
-      <img class="skill-icon" src="${icon}" alt="" draggable="false">
+      ${icon ? `<img class="skill-icon" src="${icon}" alt="" draggable="false">` : `<span class="skill-icon skill-icon--blank">${esc(name.slice(0, 1))}</span>`}
       <div class="skill-text">
         <div class="skill-head"><small>${kind}</small>${tag ? `<span class="skill-tag">${tag}</span>` : ''}</div>
         <b>${esc(name)}</b>
