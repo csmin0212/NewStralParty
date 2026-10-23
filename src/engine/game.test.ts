@@ -339,12 +339,12 @@ describe('인카운터', () => {
     const s0 = rollExactly(enemyRing('delinquent'), 4);
     s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
     const s1 = attack(s0);
-    expect(s1.phase).toEqual({ kind: 'defend', enemy: s0.enemies[0].id, stepsLeft: 2 });
+    expect(s1.phase).toMatchObject({ kind: 'defend', enemy: s0.enemies[0].id, stepsLeft: 2 });
     expect(() => attack(s1)).toThrow(RuleError);
     expect(() => defend(s0, 'block')).toThrow(RuleError);
 
     const s2 = defend(s1, 'block');
-    const counter = s2.battles.at(-1)!.events[1];
+    const counter = s2.battles.at(-1)!.events.filter((e) => e.type === 'attack')[1];
     expect(counter).toMatchObject({ type: 'attack', attacker: 'enemy', result: { mode: 'block' } });
     if (counter.type !== 'attack') throw new Error();
     expect(counter.result.damage).toBeGreaterThanOrEqual(1);
@@ -354,16 +354,16 @@ describe('인카운터', () => {
     expect(s2.phase).toEqual({ kind: 'endTurn' });
   });
 
-  it('회피: 내 주사위가 상대 공격 주사위보다 크면 피해 0, 아니면 공격값 전부', () => {
+  it('회피: 내 주사위가 상대 공격 주사위보다 크거나 6이면 피해 0, 아니면 공격값 전부', () => {
     for (let seed = 1; seed < 40; seed++) {
       const s0 = rollExactly(withEnemy(newGame(ring(empties(9)), { seed }), 'delinquent', 2), 4);
       s0.enemies[0].hp = s0.enemies[0].maxHp = 100;
       const s = defend(attack(s0), 'evade');
-      const counter = s.battles.at(-1)!.events[1];
+      const counter = s.battles.at(-1)!.events.filter((e) => e.type === 'attack')[1];
       if (counter.type !== 'attack') throw new Error();
       const r = counter.result;
       expect(r.defenseValue).toBe(r.defenseRoll); // 회피는 능력치 없이 주사위만
-      expect(r.damage).toBe(r.defenseRoll > r.attackRoll ? 0 : r.attackValue);
+      expect(r.damage).toBe(r.defenseRoll > r.attackRoll || r.defenseRoll === 6 ? 0 : r.attackValue);
       expect(s.players[0].hp).toBe(Math.max(0, MUT.hp - r.damage));
     }
   });
@@ -465,7 +465,7 @@ describe('뭇별', () => {
       const before = attack(s);
       before.enemies[0].hp = opts.enemyHp ?? 100;
       const after = defend(before, 'evade');
-      const counter = after.battles.at(-1)!.events[1];
+      const counter = after.battles.at(-1)!.events.filter((e) => e.type === 'attack')[1];
       if (counter.type === 'attack' && want(counter.result.damage === 0)) return { before, after };
     }
     throw new Error('원하는 판을 못 찾음');
@@ -495,7 +495,7 @@ describe('뭇별', () => {
 
   it('액티브 효과 중에는 회피 주사위 2개 중 높은 값을 쓴다', () => {
     const { after } = counterCase({ skill: true }, () => true);
-    const counter = after.battles.at(-1)!.events[1];
+    const counter = after.battles.at(-1)!.events.filter((e) => e.type === 'attack')[1];
     if (counter.type !== 'attack') throw new Error();
     expect(counter.result.defenseRolls).toHaveLength(2);
     expect(counter.result.defenseRoll).toBe(Math.max(...counter.result.defenseRolls));
@@ -503,7 +503,7 @@ describe('뭇별', () => {
 
   it('효과가 없으면 회피 주사위는 1개', () => {
     const { after } = counterCase({}, () => true);
-    const counter = after.battles.at(-1)!.events[1];
+    const counter = after.battles.at(-1)!.events.filter((e) => e.type === 'attack')[1];
     if (counter.type !== 'attack') throw new Error();
     expect(counter.result.defenseRolls).toHaveLength(1);
   });
@@ -1175,5 +1175,23 @@ describe('송금', () => {
   it('상점 밖에서는 못 보낸다', () => {
     const s = newGame(ring(empties(6)));
     expect(() => applyAction(s, { type: 'SEND_COINS', player: 0, to: 1 })).toThrow(RuleError);
+  });
+});
+
+describe('반격 순서', () => {
+  it('에너미가 먼저 공격 주사위를 굴리고, 플레이어는 그 값을 보고 방어 · 회피를 고른다', () => {
+    let s = withEnemy(newGame(ring(empties(9))), 'delinquent', 2);
+    s.enemies[0].hp = 99;
+    s = attack(rollExactly(s, 3));
+    if (s.phase.kind !== 'defend') throw new Error();
+    const { attackRoll } = s.phase;
+    const pre = s.battles.at(-1)!.events.at(-1)!;
+    expect(pre).toEqual({ type: 'enemyRoll', roll: attackRoll, value: attackRoll + s.enemies[0].atk });
+    for (const mode of ['block', 'evade'] as const) {
+      const after = applyAction(s, { type: 'DEFEND', player: 0, mode });
+      const hit = after.battles.at(-1)!.events.filter((e) => e.type === 'attack').at(-1)!;
+      if (hit.type !== 'attack') throw new Error();
+      expect(hit.result.attackRoll).toBe(attackRoll);
+    }
   });
 });

@@ -1,7 +1,8 @@
 import { CARDS } from '../data/cards';
 import { battleBudget, cardBlocker } from '../engine/cards';
 import { evadeDice } from '../engine/skills';
-import type { AttackResult, Battle, BattleEvent, CharacterId, DefenseMode, GameState } from '../engine/types';
+import type { AttackResult, Battle, BattleEvent, CardId, CharacterId, DefenseMode, GameState } from '../engine/types';
+import { attackPreview, defendPreview, previewHtml } from './battlePreview';
 import { cardFace } from './cardView';
 import { esc } from './html';
 import {
@@ -173,8 +174,12 @@ export class BattleView {
         <button class="rbtn rbtn--green" data-choice="attack" data-primary><b>ATTACK</b><small>d6 + ${p.atk}</small></button>`;
     } else if (phase.kind === 'defend') {
       this.showArena();
-      this.message(`${this.battle.enemy.name} 반격`);
-      const dice = evadeDice(p);
+      const enemy = state.enemies.find((e) => e.id === phase.enemy)!;
+      this.message(`${enemy.name} 공격 ${phase.attackRoll + enemy.atk}`);
+      if (this.badge('enemy').textContent?.trim() !== String(phase.attackRoll + enemy.atk)) {
+        this.setBadge('enemy', phase.attackRoll + enemy.atk, 'atk');
+      }
+      const dice = evadeDice(p) + state.turn.battle.evadeDice;
       this.choices.innerHTML = `
         <button class="rbtn rbtn--blue" data-choice="block"><b>방어</b><small>d6 + ${p.def}</small></button>
         <button class="rbtn rbtn--pink${dice > 1 ? ' boosted' : ''}" data-choice="evade"><b>회피</b><small>${dice > 1 ? `d6 ×${dice}` : 'd6'}</small></button>`;
@@ -202,6 +207,28 @@ export class BattleView {
           `<div class="battle-cards"><span class="battle-cost" title="전투 코스트"><b>${budget - used}</b>${pips}</span>${cards}</div>`,
         );
       }
+
+      // 원작처럼 카드를 내기 전에 예상 범위를 보여 준다. 카드에 마우스를 올리면 그 카드를 낸 경우로 바뀐다
+      const enemy = state.enemies.find((e) => e.id === phase.enemy)!;
+      const preview = (card: CardId | null) =>
+        previewHtml(
+          phase.kind === 'encounter'
+            ? attackPreview(state, p, enemy, card)
+            : defendPreview(state, p, enemy, phase.attackRoll, card),
+        );
+      this.choices.insertAdjacentHTML('afterbegin', `<div class="battle-preview">${preview(null)}</div>`);
+      const box = this.choices.querySelector<HTMLElement>('.battle-preview')!;
+      this.choices.querySelectorAll<HTMLButtonElement>('.battle-card').forEach((btn) => {
+        const card = p.hand[Number(btn.dataset.card)].card;
+        btn.onmouseenter = () => {
+          box.innerHTML = preview(card);
+          box.classList.add('with-card');
+        };
+        btn.onmouseleave = () => {
+          box.innerHTML = preview(null);
+          box.classList.remove('with-card');
+        };
+      });
     }
     this.choices.querySelectorAll('button').forEach((b) => (b.disabled ||= busy));
   }
@@ -261,6 +288,16 @@ export class BattleView {
         }
         await sleep(event.damage ? 1000 : 800);
         break;
+      case 'enemyRoll':
+        // 반격하는 쪽이 먼저 굴린다
+        await this.showArena();
+        this.message(`${enemyName}의 반격!`);
+        // 내 배지는 비우고 (이제 내가 막을 차례), 에너미가 공격 주사위를 굴린다
+        this.badge('player').querySelector('span')!.textContent = '?';
+        for (const side of ['player', 'enemy'] as const) this.badge(side).querySelector('em')!.textContent = '';
+        await this.rollBadge('enemy', event.value, 'atk', `공격 ${event.roll} + ${event.value - event.roll}`);
+        await sleep(250);
+        break;
       case 'card': {
         const name = CARDS[event.card].name;
         this.skillFlash(name, 'CARD');
@@ -303,35 +340,49 @@ export class BattleView {
   }
 
   /** 머리 위 원형 배지에서 숫자가 굴러가다 멈춘다. 공격하는 쪽은 공격값, 막는 쪽은 방어/회피값 */
-  private async rollBadges(attacker: Side, r: AttackResult) {
-    const defender: Side = attacker === 'player' ? 'enemy' : 'player';
-    const atkBadge = this.badge(attacker);
-    const defBadge = this.badge(defender);
-    atkBadge.dataset.kind = 'atk';
-    defBadge.dataset.kind = r.mode === 'block' ? 'block' : 'evade';
-    atkBadge.title = `공격 ${r.attackRoll} + ${r.attackValue - r.attackRoll}`;
-    defBadge.title =
-      r.mode === 'block'
-        ? `방어 ${r.defenseRoll} + ${r.defenseValue - r.defenseRoll}`
-        : `회피 주사위 ${r.defenseRolls.join(' · ')} vs 상대 주사위 ${r.attackRoll}`;
-    // 회피는 공격 주사위 눈끼리 비교하니 배지 아래에 맞붙는 눈을 적어 둔다
-    atkBadge.querySelector('em')!.textContent = r.mode === 'evade' ? `🎲${r.attackRoll}` : '';
-    defBadge.querySelector('em')!.textContent = r.mode === 'evade' ? `🎲${r.defenseRolls.join('·')}` : '';
-
-    for (const b of [atkBadge, defBadge]) b.classList.add('rolling');
+  /** 머리 위 원형 배지 하나의 숫자가 굴러가다 멈춘다 */
+  private async rollBadge(side: Side, value: number, kind: 'atk' | 'block' | 'evade', title: string) {
+    const b = this.badge(side);
+    b.dataset.kind = kind;
+    b.title = title;
+    b.classList.add('rolling');
     for (let i = 0; i < 9; i++) {
-      for (const b of [atkBadge, defBadge]) b.querySelector('span')!.textContent = String(1 + Math.floor(Math.random() * 12));
+      b.querySelector('span')!.textContent = String(1 + Math.floor(Math.random() * 12));
       await sleep(55);
     }
-    atkBadge.querySelector('span')!.textContent = String(r.attackValue);
-    defBadge.querySelector('span')!.textContent = String(r.defenseValue);
-    for (const b of [atkBadge, defBadge]) {
-      b.classList.remove('rolling');
-      b.classList.remove('land');
-      void b.offsetWidth;
-      b.classList.add('land');
-    }
-    await sleep(500);
+    b.classList.remove('rolling');
+    this.setBadge(side, value, kind);
+    await sleep(350);
+  }
+
+  private setBadge(side: Side, value: number, kind: 'atk' | 'block' | 'evade') {
+    const b = this.badge(side);
+    b.dataset.kind = kind;
+    b.querySelector('span')!.textContent = String(value);
+    b.classList.remove('land');
+    void b.offsetWidth;
+    b.classList.add('land');
+  }
+
+  /** 원작 순서: 공격하는 쪽이 먼저 굴리고, 막는 쪽이 뒤에 굴린다 (반격은 에너미가 이미 굴려 두었다) */
+  private async rollBadges(attacker: Side, r: AttackResult) {
+    const defender: Side = attacker === 'player' ? 'enemy' : 'player';
+    const defKind = r.mode === 'block' ? 'block' : 'evade';
+    // 회피는 공격 주사위 눈끼리 비교하니 배지 아래에 맞붙는 눈을 적어 둔다
+    this.badge(attacker).querySelector('em')!.textContent = r.mode === 'evade' ? `🎲${r.attackRoll}` : '';
+    this.badge(defender).querySelector('em')!.textContent = r.mode === 'evade' ? `🎲${r.defenseRolls.join('·')}` : '';
+    const atkTitle = `공격 ${r.attackRoll} + ${r.attackValue - r.attackRoll}`;
+    if (attacker === 'player') await this.rollBadge(attacker, r.attackValue, 'atk', atkTitle);
+    else this.badge(attacker).title = atkTitle;
+    await this.rollBadge(
+      defender,
+      r.defenseValue,
+      defKind,
+      r.mode === 'block'
+        ? `방어 ${r.defenseRoll} + ${r.defenseValue - r.defenseRoll}`
+        : `회피 주사위 ${r.defenseRolls.join(' · ')} vs 상대 주사위 ${r.attackRoll}`,
+    );
+    await sleep(200);
   }
 
   private setHp(side: Side, hp: number, max: number) {

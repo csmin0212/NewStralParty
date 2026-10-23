@@ -659,7 +659,10 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   }
 
   if (enemy.counter && !mods.noCounter) {
-    s.phase = { kind: 'defend', enemy: enemy.id, stepsLeft };
+    // 원작처럼 반격하는 쪽이 먼저 굴린다. 플레이어는 이 값을 보고 방어 · 회피와 카드를 고른다
+    const attackRoll = rng.d6();
+    s.phase = { kind: 'defend', enemy: enemy.id, stepsLeft, attackRoll };
+    battle.events.push({ type: 'enemyRoll', roll: attackRoll, value: attackRoll + enemy.atk });
     log(s, `  ${enemy.name}의 반격이 온다!`);
     return;
   }
@@ -669,7 +672,7 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
 /** 반격을 방어 또는 회피로 받는다 */
 function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   if (s.phase.kind !== 'defend') throw new RuleError('지금은 반격을 받을 때가 아닙니다');
-  const { stepsLeft } = s.phase;
+  const { stepsLeft, attackRoll } = s.phase;
   const enemy = findEnemy(s, s.phase.enemy);
   const battle = currentBattle(s);
   const p = currentPlayer(s);
@@ -677,7 +680,7 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   const mods = s.turn.battle;
   const me = { atk: p.atk, def: p.def + statusDef(p) + mods.def };
   const dice = evadeDice(p) + mods.evadeDice;
-  const hit = resolveAttack(enemy, me, mode, rng, mode === 'evade' ? dice : 1);
+  const hit = resolveAttack(enemy, me, mode, rng, mode === 'evade' ? dice : 1, { attackRoll });
   battle.events.push({
     type: 'attack',
     attacker: 'enemy',

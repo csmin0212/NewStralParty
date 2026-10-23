@@ -26,6 +26,11 @@ describe('resolveAttack', () => {
     expect(resolveAttack(fighter(2, 0), fighter(0, 0), 'evade', fixedDice(3, 1)).damage).toBe(5);
   });
 
+  it('회피: 6은 상대가 6이어도 피한다 (원작), 5는 5를 못 피한다', () => {
+    expect(resolveAttack(fighter(2, 0), fighter(0, 0), 'evade', fixedDice(6, 6)).damage).toBe(0);
+    expect(resolveAttack(fighter(2, 0), fighter(0, 0), 'evade', fixedDice(5, 5)).damage).toBe(7);
+  });
+
   it('회피 주사위를 여러 개 굴리면 가장 높은 눈을 쓴다', () => {
     const r = resolveAttack(fighter(2, 0), fighter(0, 0), 'evade', fixedDice(3, 2, 5), 2);
     expect(r.defenseRolls).toEqual([2, 5]);

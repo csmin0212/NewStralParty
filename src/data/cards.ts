@@ -36,6 +36,21 @@ export interface CardInfo {
   text: string;
   /** 참고한 원작 카드 */
   ref: string;
+  /** 전투 카드가 붙이는 값 (예상 범위 계산용, 효과는 game.ts) */
+  battle?: BattleBonus;
+}
+
+export interface BattleBonus {
+  atk?: [number, number];
+  def?: [number, number];
+  /** 공격 · 회피 주사위 개수 추가 (높은 눈) */
+  attackDice?: number;
+  evadeDice?: number;
+  /** 최종 공격력 배수 */
+  mult?: number;
+  noCounter?: boolean;
+  /** 반격을 받지 않고 끝난다 (전술적 후퇴 · 실드 카운터) */
+  escape?: boolean;
 }
 
 type Extra = Partial<Omit<CardInfo, 'id' | 'name' | 'type' | 'icon' | 'text' | 'ref'>>;
@@ -99,41 +114,47 @@ export const CARDS: Record<CardId, CardInfo> = {
   }),
 
   // ── 전투: 공격할 때 ──
-  atkM: card('atkM', '공격 강화 (중)', 'battle', '🗡', '공격력 +1~3', 'AP 攻击(中)', { timing: 'attack', battleCost: 1 }),
-  atkL: card('atkL', '공격 강화 (대)', 'battle', '⚔', '공격력 +1~6', 'AP 攻击(大)', { timing: 'attack', battleCost: 2 }),
-  atkG: card('atkG', '공격 강화 (특대)', 'battle', '🔱', '공격력 +1~10', 'AP 攻击(特大)', { timing: 'attack', battleCost: 3, level: 1, points: 2 }),
-  onFire: card('onFire', '불타는 의지', 'battle', '🔥', '공격력 +1 · 방어력 -1', "OJ I'm on Fire! (Lv1 5★)", { timing: 'attack', battleCost: 1 }),
+  atkM: card('atkM', '공격 강화 (중)', 'battle', '🗡', '공격력 +1~3', 'AP 攻击(中)', { timing: 'attack', battleCost: 1, battle: { atk: [1, 3] } }),
+  atkL: card('atkL', '공격 강화 (대)', 'battle', '⚔', '공격력 +1~6', 'AP 攻击(大)', { timing: 'attack', battleCost: 2, battle: { atk: [1, 6] } }),
+  atkG: card('atkG', '공격 강화 (특대)', 'battle', '🔱', '공격력 +1~10', 'AP 攻击(特大)', {
+    timing: 'attack', battleCost: 3, level: 1, points: 2, battle: { atk: [1, 10] },
+  }),
+  onFire: card('onFire', '불타는 의지', 'battle', '🔥', '공격력 +1 · 방어력 -1', "OJ I'm on Fire! (Lv1 5★)", {
+    timing: 'attack', battleCost: 1, battle: { atk: [1, 1], def: [-1, -1] },
+  }),
   magnum: card('magnum', '매그넘', 'battle', '🔫', '체력 1을 내고 공격력 +2', 'OJ Big Magnum (Lv3 20★)', {
-    timing: 'attack', battleCost: 1, level: 2, points: 2,
+    timing: 'attack', battleCost: 1, level: 2, points: 2, battle: { atk: [2, 2] },
   }),
   shadowRaid: card('shadowRaid', '그림자 습격', 'battle', '🌑', '공격력 +3 · 반격 없음', 'AP 暗影突袭', {
-    timing: 'attack', battleCost: 2, level: 1, points: 2, limit: 2,
+    timing: 'attack', battleCost: 2, level: 1, points: 2, limit: 2, battle: { atk: [3, 3], noCounter: true },
   }),
   gawu: card('gawu', '명검', 'battle', '🗡', '공격력 +1~20', 'AP 名刀：嘎呜切 (코스트 4, 1성)', {
-    timing: 'attack', battleCost: 4, level: 1, points: 5, limit: 1,
+    timing: 'attack', battleCost: 4, level: 1, points: 5, limit: 1, battle: { atk: [1, 20] },
   }),
   charge: card('charge', '축적', 'battle', '🌀', '공격력 +5 · 「전력 공격」 획득', 'AP 蓄力 (코스트 5, 2성)', {
-    timing: 'attack', battleCost: 5, level: 2, points: 5, limit: 1,
+    timing: 'attack', battleCost: 5, level: 2, points: 5, limit: 1, battle: { atk: [5, 5] },
   }),
   fullAttack: card('fullAttack', '전력 공격', 'battle', '💥', '공격력 +6 · 최종 공격력 ×1.5', 'AP 全力攻击', {
-    timing: 'attack', battleCost: 3, limit: 0,
+    timing: 'attack', battleCost: 3, limit: 0, battle: { atk: [6, 6], mult: 1.5 },
   }),
   accel: card('accel', '액셀', 'battle', '🎯', '공격 주사위 2개 중 높은 눈', 'OJ Accel Hyper (Lv4 30★, 1장)', {
-    timing: 'attack', battleCost: 3, level: 3, points: 5, limit: 1,
+    timing: 'attack', battleCost: 3, level: 3, points: 5, limit: 1, battle: { attackDice: 1 },
   }),
 
   // ── 전투: 반격을 받을 때 ──
-  defM: card('defM', '방어 강화 (중)', 'battle', '🛡', '방어력 +1~3', 'AP 防御(中)', { timing: 'defend', battleCost: 1 }),
-  defL: card('defL', '방어 강화 (대)', 'battle', '🛡', '방어력 +1~6', 'AP 防御(大)', { timing: 'defend', battleCost: 2 }),
-  defG: card('defG', '방어 강화 (특대)', 'battle', '🏰', '방어력 +1~10', 'AP 防御(特大)', { timing: 'defend', battleCost: 3, level: 1, points: 2 }),
+  defM: card('defM', '방어 강화 (중)', 'battle', '🛡', '방어력 +1~3', 'AP 防御(中)', { timing: 'defend', battleCost: 1, battle: { def: [1, 3] } }),
+  defL: card('defL', '방어 강화 (대)', 'battle', '🛡', '방어력 +1~6', 'AP 防御(大)', { timing: 'defend', battleCost: 2, battle: { def: [1, 6] } }),
+  defG: card('defG', '방어 강화 (특대)', 'battle', '🏰', '방어력 +1~10', 'AP 防御(特大)', {
+    timing: 'defend', battleCost: 3, level: 1, points: 2, battle: { def: [1, 10] },
+  }),
   rainbow: card('rainbow', '무지개 원', 'battle', '🌈', '회피 주사위 +1', 'OJ Rainbow-Colored Circle (Lv2 5★)', {
-    timing: 'defend', battleCost: 2, level: 1, points: 2,
+    timing: 'defend', battleCost: 2, level: 1, points: 2, battle: { evadeDice: 1 },
   }),
   retreat: card('retreat', '전술적 후퇴', 'battle', '🏃', '반격을 받지 않고 이탈', 'OJ Tactical Retreat (Lv1 레벨×5★)', {
-    timing: 'defend', battleCost: 1, points: 2, cost: 3,
+    timing: 'defend', battleCost: 1, points: 2, cost: 3, battle: { escape: true },
   }),
   shieldCounter: card('shieldCounter', '실드 카운터', 'battle', '↩', '에너미에게 (공격력 − 내 방어력, 최소 1) 피해 · 반격을 받지 않는다', 'OJ Shield Counter (Lv4 20★, 1장)', {
-    timing: 'defend', battleCost: 4, level: 3, points: 5, limit: 1,
+    timing: 'defend', battleCost: 4, level: 3, points: 5, limit: 1, battle: { escape: true },
   }),
 };
 

@@ -204,7 +204,9 @@ export type BattleEvent =
   /** 전투 카드 사용. value는 굴린 강화 수치, damage가 있으면 그 카드로 에너미가 피해를 입었다 (실드 카운터) */
   | { type: 'card'; card: CardId; value?: number; damage?: number; targetHp?: number }
   /** 연막탄으로 반격을 받지 않고 빠졌다 */
-  | { type: 'escape' };
+  | { type: 'escape' }
+  /** 반격하는 에너미가 먼저 굴린 공격 주사위 */
+  | { type: 'enemyRoll'; roll: number; value: number };
 
 /** 인카운터 한 번의 기록. 화면은 events를 순서대로 연출한다 */
 export interface Battle {
@@ -220,7 +222,8 @@ export type Phase =
   | { kind: 'preRoll' }
   | { kind: 'choosePath'; stepsLeft: number; options: number[] }
   | { kind: 'encounter'; enemy: number; stepsLeft: number }
-  | { kind: 'defend'; enemy: number; stepsLeft: number }
+  /** 반격: 에너미가 먼저 굴린 공격 주사위(attackRoll)를 보고 방어 · 회피와 카드를 고른다 (원작 순서) */
+  | { kind: 'defend'; enemy: number; stepsLeft: number; attackRoll: number }
   /** 상점 칸: 지나가거나 멈추면 연다. 멈췄으면 첫 구매가 무료 */
   | { kind: 'shop'; stepsLeft: number; offers: ShopOffer[]; free: boolean }
   | { kind: 'endTurn' }

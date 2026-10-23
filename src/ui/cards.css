@@ -716,3 +716,66 @@
 .shop-foot:has(.shop-leave) {
   justify-content: flex-start;
 }
+
+/* ───────── 전투 예상 범위 (카드를 내기 전에 확인) ───────── */
+.battle-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 2px 14px;
+  min-width: 360px;
+  padding: 8px 18px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+  color: #2a3b55;
+  transition: box-shadow 0.15s;
+}
+.battle-preview.with-card {
+  box-shadow: 0 0 0 3px #ffdd45, 0 8px 22px rgba(0, 0, 0, 0.3);
+}
+.bp-side {
+  display: grid;
+  justify-items: center;
+}
+.bp-side small {
+  font-size: 12px;
+  font-weight: 800;
+  color: #8492a6;
+}
+.bp-side b {
+  font-family: 'Exo 2', sans-serif;
+  font-size: 30px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1.1;
+}
+.bp-mine b {
+  color: #1f78d6;
+}
+.bp-theirs b {
+  color: #e0457f;
+}
+.bp-vs {
+  font-family: 'Exo 2', sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  font-style: italic;
+  color: #8492a6;
+}
+.bp-result {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 6px;
+  border-top: 1px solid #d8e0ea;
+  font-size: 14px;
+  font-weight: 700;
+}
+.bp-result b {
+  font-size: 17px;
+  font-weight: 900;
+  color: #2a3b55;
+}
