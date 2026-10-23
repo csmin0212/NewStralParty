@@ -1,24 +1,33 @@
+/* 파스텔 우주 테마 — 색은 docs/ASSETS.md 팔레트와 같다 */
 :root {
   color-scheme: dark;
-  --bg: #141622;
-  --surface: #1e2132;
-  --surface-2: #282c41;
-  --border: #383d58;
-  --text: #eef0f8;
-  --muted: #959bb5;
-  --accent: #7d8bff;
-  --gold: #f5c542;
 
-  --tile-empty: #3a3f59;
-  --tile-coinPlus: #2d7a4d;
-  --tile-coinMinus: #873a3e;
-  --tile-card: #4a4c9c;
-  --tile-spawn: #4a3557;
-  --tile-heal: #a54467;
-  --tile-warp: #22798a;
-  --tile-base: #b5862a;
+  /* 팔레트 */
+  --night: #1b1a3d;
+  --nebula: #3a3470;
+  --lavender: #c9b8ff;
+  --pink: #ffb3d1;
+  --mint: #9fe6f5;
+  --butter: #ffe29a;
+  --star: #f5f3ff;
 
-  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  /* 역할 */
+  --bg: var(--night);
+  --surface: rgba(36, 34, 78, 0.82);
+  --surface-2: #2e2b60;
+  --surface-3: #39357a;
+  --border: rgba(201, 184, 255, 0.22);
+  --text: var(--star);
+  --muted: #aaa4d8;
+  --ink: #1b1a3d;
+  --accent: var(--lavender);
+  --gold: var(--butter);
+  --danger: #ff8fa3;
+  --glow: rgba(201, 184, 255, 0.35);
+
+  --font-display: 'Jua', 'Pretendard Variable', sans-serif;
+
+  font-family: 'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.45;
 }
@@ -27,11 +36,48 @@
   box-sizing: border-box;
 }
 
+/* 밤하늘: 성운 세 덩어리 + 별 두 겹(반짝임) */
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--bg);
   color: var(--text);
+  background:
+    radial-gradient(ellipse 55% 45% at 12% 18%, rgba(201, 184, 255, 0.2), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 88% 85%, rgba(255, 179, 209, 0.16), transparent 70%),
+    radial-gradient(ellipse 40% 35% at 75% 12%, rgba(159, 230, 245, 0.1), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+body::before {
+  background-image:
+    radial-gradient(1.5px 1.5px at 23px 41px, var(--star), transparent),
+    radial-gradient(1px 1px at 97px 13px, var(--star), transparent),
+    radial-gradient(1px 1px at 151px 88px, var(--mint), transparent),
+    radial-gradient(1.5px 1.5px at 61px 141px, var(--star), transparent),
+    radial-gradient(1px 1px at 183px 167px, var(--pink), transparent);
+  background-size: 210px 210px;
+  opacity: 0.55;
+}
+body::after {
+  background-image:
+    radial-gradient(2px 2px at 41px 77px, var(--butter), transparent),
+    radial-gradient(1.5px 1.5px at 213px 29px, var(--star), transparent),
+    radial-gradient(2px 2px at 131px 241px, var(--lavender), transparent),
+    radial-gradient(1.5px 1.5px at 281px 173px, var(--star), transparent);
+  background-size: 330px 330px;
+  animation: twinkle 4s ease-in-out infinite alternate;
+}
+@keyframes twinkle {
+  from { opacity: 0.25; }
+  to { opacity: 0.85; }
 }
 
 button {
@@ -39,13 +85,13 @@ button {
   color: inherit;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 button:hover:not(:disabled) {
-  background: #33385a;
+  background: var(--surface-3);
 }
 button:active:not(:disabled) {
   transform: scale(0.97);
@@ -57,20 +103,28 @@ button:disabled {
 button.primary {
   width: 100%;
   padding: 12px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--lavender), var(--pink));
   border-color: transparent;
-  color: #11131f;
-  font-weight: 700;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  box-shadow: 0 4px 0 #8e7bd6, 0 6px 18px var(--glow);
 }
 button.primary:hover:not(:disabled) {
-  background: #97a2ff;
+  background: linear-gradient(135deg, #d8cbff, #ffc4dc);
+  box-shadow: 0 4px 0 #8e7bd6, 0 6px 24px rgba(255, 179, 209, 0.45);
+}
+button.primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #8e7bd6, 0 4px 12px var(--glow);
 }
 
 kbd {
+  font-family: 'Pretendard Variable', sans-serif;
   font-size: 11px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(27, 26, 61, 0.18);
   margin-left: 4px;
 }
 
@@ -84,21 +138,28 @@ kbd {
   height: 14px;
   border-radius: 50%;
   background: var(--c);
+  box-shadow: 0 0 8px var(--c);
   flex-shrink: 0;
 }
 
 /* ───────── 설정 화면 ───────── */
 
 .setup {
-  max-width: 360px;
+  max-width: 380px;
   margin: 10vh auto 0;
   padding: 0 16px;
   text-align: center;
 }
 .setup h1 {
-  font-size: 44px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 56px;
   margin: 0;
-  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--mint), var(--lavender) 45%, var(--pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px rgba(201, 184, 255, 0.45));
 }
 .subtitle {
   color: var(--muted);
@@ -111,10 +172,13 @@ kbd {
 }
 .count button {
   flex: 1;
+  font-family: var(--font-display);
+  font-size: 16px;
 }
 .count button.selected {
-  border-color: var(--accent);
-  background: #2e3360;
+  border-color: var(--lavender);
+  background: var(--surface-3);
+  box-shadow: 0 0 14px var(--glow);
 }
 .names {
   list-style: none;
@@ -134,11 +198,11 @@ kbd {
   color: inherit;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 9px 12px;
 }
 .names input:focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--lavender);
   outline-offset: -1px;
 }
 
@@ -162,75 +226,93 @@ kbd {
   position: relative;
   transform-origin: top left;
 }
+
+/* 칸 사이 길: 별자리처럼 점선 */
 .edges {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+  /* 화살표(marker)는 선이 아니라 svg의 색을 따라간다 */
+  color: rgba(201, 184, 255, 0.75);
 }
 .edges line {
   stroke: currentColor;
-  stroke-width: 2.5;
-  color: #59607f;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 7;
+  color: rgba(201, 184, 255, 0.7);
 }
 .edges line.fork {
-  color: var(--gold);
+  color: var(--butter);
 }
 .warp-link {
   fill: none;
-  stroke: #3fc6dc;
+  stroke: var(--mint);
   stroke-width: 2;
-  stroke-dasharray: 6 6;
-  opacity: 0.45;
+  stroke-linecap: round;
+  stroke-dasharray: 2 8;
+  opacity: 0.5;
 }
 
+/* 칸: 밤하늘에 떠 있는 작은 행성 발판 */
 .tile {
+  --fill: #5a5596;
+  --edge: #3b3770;
+  --ink: #e6e2ff;
   position: absolute;
   width: 70px;
   height: 70px;
   padding: 0;
-  border-radius: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--fill) 55%, white), var(--fill) 62%);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
   cursor: default;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 5px 0 var(--edge),
+    0 8px 16px rgba(10, 8, 30, 0.55),
+    0 0 18px color-mix(in srgb, var(--fill) 35%, transparent);
 }
 .tile:hover:not(:disabled) {
-  filter: brightness(1.1);
+  filter: brightness(1.08);
+  background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--fill) 55%, white), var(--fill) 62%);
 }
 .tile:active:not(:disabled) {
   transform: none;
 }
 .tile .icon {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
 }
 .tile .label {
-  font-size: 11px;
-  opacity: 0.85;
+  font-family: var(--font-display);
+  font-size: 12px;
 }
-.tile.kind-empty { background: var(--tile-empty); }
-.tile.kind-coinPlus { background: var(--tile-coinPlus); }
-.tile.kind-coinMinus { background: var(--tile-coinMinus); }
-.tile.kind-card { background: var(--tile-card); }
-.tile.kind-spawn { background: var(--tile-spawn); }
-.tile.kind-heal { background: var(--tile-heal); }
-.tile.kind-warp { background: var(--tile-warp); }
-.tile.kind-base { background: var(--tile-base); }
+.tile.kind-empty { --fill: #5a5596; --edge: #3b3770; --ink: #e6e2ff; }
+.tile.kind-coinPlus { --fill: #a8ebc4; --edge: #5fb58a; --ink: #12422c; }
+.tile.kind-coinMinus { --fill: #f7a6a0; --edge: #c46a66; --ink: #4e1a18; }
+.tile.kind-card { --fill: #c9b8ff; --edge: #8e7bd6; --ink: #2a2160; }
+.tile.kind-spawn { --fill: #3a3470; --edge: #241f4c; --ink: var(--pink); border-color: rgba(255, 179, 209, 0.6); }
+.tile.kind-heal { --fill: #ffb3d1; --edge: #d27a9e; --ink: #5a1a36; }
+.tile.kind-warp { --fill: #9fe6f5; --edge: #5db3c6; --ink: #0d3f4a; }
+.tile.kind-base { --fill: #ffe29a; --edge: #c9a24e; --ink: #4a3410; border-color: #fff6d6; }
 
 .tile.choice {
   cursor: pointer;
-  border-color: var(--gold);
+  border-color: var(--butter);
   animation: glow 0.9s ease-in-out infinite alternate;
 }
 @keyframes glow {
-  from { box-shadow: 0 0 0 0 rgba(245, 197, 66, 0.7); }
-  to { box-shadow: 0 0 0 8px rgba(245, 197, 66, 0); }
+  from { box-shadow: 0 5px 0 var(--edge), 0 0 0 0 rgba(255, 226, 154, 0.8); }
+  to { box-shadow: 0 5px 0 var(--edge), 0 0 0 10px rgba(255, 226, 154, 0); }
 }
 
 .token {
@@ -240,21 +322,22 @@ kbd {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--c);
-  border: 3px solid #fff;
-  color: #10121c;
-  font-weight: 800;
-  font-size: 13px;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 55%, white), var(--c));
+  border: 3px solid var(--star);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
   display: grid;
   place-items: center;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6);
   transition: transform 0.16s ease-out;
   pointer-events: none;
 }
 .token.current {
   width: 34px;
   height: 34px;
-  border-color: var(--gold);
+  border-color: var(--butter);
+  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6), 0 0 14px rgba(255, 226, 154, 0.8);
 }
 .token.ko {
   filter: grayscale(1);
@@ -268,18 +351,19 @@ kbd {
   height: 38px;
   translate: -50% -50%;
   border-radius: 50%;
-  background: #1b1d2b;
-  border: 2px solid #c9cde0;
+  background: var(--night);
+  border: 2px solid var(--lavender);
   display: grid;
   place-items: center;
   z-index: 4;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6), 0 0 10px rgba(201, 184, 255, 0.35);
   pointer-events: none;
   animation: enemy-in 0.35s ease-out;
   transition: opacity 0.35s, scale 0.35s;
 }
 .enemy.counter {
-  border-color: #ff7a5c;
+  border-color: var(--pink);
+  box-shadow: 0 3px 6px rgba(10, 8, 30, 0.6), 0 0 10px rgba(255, 179, 209, 0.5);
 }
 .enemy .face {
   font-size: 21px;
@@ -292,13 +376,13 @@ kbd {
   bottom: -7px;
   height: 4px;
   border-radius: 2px;
-  background: #0d0e16;
+  background: var(--night);
   overflow: hidden;
 }
 .enemy .ehp b {
   display: block;
   height: 100%;
-  background: #ff7a5c;
+  background: var(--pink);
   transition: width 0.3s;
 }
 .enemy.gone {
@@ -314,23 +398,24 @@ kbd {
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  font-size: 30px;
-  font-weight: 800;
-  padding: 10px 20px;
-  border-radius: 16px;
-  background: rgba(20, 22, 34, 0.9);
+  font-family: var(--font-display);
+  font-size: 32px;
+  padding: 10px 22px;
+  border-radius: 18px;
+  background: rgba(27, 26, 61, 0.92);
   border: 1px solid var(--border);
+  box-shadow: 0 0 30px var(--glow);
   pointer-events: none;
   opacity: 0;
   z-index: 10;
 }
 .dice-pop b {
-  color: var(--gold);
+  color: var(--butter);
 }
 .dice-pop small {
-  font-size: 20px;
+  font-size: 22px;
   margin-left: 6px;
-  color: var(--accent);
+  color: var(--mint);
 }
 .dice-pop.pop {
   animation: dice-pop 1.4s ease-out;
@@ -349,14 +434,15 @@ kbd {
   display: grid;
   place-content: center;
   text-align: center;
-  font-size: 34px;
-  font-weight: 800;
-  background: rgba(10, 11, 18, 0.7);
-  border-radius: 16px;
+  font-family: var(--font-display);
+  font-size: 38px;
+  background: rgba(27, 26, 61, 0.75);
+  border-radius: 20px;
   z-index: 20;
 }
 .board-overlay div {
-  font-size: 64px;
+  font-size: 68px;
+  filter: drop-shadow(0 0 20px rgba(255, 226, 154, 0.7));
 }
 
 /* ───────── 전투 화면 ───────── */
@@ -367,8 +453,8 @@ kbd {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(8, 9, 15, 0.72);
-  backdrop-filter: blur(3px);
+  background: rgba(20, 18, 48, 0.7);
+  backdrop-filter: blur(4px);
   z-index: 30;
   opacity: 0;
   pointer-events: none;
@@ -381,10 +467,12 @@ kbd {
 .battle-card {
   width: min(560px, 100%);
   padding: 18px 20px 20px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #262a42, #1c1f31);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(201, 184, 255, 0.18), transparent 70%),
+    linear-gradient(180deg, #312d68, #23214e);
   border: 1px solid var(--border);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 20px 50px rgba(10, 8, 30, 0.6), 0 0 40px rgba(201, 184, 255, 0.15);
   display: grid;
   gap: 14px;
   scale: 0.92;
@@ -395,10 +483,10 @@ kbd {
 }
 .battle-title {
   text-align: center;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: #ff9a7a;
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 3px;
+  color: var(--pink);
 }
 
 .fighters {
@@ -408,11 +496,10 @@ kbd {
   gap: 8px;
 }
 .vs {
-  font-size: 22px;
-  font-weight: 900;
-  font-style: italic;
-  color: var(--gold);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: var(--butter);
+  text-shadow: 0 0 14px rgba(255, 226, 154, 0.6);
 }
 .fighter {
   position: relative;
@@ -427,20 +514,22 @@ kbd {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 70%, white), var(--c));
-  border: 4px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
-  font-size: 40px;
-  font-weight: 900;
-  color: #10121c;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 55%, white), var(--c));
+  border: 4px solid var(--star);
+  box-shadow: 0 6px 16px rgba(10, 8, 30, 0.5), 0 0 22px color-mix(in srgb, var(--c) 50%, transparent);
+  font-family: var(--font-display);
+  font-size: 42px;
+  color: var(--ink);
 }
 .fighter .enemy-avatar {
-  background: radial-gradient(circle at 35% 30%, #4a3f63, #241d33);
-  border-color: #ff9a7a;
+  background: radial-gradient(circle at 35% 30%, #4d4590, var(--night));
+  border-color: var(--pink);
+  box-shadow: 0 6px 16px rgba(10, 8, 30, 0.5), 0 0 22px rgba(255, 179, 209, 0.4);
   font-size: 54px;
 }
 .fname {
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 18px;
   margin-top: 4px;
 }
 .fstats {
@@ -453,26 +542,26 @@ kbd {
 }
 .tag {
   font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
 .tag.warn {
-  color: #ffb39c;
-  border-color: #9a4a3a;
+  color: var(--pink);
+  border-color: rgba(255, 179, 209, 0.55);
 }
 .fighter .bar {
   width: 120px;
   height: 8px;
   border-radius: 4px;
-  background: #0d0e16;
+  background: var(--night);
   overflow: hidden;
 }
 .fighter .bar i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #ff5f7e, #ff8f6b);
+  background: linear-gradient(90deg, var(--pink), var(--lavender));
   transition: width 0.45s ease-out;
 }
 .hptext {
@@ -520,18 +609,18 @@ kbd {
   top: 18px;
   left: 50%;
   translate: -50% 0;
-  font-size: 30px;
-  font-weight: 900;
+  font-family: var(--font-display);
+  font-size: 34px;
   pointer-events: none;
   opacity: 0;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+  text-shadow: 0 3px 0 rgba(27, 26, 61, 0.7);
 }
 .pop.dmg {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 .pop.miss {
-  color: #8fd3ff;
-  font-size: 24px;
+  color: var(--mint);
+  font-size: 26px;
 }
 .pop.show {
   animation: pop-up 1s ease-out;
@@ -561,16 +650,16 @@ kbd {
   color: var(--muted);
 }
 .die {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: #f4f1ea;
-  color: #1a1b25;
-  font-size: 24px;
-  font-weight: 900;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #fff8e7;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 26px;
   display: grid;
   place-items: center;
-  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 -4px 0 rgba(201, 162, 78, 0.35), 0 4px 10px rgba(10, 8, 30, 0.5), 0 0 14px rgba(255, 226, 154, 0.3);
 }
 .die.rolling {
   animation: shake-die 0.12s linear infinite;
@@ -588,8 +677,10 @@ kbd {
   opacity: 1;
 }
 .die-box .sum b {
-  color: var(--text);
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--butter);
+  font-size: 18px;
 }
 .dice-row.settled .die {
   animation: die-land 0.3s ease-out;
@@ -604,8 +695,8 @@ kbd {
 
 .battle-msg {
   text-align: center;
-  font-size: 17px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 19px;
   min-height: 1.5em;
 }
 .battle-actions {
@@ -619,6 +710,9 @@ kbd {
   font-size: 13px;
   color: var(--muted);
 }
+.battle-actions .hint b {
+  color: var(--pink);
+}
 .choice-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -627,23 +721,35 @@ kbd {
 .choice-row button.primary {
   width: auto;
 }
+.choice-row button:not(.primary) {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
 .defense {
   display: grid;
   gap: 2px;
   padding: 12px;
 }
 .defense b {
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
 }
 .defense small {
+  font-family: 'Pretendard Variable', sans-serif;
   color: var(--muted);
   font-size: 12px;
+}
+.defense:hover:not(:disabled) {
+  border-color: var(--mint);
+  box-shadow: 0 0 14px rgba(159, 230, 245, 0.3);
 }
 
 /* ───────── 패널 ───────── */
 
 .panel {
   background: var(--surface);
+  backdrop-filter: blur(8px);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -652,8 +758,9 @@ kbd {
   gap: 12px;
 }
 .round {
-  color: var(--muted);
-  font-size: 13px;
+  font-family: var(--font-display);
+  color: var(--lavender);
+  font-size: 15px;
 }
 .players {
   list-style: none;
@@ -667,12 +774,14 @@ kbd {
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
 }
 .player.current {
   background: var(--surface-2);
   border-color: var(--c);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--c) 30%, transparent);
 }
 .player.ko {
   opacity: 0.6;
@@ -682,17 +791,19 @@ kbd {
   min-width: 0;
 }
 .pname {
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 16px;
 }
 .lv {
-  color: var(--gold);
-  font-size: 13px;
+  color: var(--butter);
+  font-size: 14px;
 }
 .ko-tag {
+  font-family: 'Pretendard Variable', sans-serif;
   font-size: 11px;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: #873a3e;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #8a3a5a;
 }
 .stats {
   display: flex;
@@ -702,14 +813,14 @@ kbd {
 .hpbar {
   height: 4px;
   border-radius: 2px;
-  background: var(--bg);
+  background: var(--night);
   margin-top: 4px;
   overflow: hidden;
 }
 .hpbar i {
   display: block;
   height: 100%;
-  background: #e05577;
+  background: linear-gradient(90deg, var(--pink), var(--lavender));
   transition: width 0.3s;
 }
 
@@ -717,18 +828,21 @@ kbd {
   display: grid;
   gap: 10px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 .actions h2 {
-  font-size: 18px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
   margin: 0;
 }
 .actions p {
   margin: 0;
 }
 .who {
-  font-weight: 800;
+  font-family: var(--font-display);
 }
 .hand,
 .paths {
@@ -745,7 +859,7 @@ kbd {
   color: var(--muted);
 }
 .mods {
-  color: var(--accent);
+  color: var(--mint);
   font-size: 13px;
 }
 
@@ -758,6 +872,8 @@ kbd {
   overflow-y: auto;
   font-size: 13px;
   color: var(--muted);
+  scrollbar-width: thin;
+  scrollbar-color: var(--nebula) transparent;
 }
 .log li {
   padding: 2px 0;
