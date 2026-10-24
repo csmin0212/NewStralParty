@@ -6,6 +6,8 @@ export interface Rng {
   /** [min, max] 정수 */
   int(min: number, max: number): number;
   d6(): number;
+  /** 이동 주사위 (원작 1~10) */
+  d10(): number;
   pick<T>(items: readonly T[]): T;
   readonly state: number;
 }
@@ -25,6 +27,9 @@ export function createRng(seed: number): Rng {
     },
     d6() {
       return rng.int(1, 6);
+    },
+    d10() {
+      return rng.int(1, 10);
     },
     pick(items) {
       return items[rng.int(0, items.length - 1)];

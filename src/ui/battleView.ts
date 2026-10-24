@@ -7,7 +7,6 @@ import { cardFace } from './cardView';
 import { esc } from './html';
 import {
   BATTLE_ART,
-  CHARACTER_ART,
   BOSS_ART,
   ENEMY_ART,
   ENEMY_ENCOUNTER_ART,
@@ -18,6 +17,7 @@ import {
 } from './assets';
 import { wait as sleep } from './settings';
 import { sfx } from './sound';
+import { skinArt } from './skins';
 
 export type BattleChoice =
   | { type: 'ENCOUNTER'; choice: 'attack' | 'release' }
@@ -56,6 +56,7 @@ export class BattleView {
   private enemyPoseTimer: ReturnType<typeof setTimeout> | undefined;
   private playerPoseTimer: ReturnType<typeof setTimeout> | undefined;
   private character: CharacterId | null = null;
+  private skin: string | undefined;
 
   constructor(root: HTMLElement) {
     this.el = document.createElement('div');
@@ -106,8 +107,9 @@ export class BattleView {
       ? ((state.bossState.phase === 2 ? bossArt.phase2 : undefined) ?? bossArt.portrait ?? bossArt.token)
       : ENEMY_ART[e.kind];
     const big = (bossArt ? bossArt.encounter : ENEMY_ENCOUNTER_ART[e.kind]) ?? idle;
-    const poses = CHARACTER_ART[p.character].poses;
+    const poses = skinArt(p.character, p.skin).poses;
     this.character = p.character;
+    this.skin = p.skin;
     for (const src of [...Object.values(ENEMY_POSES[e.kind] ?? {}), ...Object.values(poses), BATTLE_ART.impact, BATTLE_ART.smoke]) {
       if (src) new Image().src = src;
     }
@@ -404,7 +406,7 @@ export class BattleView {
     u.classList.add(pose);
     if (side === 'player' && this.character) {
       clearTimeout(this.playerPoseTimer);
-      const art = CHARACTER_ART[this.character].poses;
+      const art = skinArt(this.character, this.skin).poses;
       const image = u.querySelector<HTMLImageElement>('.player-art');
       const key: CharacterPose =
         pose === 'lunge' ? 'attack' : pose === 'dodge' ? 'evade' : pose === 'hit' ? 'hit' : pose === 'block' ? 'block' : 'down';

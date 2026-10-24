@@ -1,16 +1,18 @@
 import { CHARACTER_IDS, CHARACTERS, type StatGrowth } from '../data/characters';
 import type { CharacterId } from '../engine/types';
-import { CHARACTER_ART, LOBBY_ART, UI_ART, type CharacterPose } from './assets';
+import { LOBBY_ART, UI_ART, type CharacterPose } from './assets';
+import { chosenSkin, myArt, skinsOf } from './skins';
 import { esc } from './html';
+import { RULES } from '../engine/rules';
 import { loadAccount, saveAccount } from '../meta/account';
-import { bondRank, GIFT_IDS, GIFTS, MAX_BOND, type GiftId } from '../meta/rules';
-import { currencyBar } from './currency';
+import { bondRank } from '../meta/rules';
 
 type View = 'list' | 'detail';
-type Tab = 'skill' | 'bond' | 'growth' | 'potential' | 'profile';
+type Tab = 'skill' | 'skin' | 'bond' | 'growth' | 'potential' | 'profile';
 
 const TABS: [Tab, string][] = [
   ['skill', '기본 정보'],
+  ['skin', '스킨'],
   ['bond', '인연'],
   ['growth', '성장'],
   ['potential', '잠재 능력'],
@@ -37,13 +39,15 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
   let selected: CharacterId = CHARACTER_IDS[0];
   let view: View = 'list';
   let tab: Tab = 'skill';
-  let shown = selected;
+  /** 히어로 그림이 바뀌었는지 (캐릭터 · 스킨) */
+  let shown = '';
 
   const render = () => {
     const c = CHARACTERS[selected];
-    const art = CHARACTER_ART[selected];
-    const swap = shown !== selected;
-    shown = selected;
+    const art = myArt(selected);
+    const key = `${selected}:${chosenSkin(selected)}`;
+    const swap = shown !== '' && shown !== key;
+    shown = key;
     root.innerHTML = `
       <div class="chars" style="--c:${c.color}" data-view="${view}">
         <img class="chars-bg" src="${LOBBY_ART.room}" alt="" draggable="false">
@@ -52,7 +56,6 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
           <button class="ba-back" data-act="back" title="뒤로"><i></i></button>
           <h2>${view === 'list' ? '캐릭터' : '캐릭터 정보'}</h2>
           <span class="ba-count"><b>${CHARACTER_IDS.length}</b> / ${SLOTS}</span>
-          <div class="top-cur">${currencyBar(loadAccount())}</div>
         </header>
 
         <section class="chars-hero">
@@ -73,9 +76,9 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
       const c = CHARACTERS[id];
       const s = acc.students[id];
       return `
-        <button class="char-card ${id === selected ? 'selected' : ''} ${s.owned ? '' : 'unowned'}" data-pick="${id}" style="--c:${c.color}">
-          <span class="char-card-art"><img src="${CHARACTER_ART[id].portrait}" alt="" draggable="false">
-            ${s.owned ? `<i class="cc-bond">♥${bondRank(s.affection).rank}</i>` : '<i class="cc-lock">미보유</i>'}
+        <button class="char-card ${id === selected ? 'selected' : ''}" data-pick="${id}" style="--c:${c.color}">
+          <span class="char-card-art"><img src="${myArt(id).portrait}" alt="" draggable="false">
+            <i class="cc-bond">♥${bondRank(s.affection).rank}</i>
           </span>
           <span class="char-card-name">${c.name}</span>
         </button>`;
@@ -93,7 +96,7 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
 
   const detailPanel = (current: Tab) => {
     const c = CHARACTERS[selected];
-    const art = CHARACTER_ART[selected];
+    const art = myArt(selected);
     // 잠재 능력이 없는 캐릭터는 탭을 뺀다
     if (current === 'potential' && !c.potential) current = 'skill';
     const tabs = TABS.filter(([id]) => id !== 'potential' || c.potential)
@@ -106,7 +109,7 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
         <div class="ba-band">기본 능력치</div>
         <dl class="stat-table">
           <div><dt><img src="${UI_ART.heart}" alt="">체력</dt><dd>${c.hp}</dd></div>
-          <div><dt><img src="${UI_ART.coin}" alt="">코인</dt><dd>${c.startCoins}</dd></div>
+          <div><dt><img src="${UI_ART.coin}" alt="">코인</dt><dd>${RULES.startCoins + (c.startBonus ?? 0)}</dd></div>
           <div><dt><span class="ico">⚔</span>공격력</dt><dd>${c.atk}</dd></div>
           <div><dt><span class="ico">🛡</span>방어력</dt><dd>${c.def}</dd></div>
         </dl>
@@ -114,6 +117,8 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
         ${skillCard('액티브', art.skillActive, c.active.name, c.active.description, `⏱ ${c.active.cooldown}`)}
         ${skillCard('패시브', art.skillPassive, c.passive.name, c.passive.description)}
         ${c.passive2 ? skillCard('패시브', art.skillPassive2, c.passive2.name, c.passive2.description) : ''}`;
+    } else if (current === 'skin') {
+      body = skinTab(selected);
     } else if (current === 'bond') {
       body = bondTab(selected);
     } else if (current === 'growth') {
@@ -165,13 +170,10 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
     const pick = target.closest<HTMLElement>('[data-pick]');
     const t = target.closest<HTMLElement>('[data-tab]');
     const act = target.closest<HTMLElement>('[data-act]')?.dataset.act;
-    const gift = target.closest<HTMLButtonElement>('[data-gift]');
-    if (gift && !gift.disabled) {
+    const skin = target.closest<HTMLElement>('[data-skin]');
+    if (skin) {
       const acc = loadAccount();
-      const id = gift.dataset.gift as GiftId;
-      if ((acc.gifts[id] ?? 0) <= 0 || !acc.students[selected].owned) return;
-      acc.gifts[id]! -= 1;
-      acc.students[selected].affection += GIFTS[id].affection;
+      acc.students[selected].skin = skin.dataset.skin;
       saveAccount(acc);
     } else if (pick) {
       // 이미 고른 카드를 한 번 더 누르면 상세로
@@ -189,6 +191,24 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
   };
 
   render();
+}
+
+/** 스킨: 고르면 로비 · 시작 화면 · 게임 그림이 바뀐다 */
+function skinTab(id: CharacterId): string {
+  const now = chosenSkin(id);
+  const list = skinsOf(id);
+  const cards = list
+    .map(
+      (s) => `
+      <button class="skin-card ${s.id === now ? 'on' : ''}" data-skin="${s.id}">
+        <span class="skin-art"><img src="${s.art.main}" alt="" draggable="false"></span>
+        <span class="skin-foot"><img class="skin-token" src="${s.art.token}" alt="" draggable="false"><b>${esc(s.name)}</b>${s.id === now ? '<i>✔</i>' : ''}</span>
+      </button>`,
+    )
+    .join('');
+  return `
+    <div class="ba-band">스킨 · ${list.length}</div>
+    <div class="skin-grid">${cards}</div>`;
 }
 
 function skillCard(kind: string, icon: string | undefined, name: string, description: string, tag?: string): string {
@@ -217,20 +237,11 @@ function growthText(g: StatGrowth): string {
   return parts.join(' · ');
 }
 
-/** 인연 랭크 · 호감도 · 선물 (블루 아카이브 인연) */
+/** 인연 랭크 · 호감도 (블루 아카이브 인연) */
 function bondTab(id: CharacterId): string {
-  const acc = loadAccount();
-  const s = acc.students[id];
-  if (!s.owned) return '<div class="ba-band">인연</div><p class="bond-locked">미보유 · 모집</p>';
+  const s = loadAccount().students[id];
   const b = bondRank(s.affection);
   const w = b.need ? (b.into / b.need) * 100 : 100;
-  const gifts = GIFT_IDS.map((g) => {
-    const n = acc.gifts[g] ?? 0;
-    return `
-      <button class="gift-btn" data-gift="${g}" ${n > 0 && b.rank < MAX_BOND ? '' : 'disabled'}>
-        <span>${GIFTS[g].icon}</span><b>${GIFTS[g].name}</b><small>×${n} · 호감도 +${GIFTS[g].affection}</small>
-      </button>`;
-  }).join('');
   return `
     <div class="ba-band">인연</div>
     <div class="bond-head">
@@ -239,7 +250,5 @@ function bondTab(id: CharacterId): string {
         <div><b>인연 랭크 ${b.rank}</b><span>${b.need ? `${b.into} / ${b.need}` : 'MAX'}</span></div>
         <i><b style="width:${w}%"></b></i>
       </div>
-    </div>
-    <div class="ba-band">선물</div>
-    <div class="gift-row">${gifts}</div>`;
+    </div>`;
 }

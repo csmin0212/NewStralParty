@@ -277,6 +277,7 @@
 
 /* ───────── 게임 화면: 손패 · 더미 · 덱 정비 ───────── */
 .hud-hand.fan .hand-card {
+  display: block;
   width: 140px;
   height: 196px;
   padding: 0;

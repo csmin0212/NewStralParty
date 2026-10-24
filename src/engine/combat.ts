@@ -23,7 +23,7 @@ export function resolveAttack(
   mode: DefenseMode,
   rng: Rng,
   evadeDice = 1,
-  opts: { attackDice?: number; sumDice?: boolean; attackRoll?: number } = {},
+  opts: { attackDice?: number; sumDice?: boolean; attackRoll?: number; defenseRoll?: number } = {},
 ): AttackResult {
   const rolls = () => Array.from({ length: Math.max(1, opts.attackDice ?? 1) }, () => rng.d6());
   const attackRoll =
@@ -31,7 +31,7 @@ export function resolveAttack(
   const attackValue = attackRoll + attacker.atk;
 
   if (mode === 'block') {
-    const defenseRoll = rng.d6();
+    const defenseRoll = opts.defenseRoll ?? rng.d6();
     const defenseValue = defenseRoll + defender.def;
     return {
       mode,

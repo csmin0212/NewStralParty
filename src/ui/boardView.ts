@@ -3,12 +3,13 @@ import { ENEMIES } from '../data/enemies';
 import { bossEnemy, dangerTiles, markName } from '../engine/boss';
 import type { Board, BossTurn, Enemy, EnemyKind, GameState, Mark } from '../engine/types';
 import { esc } from './html';
-import { BOSS_ART, CHARACTER_ART, ENEMY_ART, MARK_ART, TILE_ART } from './assets';
+import { BOSS_ART, ENEMY_ART, MARK_ART, TILE_ART } from './assets';
 import { campusLayout, campusScenery } from './campusMap';
 import { MAP_THEMES } from '../data/maps';
 import { mapScenery } from './mapScenery';
 import { wait as sleep } from './settings';
 import { sfx } from './sound';
+import { skinArt } from './skins';
 
 const TILE = 70; // 칸 크기(px)
 const STEP_MS = 230;
@@ -62,7 +63,7 @@ export class BoardView {
       tok.className = 'token';
       tok.style.setProperty('--c', p.color);
       // 캐릭터 말 그림이 있으면 발판 위에 선 꼬마 캐릭터로, 없으면 번호 원
-      const art = CHARACTER_ART[p.character]?.token;
+      const art = skinArt(p.character, p.skin).token;
       if (art) {
         tok.classList.add('has-art');
         tok.innerHTML = `<img class="token-art" src="${art}" alt="" draggable="false"><b>${p.id + 1}</b><i class="steps"></i>`;

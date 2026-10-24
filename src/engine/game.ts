@@ -1,24 +1,21 @@
 // 순수 규칙 로직. UI · 네트워크 코드에 의존하지 않는다.
 // applyAction(state, action) → 새 state. 입력 state는 건드리지 않는다.
 
-import { CARDS, DECK_CARD_IDS, DEFAULT_PRESETS } from '../data/cards';
+import { CARDS, DECK_CARD_IDS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
 import {
-  canAddToDeck,
-  canEditDeck,
   cardBlocker,
   cardCoinCost,
   cardTargets,
-  deckBudget,
   distances,
   freshBattleMods,
   freshStatus,
   handLimit,
+  randomCard,
   shuffle,
   statusAtk,
   statusDef,
   targetable,
-  validateDeck,
 } from './cards';
 import {
   bossTurn,
@@ -71,6 +68,34 @@ import {
   roundRewardBonus,
 } from './relics';
 import { resolveAttack } from './combat';
+import {
+  isKit,
+  kitActive,
+  kitAtk,
+  kitBattleCard,
+  kitBattleEnd,
+  kitBeforeDamage,
+  kitCreate,
+  kitDamaged,
+  kitDef,
+  kitDiscard,
+  kitEnemyAtk,
+  kitEvaded,
+  kitEvent,
+  kitFlaw,
+  kitFought,
+  kitGive,
+  kitHealed,
+  kitHit,
+  kitKO,
+  kitMoveBonus,
+  kitMoved,
+  kitNoCounter,
+  kitPass,
+  kitRoundEnd,
+  kitShop,
+  kitTrapImmune,
+} from './kits';
 import { createRng, type Rng } from './rng';
 import { RULES } from './rules';
 import {
@@ -108,10 +133,9 @@ export interface PlayerSetup {
   character: CharacterId;
   /** 잠재 능력 해방 */
   potential?: boolean;
-  /** 가져가는 덱. 없으면 기본 덱 */
-  deck?: CardId[];
   /** CPU 자리 (화면이 대신 고른다. 규칙은 같다) */
   cpu?: boolean;
+  skin?: string;
 }
 
 export interface GameOptions {
@@ -131,10 +155,6 @@ export function createGame({ board, boss, players, seed, difficulty = 'normal' }
   if (problems.length > 0) {
     throw new RuleError(`잘못된 보드: ${problems.join(', ')}`);
   }
-  for (const p of players) {
-    const deckProblems = validateDeck(p.deck ?? DEFAULT_PRESETS[0].cards, CHARACTERS[p.character].deckPoints);
-    if (deckProblems.length > 0) throw new RuleError(`${p.name}의 덱: ${deckProblems.join(', ')}`);
-  }
 
   const state: GameState = {
     board,
@@ -149,10 +169,11 @@ export function createGame({ board, boss, players, seed, difficulty = 'normal' }
         name: p.name,
         color: p.color,
         character: p.character,
+        skin: p.skin,
         potential: p.potential ?? false,
         tile: home,
         home,
-        coins: c.startCoins,
+        coins: RULES.startCoins + (c.startBonus ?? 0),
         relics: [],
         relicOffer: null,
         relicQueue: [],
@@ -162,6 +183,8 @@ export function createGame({ board, boss, players, seed, difficulty = 'normal' }
         energy: 0,
         relicBuys: 0,
         mapRes: {},
+        charVars: {},
+        charTiles: {},
         task: null,
         tasksDone: [],
         cpu: p.cpu ?? false,
@@ -172,9 +195,6 @@ export function createGame({ board, boss, players, seed, difficulty = 'normal' }
         def: c.def,
         move: 0,
         status: freshStatus(),
-        deck: [...(p.deck ?? DEFAULT_PRESETS[0].cards)],
-        drawPile: [],
-        discard: [],
         hand: [],
         skillCooldown: 0,
         skillActiveUntil: null,
@@ -207,7 +227,7 @@ export function createGame({ board, boss, players, seed, difficulty = 'normal' }
 
   const rng = createRng(state.rngState);
   for (const p of state.players) {
-    p.drawPile = shuffle(p.deck, rng);
+    kitCreate(p);
     drawCards(state, p, rng, RULES.startHand);
     assignTask(state, rng, p);
   }
@@ -251,8 +271,8 @@ export function applyAction(state: GameState, action: Action): GameState {
     case 'BUY_RELIC':
       buyRelic(s, rng);
       break;
-    case 'EDIT_DECK':
-      editDeck(s, rng, action.add, action.remove);
+    case 'STOP_HERE':
+      stopHere(s, rng, action.stop);
       break;
     case 'ROLL':
       roll(s, rng);
@@ -267,7 +287,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       defend(s, rng, action.mode);
       break;
     case 'USE_SKILL':
-      useSkill(s, rng, action.target, action.cards);
+      useSkill(s, rng, action.target, action.cards, action.value);
       break;
     case 'END_TURN':
       endTurn(s, rng);
@@ -353,13 +373,14 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
 
   p.hand.splice(handIndex, 1);
   s.stats[p.id].cardsUsed += 1;
-  // 덱 카드는 (받은 카드면 준 사람의) 버린 더미로 가서 다시 돈다. 상점 · 생성 카드는 쓰면 사라진다
+  // 쓴 카드는 사라진다 (원작: 덱이 없다)
   const giver = hand.from !== undefined ? s.players[hand.from] : undefined;
-  if (!hand.shop) (giver ?? p).discard.push(hand.card);
   const cost = cardCoinCost(hand.card, p);
   p.coins -= cost;
-  if (info.type === 'battle') s.turn.battle.costUsed += info.battleCost!;
-  else s.turn.cardsPlayed += 1;
+  if (info.type === 'battle') {
+    s.turn.battle.costUsed += info.battleCost!;
+    kitBattleCard(s, p, hand.card);
+  } else s.turn.cardsPlayed += 1;
 
   s.seq += 1;
   s.lastCard = { seq: s.seq, player: s.current, card: hand.card };
@@ -459,6 +480,23 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
     case 'share':
       drawCards(s, p, rng, 1);
       drawCards(s, ally!, rng, 1);
+      kitGive(s, p, ally!, 1);
+      break;
+    case 'talismanFu':
+      heal(ally!, 2);
+      // 희몽조 → 희몽풍: 기력
+      if (p.character === 'zhao' && ally!.character === 'fen') ally!.stacks = 1;
+      break;
+    case 'talismanHuo':
+      damage(s, rng, p, 1);
+      break;
+    case 'livingPage':
+      strike(enemy!, 2 + (p.charVars.page ?? 0) + bonus);
+      break;
+    case 'bite':
+      b.atk += 2;
+      b.noCounter = true;
+      battleEvent({ value: 2 });
       break;
     case 'backup': {
       const from = p.tile;
@@ -579,7 +617,7 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       if (s.phase.kind !== 'defend') break;
       const { stepsLeft } = s.phase;
       const foe = findEnemy(s, s.phase.enemy);
-      const dmg = hurtEnemy(s, rng, foe, Math.max(1, foe.atk - (p.def + statusDef(p) + relicDefense(p) + b.def)));
+      const dmg = hurtEnemy(s, rng, foe, Math.max(1, foe.atk - (p.def + statusDef(p) + relicDefense(p) + kitDef(s, p) + b.def)));
       battleEvent({ damage: dmg, targetHp: foe.hp });
       log(s, `  실드 카운터 — ${foe.name}에게 ${dmg} 피해`);
       if (isOver(s)) {
@@ -619,35 +657,22 @@ export function strikeEnemy(s: GameState, rng: Rng, p: Player, enemy: Enemy, amo
   onEnemyGone(s, rng, enemy);
 }
 
-/** 거점에서 덱 정비: 카드 1장 넣기 / 빼기. 넣은 카드는 뽑을 더미 아무 데나 섞여 들어간다 */
-function editDeck(s: GameState, rng: Rng, add?: CardId, remove?: CardId) {
+/** 상점 열기: 카드 3장 + (있으면) 내 캐릭터 전용 카드. 칩 상점은 유물만 */
+function openShop(s: GameState, rng: Rng, stepsLeft: number, chips = false) {
   const p = currentPlayer(s);
-  if (!canEditDeck(s, p)) throw new RuleError('덱 정비는 내 거점에서만 할 수 있습니다');
-  if (add) {
-    if (!canAddToDeck(p.deck, add, deckBudget(p))) throw new RuleError('더 넣을 수 없는 카드입니다');
-    p.deck.push(add);
-    p.drawPile.splice(rng.int(0, p.drawPile.length), 0, add);
-    log(s, `${p.name}: 덱에 「${CARDS[add].name}」 추가`);
+  if (chips) {
+    s.phase = { kind: 'shop', stepsLeft, offers: [], free: false, chips: true };
+    log(s, `${p.name}: 🔷 칩 상점`);
+    return;
   }
-  if (remove) {
-    if (p.deck.length <= RULES.deckMin) throw new RuleError(`덱은 ${RULES.deckMin}장 이상이어야 합니다`);
-    const pile = p.drawPile.includes(remove) ? p.drawPile : p.discard.includes(remove) ? p.discard : null;
-    if (!pile) throw new RuleError('손에 든 카드는 뺄 수 없습니다');
-    pile.splice(pile.indexOf(remove), 1);
-    p.deck.splice(p.deck.indexOf(remove), 1);
-    log(s, `${p.name}: 덱에서 「${CARDS[remove].name}」 제거`);
-  }
-}
-
-/** 상점 열기: 카드 3장 + (있으면) 내 캐릭터 전용 카드 */
-function openShop(s: GameState, rng: Rng, stepsLeft: number) {
-  const p = currentPlayer(s);
   // 지금 성으로 곧 쓸 수 있는 카드만 (한 단계 위까지)
   const usable = DECK_CARD_IDS.filter((id) => CARDS[id].level <= p.level + 1);
   const pool = shuffle(usable, rng).slice(0, RULES.shopOffers);
   const offers: ShopOffer[] = pool.map((card) => ({ card, price: Math.max(0, RULES.shopPrice - relicShopDiscount(p)), sold: false }));
   const hyper = CHARACTERS[p.character].hyper;
   if (hyper) offers.push({ card: hyper.card, price: hyper.price, sold: false });
+  const extra = kitShop(s, rng, p);
+  if (extra) offers.push({ card: extra, price: Math.max(0, RULES.shopPrice - relicShopDiscount(p)), sold: false });
   s.phase = { kind: 'shop', stepsLeft, offers, free: stepsLeft === 0 };
   log(s, `${p.name}: 🛒 상점${stepsLeft === 0 ? ' (멈춤: 첫 구매 무료)' : ''}`);
 }
@@ -660,7 +685,6 @@ function buyCard(s: GameState, offerIndex: number) {
   if (!offer || offer.sold) throw new RuleError('살 수 없는 카드입니다');
   const price = s.phase.free ? 0 : offer.price;
   if (p.coins < price) throw new RuleError(`코인 ${price} 필요`);
-  if (p.hand.length >= handLimit(p)) throw new RuleError('손패가 가득 찼습니다');
   p.coins -= price;
   offer.sold = true;
   s.phase.free = false;
@@ -675,7 +699,7 @@ export function relicPrice(p: Player): number {
 }
 
 function buyRelic(s: GameState, rng: Rng) {
-  if (s.phase.kind !== 'shop') throw new RuleError('상점이 아닙니다');
+  if (s.phase.kind !== 'shop' || !s.phase.chips) throw new RuleError('칩 상점이 아닙니다');
   const p = currentPlayer(s);
   if (p.relicOffer) throw new RuleError('먼저 유물을 고르세요');
   const price = relicPrice(p);
@@ -697,13 +721,15 @@ function pickRelic(s: GameState, rng: Rng, id: RelicId) {
 
 /** 상점에서 아군에게 코인 5 송금 */
 function sendCoins(s: GameState, rng: Rng, to: number) {
-  if (s.phase.kind !== 'shop') throw new RuleError('송금은 상점에서만 할 수 있습니다');
+  if (s.phase.kind !== 'shop' || s.phase.chips) throw new RuleError('송금은 상점에서만 할 수 있습니다');
+  if (s.phase.sent) throw new RuleError('송금은 상점마다 한 번');
   const p = currentPlayer(s);
   const ally = s.players[to];
   if (!ally || ally.id === p.id) throw new RuleError('보낼 아군을 골라야 합니다');
   if (p.coins < RULES.transferCoins) throw new RuleError(`코인 ${RULES.transferCoins} 필요`);
   p.coins -= RULES.transferCoins;
   ally.coins += RULES.transferCoins;
+  s.phase.sent = true;
   onTransfer(s, rng, p, ally);
   log(s, `${p.name}: 💌 ${ally.name}에게 코인 ${RULES.transferCoins} 송금`);
 }
@@ -711,6 +737,12 @@ function sendCoins(s: GameState, rng: Rng, to: number) {
 function leaveShop(s: GameState, rng: Rng) {
   if (s.phase.kind !== 'shop') throw new RuleError('상점이 아닙니다');
   const { stepsLeft } = s.phase;
+  // 원격 상점 (파루난): 주사위 전으로
+  if (s.turn.remoteShop) {
+    s.turn.remoteShop = false;
+    s.phase = { kind: 'preRoll' };
+    return;
+  }
   if (stepsLeft > 0) {
     s.phase = { kind: 'preRoll' }; // move()가 다시 정한다
     move(s, rng, stepsLeft, [currentPlayer(s).tile]);
@@ -723,17 +755,20 @@ function roll(s: GameState, rng: Rng) {
   if (s.phase.kind !== 'preRoll') throw new RuleError('지금은 주사위를 굴릴 수 없습니다');
   const p = currentPlayer(s);
   if (p.relicOffer) throw new RuleError('유물을 먼저 고르세요');
+  s.turn.landed = false;
   if (p.status.nextMoveDice > 0) {
     s.turn.diceCount = Math.max(s.turn.diceCount, p.status.nextMoveDice);
     p.status.nextMoveDice = 0;
   }
   const dice =
-    s.turn.fixedMove !== null ? [s.turn.fixedMove] : Array.from({ length: s.turn.diceCount }, () => rng.d6());
-  s.turn.extraSteps += p.move - p.status.slow + relicMoveBonus(p) + useOverclock(s, p);
+    s.turn.fixedMove !== null ? [s.turn.fixedMove] : Array.from({ length: s.turn.diceCount }, () => (s.turn.sixDice ? rng.d6() : rng.d10()));
+  s.turn.extraSteps += p.move - p.status.slow + relicMoveBonus(p) + useOverclock(s, p) + kitMoveBonus(s, p);
   p.status.slow = 0;
-  const steps = Math.max(1, dice.reduce((a, b) => a + b, 0) + s.turn.extraSteps);
+  // 원작: 합이 0 이하면 제자리, 한 번 이동은 최대 10
+  const steps = Math.min(RULES.moveCap, Math.max(0, dice.reduce((a, b) => a + b, 0) + s.turn.extraSteps));
   s.turn.dice = dice;
   onMove(s, p, steps);
+  kitMoved(s, p, steps);
 
   const bonus = s.turn.extraSteps > 0 ? ` + ${s.turn.extraSteps}` : '';
   log(s, `${p.name}: 🎲 ${dice.join(' + ')}${bonus} → ${steps}칸 이동`);
@@ -776,13 +811,15 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   }
 
   const mods = s.turn.battle;
+  s.turn.challenged = true;
   const surge = onAttackStart(s, p, enemy);
-  const atk = Math.floor((p.atk + statusAtk(p) + mods.atk + relicAttack(p, enemy) + surge) * mods.atkMult);
+  const atk = Math.ceil((p.atk + statusAtk(p) + mods.atk + relicAttack(p, enemy) + kitAtk(s, p, enemy) + surge) * mods.atkMult);
   const foe = { atk: enemy.atk, def: enemyDefAgainst(s, p, enemy) };
   const hit = resolveAttack({ atk, def: p.def }, foe, enemy.defense, rng, 1, {
     attackDice: mods.attackDice,
     sumDice: mods.sumDice,
     attackRoll: relicAttackRoll(rng, p),
+    defenseRoll: kitFlaw(enemy, p) ? 0 : undefined,
   });
   const decoy = !enemy.isBoss && ENEMIES[enemy.kind as EnemyKind].decoy;
   hit.damage = hurtEnemy(s, rng, enemy, hit.damage);
@@ -794,6 +831,12 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   }
   if (decoy) battle.events.push({ type: 'skill', name: '분신이었다!' });
   if (hit.damage > 0) onHitMonster(p);
+  kitFought(s, p, enemy);
+  kitHit(s, rng, p, enemy, hit.damage);
+  if (isOver(s)) {
+    battle.done = true;
+    return;
+  }
   afterChallenge(s, rng, p, enemy, atk);
   if (isOver(s)) {
     battle.done = true;
@@ -807,9 +850,9 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   }
 
   // 그림자 습격의 반격 없음은 보스에게는 통하지 않는다
-  if (enemy.counter && !(mods.noCounter && !enemy.isBoss) && !relicNoCounter(p)) {
+  if (enemy.counter && !(mods.noCounter && !enemy.isBoss) && !relicNoCounter(p) && !kitNoCounter(s)) {
     // 원작처럼 반격하는 쪽이 먼저 굴린다. 플레이어는 이 값을 보고 방어 · 회피와 카드를 고른다
-    const attackRoll = rng.d6();
+    const attackRoll = kitFlaw(enemy, p) ? 0 : rng.d6();
     s.phase = { kind: 'defend', enemy: enemy.id, stepsLeft, attackRoll };
     battle.events.push({ type: 'enemyRoll', roll: attackRoll, value: attackRoll + enemy.atk });
     log(s, `  ${enemy.name}의 반격이 온다!`);
@@ -827,9 +870,10 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   const p = currentPlayer(s);
 
   const mods = s.turn.battle;
-  const me = { atk: p.atk, def: p.def + statusDef(p) + relicDefense(p) + mods.def };
+  const me = { atk: p.atk, def: p.def + statusDef(p) + relicDefense(p) + kitDef(s, p) + mods.def };
   const dice = evadeDice(p) + mods.evadeDice;
-  const hit = resolveAttack(enemy, me, mode, rng, mode === 'evade' ? dice : 1, { attackRoll });
+  const foe = { atk: Math.max(0, enemy.atk + kitEnemyAtk(enemy, p)), def: enemy.def };
+  const hit = resolveAttack(foe, me, mode, rng, mode === 'evade' ? dice : 1, { attackRoll });
   battle.events.push({
     type: 'attack',
     attacker: 'enemy',
@@ -851,6 +895,7 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
 
   if (mode === 'evade' && hit.damage === 0) {
     onEvaded(p);
+    kitEvaded(p);
     if (evadeSucceeded(s, rng, p, enemy, battle)) return;
   }
   finishBattle(s, rng, stepsLeft);
@@ -909,24 +954,49 @@ function defeatEnemy(s: GameState, rng: Rng, p: Player, enemy: Enemy, battle: Ba
 }
 
 /** 액티브 스킬: 주사위를 굴리기 전에, 재사용 대기가 끝났을 때만 */
-function useSkill(s: GameState, rng: Rng, target?: number, cards?: number[]) {
+function useSkill(s: GameState, rng: Rng, target?: number, cards?: number[], value?: number) {
   if (s.phase.kind !== 'preRoll') throw new RuleError('스킬은 주사위를 굴리기 전에만 쓸 수 있습니다');
   const p = currentPlayer(s);
   if (s.turn.skillUsed) throw new RuleError('스킬은 턴마다 한 번만 쓸 수 있습니다');
   if (p.skillCooldown > 0) throw new RuleError(`재사용까지 ${p.skillCooldown}라운드 남았습니다`);
+  const def = CHARACTERS[p.character].active;
   const targets = skillTargets(s, p);
   if (targets && (target === undefined || !targets.includes(target))) throw new RuleError('사거리 안의 대상을 골라야 합니다');
-  if (p.character === 'mona') {
+  if (def.cards) {
     const picked = [...new Set(cards ?? [])];
-    if (picked.length < 1 || picked.length > 2 || picked.some((i) => !p.hand[i])) throw new RuleError('줄 카드를 1~2장 골라야 합니다');
-    if (s.players[target!].hand.length + picked.length > handLimit(s.players[target!])) throw new RuleError('아군 손패에 자리가 없습니다');
+    const [min, max] = def.cards;
+    if (picked.length < min || picked.length > max || picked.some((i) => !p.hand[i])) throw new RuleError(`줄 카드를 ${min === max ? min : `${min}~${max}`}장 골라야 합니다`);
+  }
+  if (def.value && !(Number.isInteger(value) && value! >= def.value[0] && value! <= def.value[1])) {
+    throw new RuleError(`${def.value[0]}~${def.value[1]} 중에서 골라야 합니다`);
   }
 
   activateSkill(s, p);
   s.turn.skillUsed = true;
   onSkillUsed(s, rng, p);
-  const name = CHARACTERS[p.character].active.name;
-  log(s, `${p.name}: ✨ 액티브 스킬 「${name}」!`);
+  log(s, `${p.name}: ✨ 액티브 스킬 「${def.name}」!`);
+
+  if (isKit(p.character)) {
+    const follow = kitActive(s, rng, p, { target, cards, value });
+    if (!follow || isOver(s)) return;
+    if (follow.kind === 'shop') {
+      s.turn.remoteShop = true;
+      openShop(s, rng, 0);
+      const shop = s.phase as GameState['phase'];
+      if (shop.kind === 'shop') shop.free = false;
+    } else if (follow.kind === 'teleport') {
+      const from = p.tile;
+      p.tile = follow.tile;
+      recordMove(s, [from, p.tile]);
+    } else if (follow.kind === 'challenge') {
+      const enemy = findEnemy(s, follow.enemy);
+      s.turn.remote = true;
+      s.turn.remoteFar = follow.far;
+      startEncounter(s, enemy, 0);
+      currentBattle(s).events.push({ type: 'skill', name: def.name });
+    }
+    return;
+  }
 
   if (p.character === 'soda') {
     // 조나단 러시: 상대 칸으로 워프해 전투. 이 전투 동안 상대 방어력 -2, 전투가 끝나면 그 칸에서 차례를 마친다
@@ -936,7 +1006,7 @@ function useSkill(s: GameState, rng: Rng, target?: number, cards?: number[]) {
     recordMove(s, [from, p.tile]);
     startEncounter(s, enemy, 0);
     s.turn.battle.enemyDefDown += 2;
-    currentBattle(s).events.push({ type: 'skill', name });
+    currentBattle(s).events.push({ type: 'skill', name: def.name });
   }
 
   if (p.character === 'mona') {
@@ -954,8 +1024,15 @@ function useSkill(s: GameState, rng: Rng, target?: number, cards?: number[]) {
 
 function endTurn(s: GameState, rng: Rng) {
   if (s.phase.kind !== 'endTurn') throw new RuleError('아직 턴을 끝낼 수 없습니다');
-  onTurnEnd(s, rng, currentPlayer(s));
+  const p = currentPlayer(s);
+  onTurnEnd(s, rng, p);
   if (isOver(s)) return;
+  // 손패 한도를 넘으면 늦게 얻은 카드부터 버린다
+  if (p.hand.length > handLimit(p)) {
+    const dropped = p.hand.splice(handLimit(p));
+    kitDiscard(s, p, dropped);
+    log(s, `${p.name}: 🃏 손패 한도 — ${dropped.map((h) => CARDS[h.card].name).join(', ')} 버림`);
+  }
   nextPlayer(s, rng);
   beginTurn(s, rng);
 }
@@ -983,6 +1060,8 @@ function nextPlayer(s: GameState, rng: Rng) {
   if (s.current !== 0) return;
   // 모두 움직인 뒤 보스와 미니언 차례 (OJ: 보스는 5번째 유닛)
   bossTurn(s, rng);
+  if (isOver(s)) return;
+  kitRoundEnd(s, rng);
   if (isOver(s)) return;
   s.round += 1;
   log(s, `── ${s.round}라운드 ──`);
@@ -1032,7 +1111,6 @@ function beginTurn(s: GameState, rng: Rng) {
       p.hp = p.maxHp;
       log(s, `${p.name}: ✨ 부활! (HP ${p.hp})`);
     }
-    p.coins += RULES.turnIncome;
     tickStatus(s, p);
     onTurnStart(s, rng, p);
     return;
@@ -1127,9 +1205,50 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
     left += passBonus(s, p);
   }
 
-  land(s, rng, path);
-  s.phase = { kind: 'endTurn' };
+  arrive(s, rng, path);
+}
+
+/** 이동이 끝난 칸: 칸 효과 → (전투 · 질주가 없으면) 차례 끝 */
+function arrive(s: GameState, rng: Rng, path: number[]) {
+  const p = currentPlayer(s);
+  s.turn.noBattle = false;
+  // 링링 돌진: 멈춘 칸에서 붙잡은 몬스터와 싸울지
+  if (s.turn.charge) {
+    s.turn.charge = false;
+    const grabbed = s.enemies.find((e) => e.tile === p.tile && targetable(s, e));
+    if (grabbed) {
+      startEncounter(s, grabbed, 0);
+      recordMove(s, path);
+      return;
+    }
+  }
+  // 멈춘 칸에서 전투가 있었으면 전투 뒤에 돌아와도 칸 효과는 한 번만
+  if (!s.turn.landed) {
+    s.turn.landed = true;
+    land(s, rng, path);
+    if (s.turn.extraEvent && !isOver(s)) {
+      s.turn.extraEvent = false;
+      runEvent(s, rng, p, path);
+    }
+  }
+  if (s.turn.haste) {
+    s.turn.haste = false;
+    s.turn.landed = false;
+    s.phase = { kind: 'preRoll' };
+  } else if (s.phase.kind === 'preRoll') {
+    s.phase = { kind: 'endTurn' };
+  }
   recordMove(s, path);
+}
+
+/** 지나가던 거점 · 확인 지점에서 멈출지 */
+function stopHere(s: GameState, rng: Rng, stop: boolean) {
+  if (s.phase.kind !== 'stopChoice') throw new RuleError('지금은 고를 수 없습니다');
+  const { stepsLeft } = s.phase;
+  const p = currentPlayer(s);
+  s.phase = { kind: 'preRoll' };
+  if (stop) arrive(s, rng, [p.tile]);
+  else move(s, rng, stepsLeft, [p.tile]);
 }
 
 /** 가속 칸: 지나가거나 멈추면 1칸 더 (멈출 수 없다) */
@@ -1144,21 +1263,66 @@ function enter(s: GameState, rng: Rng, tileId: number, path: number[], stepsLeft
   const p = currentPlayer(s);
   p.tile = tileId;
   path.push(tileId);
-  if (tileId === p.home) tryLevelUp(s, rng, p);
+  kitPass(s, rng, p, tileId);
+  if (isOver(s)) return true;
 
-  const enemy = s.enemies.find((e) => e.tile === tileId && targetable(s, e));
+  const enemy = s.turn.noBattle ? undefined : s.enemies.find((e) => e.tile === tileId && targetable(s, e));
   if (enemy) {
     startEncounter(s, enemy, stepsLeft);
     return true;
   }
-  if (s.board.tiles[tileId].kind === 'shop') {
-    openShop(s, rng, stepsLeft);
+  const kind = s.board.tiles[tileId].kind;
+  if (kind === 'shop' || kind === 'chipShop') {
+    openShop(s, rng, stepsLeft, kind === 'chipShop');
+    return true;
+  }
+  // 내 거점 · 확인 지점: 성을 올리거나 회복할 수 있으면 멈출지 묻는다
+  if (stepsLeft > 0 && (tileId === p.home || kind === 'checkpoint') && canRest(p)) {
+    s.phase = { kind: 'stopChoice', stepsLeft };
     return true;
   }
   return false;
 }
 
-/** 내 거점을 지나가거나 도착하면 코인을 내고 레벨업 */
+/** 거점에 멈추면 할 일이 있는지 (성 오름 · 회복) */
+export function canRest(p: Player): boolean {
+  const cost = RULES.levelUpCost[p.level];
+  return (cost !== undefined && p.coins >= cost) || p.hp < p.maxHp;
+}
+
+/** 멈춘 칸에 맵 몬스터 1마리 → 바로 전투 */
+function monsterTile(s: GameState, rng: Rng, p: Player) {
+  const kind = rng.pick(s.board.monsters ?? DEFAULT_MONSTERS);
+  const e = spawnEnemy(s, kind, p.tile);
+  log(s, `${p.name}: 👾 몬스터 칸 — ${e.name}`);
+  startEncounter(s, e, 0);
+}
+
+const DEFAULT_MONSTERS: EnemyKind[] = ['robot', 'drone', 'delinquent'];
+
+/** 정한 칸에 에너미 1마리 */
+export function spawnEnemy(s: GameState, kind: EnemyKind, tile: number): Enemy {
+  const info = ENEMIES[kind];
+  const e: Enemy = {
+    id: s.nextEnemyId++,
+    kind,
+    name: info.name,
+    icon: info.icon,
+    isBoss: false,
+    tile,
+    hp: info.hp,
+    maxHp: info.hp,
+    atk: info.atk + s.enemyBonus.atk,
+    def: info.def + s.enemyBonus.def,
+    counter: info.counter,
+    defense: info.defense,
+    reward: info.reward,
+  };
+  s.enemies.push(e);
+  return e;
+}
+
+/** 거점 · 확인 지점에 멈추면 코인을 내고 1성 오름 */
 function tryLevelUp(s: GameState, rng: Rng, p: Player) {
   const cost = RULES.levelUpCost[p.level];
   if (cost === undefined) return;
@@ -1230,10 +1394,24 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
 
   switch (tile.kind) {
     case 'empty':
-    case 'base':
-    case 'spawn':
     case 'shop':
+    case 'chipShop':
     case 'boost':
+      break;
+    case 'base':
+    case 'checkpoint': {
+      const healed = heal(p, RULES.heal);
+      if (healed) log(s, `${p.name}: ❤️ HP +${healed}`);
+      tryLevelUp(s, rng, p);
+      break;
+    }
+    case 'monster':
+      monsterTile(s, rng, p);
+      break;
+    case 'haste':
+      s.turn.haste = true;
+      log(s, `${p.name}: 💨 질주 — 한 번 더`);
+      notice(s, `💨 질주`);
       break;
     case 'sand':
       p.status.slow += 2;
@@ -1263,6 +1441,7 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
       break;
     }
     case 'trap':
+      if (kitTrapImmune(s, p)) break;
       log(s, `${p.name}: ⚠️ 함정 — 2 피해`);
       damage(s, rng, p, 2);
       break;
@@ -1291,18 +1470,19 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
       log(s, `${p.name}: 📝 반성실 — 문제아 (공격력 +2 · 방어력 -2)`);
       notice(s, `📝 ${p.name} 문제아`);
       break;
-    case 'coinPlus':
-      p.coins += RULES.coinPlus;
-      log(s, `${p.name}: 🪙 코인 +${RULES.coinPlus}`);
-      break;
-    case 'coinMinus': {
-      const lost = Math.min(p.coins, RULES.coinMinus);
-      p.coins -= lost;
-      log(s, `${p.name}: 💸 코인 -${lost}`);
+    case 'windfall': {
+      const n = rng.pick(RULES.windfall);
+      p.coins += n;
+      log(s, `${p.name}: 🪙 횡재 — 코인 +${n}`);
       break;
     }
+    case 'calamity':
+      if (kitTrapImmune(s, p)) break;
+      log(s, `${p.name}: ⚡ 재앙 — ${RULES.calamity} 피해`);
+      damage(s, rng, p, RULES.calamity);
+      break;
     case 'card':
-      drawCards(s, p, rng, 1);
+      drawCards(s, p, rng, RULES.cardTile);
       break;
     case 'event':
       runEvent(s, rng, p, path);
@@ -1329,6 +1509,7 @@ function runEvent(s: GameState, rng: Rng, p: Player, path: number[]) {
   const ev = EVENTS[id];
   log(s, `${p.name}: ${ev.icon} 이벤트 「${ev.name}」 ${ev.text}`);
   notice(s, `${ev.icon} ${ev.name} — ${ev.text}`);
+  kitEvent(s, p);
   switch (id) {
     case 'vending':
       p.coins += 6;
@@ -1395,23 +1576,11 @@ function distanceTiles(s: GameState, from: number, range: number): number[] {
   return [...dist].filter(([, d]) => d <= range).map(([t]) => t);
 }
 
-/** 내 덱에서 n장 뽑는다. 뽑을 더미가 비면 버린 더미를 섞어 다시 쓴다. 손패가 가득 차면 바로 버린 더미로 */
-export function drawCards(s: GameState, p: Player, rng: Rng, n: number) {
+/** 공용 카드에서 n장. 손패 한도는 차례가 끝날 때 본다 */
+export function drawCards(_s: GameState, p: Player, rng: Rng, n: number) {
   for (let i = 0; i < n; i++) {
-    if (p.drawPile.length === 0) {
-      if (p.discard.length === 0) return;
-      p.drawPile = shuffle(p.discard, rng);
-      p.discard = [];
-      log(s, `${p.name}: 🔀 버린 카드를 섞어 덱으로`);
-    }
-    const card = p.drawPile.pop()!;
-    if (p.hand.length >= handLimit(p)) {
-      p.discard.push(card);
-      log(s, `${p.name}: 🃏 손패가 가득 차서 「${CARDS[card].name}」 버림`);
-    } else {
-      p.hand.push({ card });
-      onCardsGained(p, 1);
-    }
+    p.hand.push({ card: randomCard(rng) });
+    onCardsGained(p, 1);
   }
 }
 
@@ -1499,6 +1668,14 @@ function startEncounter(s: GameState, enemy: Enemy, stepsLeft: number) {
 /** 전투를 마치고 남은 칸만큼 이어서 이동 */
 function finishBattle(s: GameState, rng: Rng, stepsLeft: number) {
   currentBattle(s).done = true;
+  kitBattleEnd(s, currentPlayer(s));
+  // 원격 도전 (낸시): 제자리에서 주사위 전으로
+  if (s.turn.remote) {
+    s.turn.remote = false;
+    s.turn.remoteFar = false;
+    s.phase = { kind: 'preRoll' };
+    return;
+  }
   s.phase = { kind: 'preRoll' }; // move()가 다시 정한다
   move(s, rng, stepsLeft, [currentPlayer(s).tile]);
 }
@@ -1524,10 +1701,12 @@ function defenseName(mode: DefenseMode): string {
 
 /** 피해. HP 0이면 그 자리에 KO — 다음 라운드를 쉬고, 진행도 +1 (기믹 즉시 발동) */
 export function damage(s: GameState, rng: Rng, p: Player, amount: number) {
-  amount = onDamage(s, p, amount);
+  amount = onDamage(s, p, kitBeforeDamage(s, p, amount));
   s.stats[p.id].damageTaken += Math.min(p.hp, amount);
   p.hp = Math.max(0, p.hp - amount);
+  kitDamaged(s, p, amount);
   if (p.hp > 0) return;
+  kitKO(p);
   s.stats[p.id].kos += 1;
 
   p.ko = true;
@@ -1543,7 +1722,9 @@ export function heal(p: Player, amount: number): number {
   if (amount > 0) p.status.erode = false;
   const before = p.hp;
   p.hp = Math.min(p.maxHp, p.hp + amount);
-  return p.hp - before;
+  const healed = p.hp - before;
+  kitHealed(p, healed, Math.max(0, amount - healed));
+  return healed;
 }
 
 function recordMove(s: GameState, path: number[]) {

@@ -85,7 +85,7 @@
 
 ## 3. 밸런스 (자동 플레이)
 
-CPU 4명 ([src/ui/cpu.ts](../src/ui/cpu.ts)) · 전용 맵 · NORMAL · 진행도 한계 28 · 유물 · 임무 · 상점 포함
+CPU 4명 ([src/ui/cpu.ts](../src/ui/cpu.ts)) · 전용 맵 · NORMAL · 진행도 한계 24 · 원작 규칙 → [COOP_DESIGN.md 11번](COOP_DESIGN.md#11-바꾼-것)
 
 | 보스 | 맵 | 4인 체력 |
 |---|---|---|

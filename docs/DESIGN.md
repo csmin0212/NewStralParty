@@ -281,7 +281,7 @@ PvP 경쟁 대신 **협동 보스 레이드**로 간다. 친구들이 한 팀이
 
 ---
 
-## 11. 카드 · 덱 — ✅ (100% 오렌지 쥬스식 개인 덱 + 아스트랄 파티식 전투 코스트 · 상점)
+## 11. 카드 — 덱 없음 (원작 공용 카드) → [COOP_DESIGN.md](COOP_DESIGN.md)
 
 원작 카드 조사: [CARD_REFERENCE.md](CARD_REFERENCE.md) · 밸런스 검토: [CARD_BALANCE.md](CARD_BALANCE.md). 카드마다 참고한 원작 카드를 적어 둔다.
 

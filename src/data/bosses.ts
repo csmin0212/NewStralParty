@@ -16,7 +16,7 @@ export const PLACEHOLDER_BOSS: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['robot', 'robot', 'drone', 'delinquent'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
@@ -51,7 +51,7 @@ const BINAH: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['drone', 'drone', 'robot'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
@@ -117,7 +117,7 @@ const CHESED: BossDef = {
   def: 2,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['robot', 'robot', 'drone'] }] },
     { at: 2, actions: [{ type: 'bossAppear' }] },
@@ -171,7 +171,7 @@ const SHIROKURO: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['slumpia', 'slumpia', 'drone'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
@@ -243,7 +243,7 @@ const HIERONYMUS: BossDef = {
   def: 3,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['robot', 'drone', 'delinquent'] }] },
     { at: 2, actions: [{ type: 'move', move: 'relics' }] },
@@ -299,7 +299,7 @@ const KAITEN: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['kaitenger', 'kaitenger', 'kaitenger', 'kaitenger', 'kaitenger'] }] },
     { at: 6, actions: [{ type: 'bossAppear' }] },
@@ -355,7 +355,7 @@ const PERORODZILLA: BossDef = {
   def: 2,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['drone', 'robot', 'thief'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
@@ -411,7 +411,7 @@ const HOD: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['robot', 'drone'] }] },
     { at: 2, actions: [{ type: 'bossAppear' }] },
@@ -468,7 +468,7 @@ const GOZ: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['slumpia', 'slumpia', 'thief'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
@@ -523,7 +523,7 @@ const WAKAMO: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['drone', 'drone', 'robot'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
@@ -593,7 +593,7 @@ const KUROKAGE: BossDef = {
   def: 1,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['drone', 'robot', 'thief'] }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },
@@ -649,7 +649,7 @@ const GREGORIUS: BossDef = {
   def: 2,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['robot', 'delinquent', 'drone'] }] },
     { at: 2, actions: [{ type: 'move', move: 'organ' }] },
@@ -701,7 +701,7 @@ const GEBURAH: BossDef = {
   def: 2,
   counter: true,
   defense: 'block',
-  defeatAt: 28,
+  defeatAt: 24,
   timeline: [
     { at: 1, actions: [{ type: 'summon', enemies: ['robot', 'robot', 'drone'] }, { type: 'move', move: 'heater' }] },
     { at: 3, actions: [{ type: 'bossAppear' }] },

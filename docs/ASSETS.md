@@ -295,6 +295,24 @@ id: `binah` 비나 · `chesed` 케세드 · `shirokuro` 시로 · `hieronymus` �
 
 **효과음** — ✅ Kenney CC0 14종 `sfx/<id>.ogg` → [SYSTEMS.md](SYSTEMS.md#효과음)
 
+### 8차 요청 — 원작 캐릭터 35명 · 새 칸 3
+
+지금은 대표 색 원 + 이름 첫 글자. 그림이 오면 [src/ui/assets.ts](../src/ui/assets.ts)의 `DRAWN_ART`에 넣는다.
+
+**캐릭터** — `characters/<id>/` (뭇별 · Soda · 모나와 같은 규격: main · token · portrait · battle-idle · attack · hit · block · evade · down)
+
+`parunan` 파루난 (帕露南) · `fanny` 페니 (芬妮) · `alana` 알라나 (阿兰娜) · `komachi` 코마치 (小町) · `padman` 패드맨 (派德曼) · `papara` 파파라 (帕帕拉) · `ren` 렌 (恋) · `mimi` 미미 (米米) · `z3000` Z3000 · `pandaman` 판다맨 (潘大猛) · `inkshadow` 묵영 (墨影) · `lulu` 루루 (璐璐) · `fen` 희몽풍 (姬梦枫) · `haiqing` 남해청 (蓝海晴) · `misaki` 미사키 (美咲) · `nardis` 나디스 (娜蒂斯) · `jasmine` 자스민 (茉莉) · `al` 알 (阿尔) · `luka` 루카 (星魅琉华) · `nancy` 낸시 (南希露) · `rin` 린 (凛) · `megas` 메가스 (梅加斯) · `zhao` 희몽조 (姬梦朝) · `teru` 테루 (照) · `moses` 모세 (摩西) · `mamushi` 마무시 (真梦梓) · `bonnie` 보니 (邦妮) · `lingling` 링링 (玲玲) · `sykes` 사이크스 (赛克斯) · `kangel` 초텐짱 (超天酱) · `ame` 아메짱 (糖糖) · `jill` 질 (吉尔) · `dorothy` 도로시 (多萝西) · `hanna` 한나 (远野汉娜) · `sherry` 셰리 (橘雪莉)
+
+**칸** — `tiles/<file>.png` 512×512
+
+| 파일 | 칸 | 윗면 |
+|---|---|---|
+| `checkpoint` | 🚩 확인 지점 | 깃발 · 큰 발판 |
+| `chip-shop` | 🔷 칩 상점 | 칩 메달 진열대 |
+| `haste` | 💨 질주 | 달리는 화살표 |
+
+횡재 · 재앙 · 몬스터 칸은 지금 코인+ · 코인− · 균열 그림을 쓴다.
+
 ### 7차 요청 — 유물 아이콘 76 · 맵 칸 12 · 찻주전자 병정
 
 그림이 오면 [src/ui/assets.ts](../src/ui/assets.ts)의 `RELIC_FILES` · `TILE_ART` · `ENEMY_ART`에 넣는다. 지금은 이모지.
@@ -495,7 +513,7 @@ isolated on transparent background, no text, no letters, no frame, no border
 | Soda · 라이더 | 스탠딩 · 보드 말 · 초상화 · 전투 · 스킬 | 11 |
 | Soda · 기본 | 마법사 | 11 |
 
-`characters/mutbyeol/memorial/night-v3/original.webp` · `characters/soda/memorial/scene-v6-swim.webp` · `characters/mona/memorial/scene-v4.webp` ✅
+`characters/mutbyeol/memorial/night-v3/original.webp` · `characters/soda/memorial/scene-v7-pastel.webp` · `characters/mona/memorial/scene-v7-pastel.webp` ✅
 
 `characters/soda/skins/rider/` · `memorials.html`
 
@@ -503,5 +521,5 @@ isolated on transparent background, no text, no letters, no frame, no border
 
 | 애니메이션 | 경로 | 원화 |
 |---|---|---|
-| Soda | memorial-soda.html | scene-v6-swim.webp |
-| 모나 | memorial-mona.html | scene-v4.webp |
+| Soda | memorial-soda.html | scene-v7-pastel.webp |
+| 모나 | memorial-mona.html | scene-v7-pastel.webp |

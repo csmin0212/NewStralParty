@@ -1,10 +1,9 @@
 import { CHARACTERS } from '../data/characters';
 import { DIFFICULTIES } from '../data/difficulty';
-import type { GameState } from '../engine/types';
+import type { CharacterId, GameState } from '../engine/types';
 import { bondRank, type MatchRewards } from '../meta/rules';
-import { CHARACTER_ART } from './assets';
+import { myArt, skinArt } from './skins';
 import { bossFace } from './bossHud';
-import { creditIcon, pyroIcon } from './currency';
 import { esc } from './html';
 
 /**
@@ -24,7 +23,7 @@ export function showResult(
       const st = s.stats[i];
       return `
         <tr class="${r.mvp === i ? 'mvp' : ''}" style="--c:${p.color}">
-          <td class="rs-who"><img src="${CHARACTER_ART[p.character].portrait}" alt=""><span><b>${esc(p.name)}</b><small>${CHARACTERS[p.character].name}</small></span>${r.mvp === i ? '<em>MVP</em>' : ''}</td>
+          <td class="rs-who"><img src="${skinArt(p.character, p.skin).portrait}" alt=""><span><b>${esc(p.name)}</b><small>${CHARACTERS[p.character].name}</small></span>${r.mvp === i ? '<em>MVP</em>' : ''}</td>
           <td class="num boss">${st.bossDamage}</td>
           <td class="num">${st.damage}</td>
           <td class="num">${st.kills}</td>
@@ -46,7 +45,7 @@ export function showResult(
       const w = now.need ? (now.into / now.need) * 100 : 100;
       return `
         <div class="rs-bond">
-          <img src="${CHARACTER_ART[id as keyof typeof CHARACTER_ART].portrait}" alt="">
+          <img src="${myArt(id as CharacterId).portrait}" alt="">
           <div><b>${c.name}</b><span class="rs-heart">♥ ${now.rank}</span>${now.rank > was ? '<em>RANK UP</em>' : ''}
             <i class="rs-bar"><b style="width:${w}%"></b></i><small>호감도 +${amount}</small></div>
         </div>`;
@@ -72,10 +71,8 @@ export function showResult(
       </table>
       <div class="rs-rewards">
         <div class="rs-loot">
-          <span>${creditIcon}<b>+${r.credits.toLocaleString()}</b></span>
-          ${r.pyroxene ? `<span>${pyroIcon}<b>+${r.pyroxene}</b>${r.firstClear ? '<em>첫 처치</em>' : ''}</span>` : ''}
           <span class="rs-exp">EXP <b>+${r.exp}</b></span>
-          ${r.season ? '<em class="rs-season">SEASON ×1.5</em>' : ''}
+          ${r.firstClear ? '<em>첫 처치</em>' : ''}
         </div>
         <div class="rs-bonds">${bonds}</div>
       </div>

@@ -3,11 +3,12 @@
 
 import { DIFFICULTIES } from '../data/difficulty';
 import { ENEMIES } from '../data/enemies';
-import { distances, shuffle } from './cards';
+import { distances, shuffle, statusDef } from './cards';
 import { advanceProgress, bossAppear, damage, heal, isOver, log, notice, summon } from './game';
 import type { Rng } from './rng';
 import { bossDamageTaken } from './skills';
 import { decayMarks, markBonus, onAttacked } from './relics';
+import { kitDef, kitEnemyAtk, kitFought, kitSafe, kitSlow } from './kits';
 import type {
   BossDef,
   BossEffect,
@@ -113,7 +114,8 @@ export function hurtEnemy(s: GameState, rng: Rng, e: Enemy, amount: number): num
     log(s, `  🎩 분신이었다!`);
     return 0;
   }
-  const marked = amount > 0 ? markBonus(e) : 0;
+  // 표식 +1 · 숙명의 메아리 +1 (남해청)
+  const marked = amount > 0 ? markBonus(e) + (e.tags?.vuln ? 1 : 0) : 0;
   const dealt = (e.isBoss ? bossDamageTaken(s, amount) : amount) + marked;
   // 연결된 미니언은 남은 체력까지만 보스에게 넘긴다 (넘친 피해는 넘어가지 않는다)
   const taken = Math.min(e.hp, dealt);
@@ -723,7 +725,10 @@ function minionTurn(s: GameState, rng: Rng, turn: BossTurn) {
         }
       }
     }
-    if (info.roam) roam(s, rng, e, rng.int(1, info.roam), turn);
+    if (info.roam) {
+      const steps = rng.int(1, info.roam) - kitSlow(s, e);
+      if (steps > 0) roam(s, rng, e, steps, turn);
+    }
   }
 }
 
@@ -754,7 +759,7 @@ function roam(s: GameState, rng: Rng, e: Enemy, steps: number, turn: BossTurn) {
     const here = path[path.length - 1];
     let options: number[];
     if (info.chase) {
-      const targets = alive(s).map((p) => p.tile);
+      const targets = alive(s).filter((p) => !kitSafe(s, p)).map((p) => p.tile);
       const dist = (t: number) => {
         const d = distances(s.board, t);
         return Math.min(...targets.map((x) => d.get(x) ?? 99));
@@ -770,7 +775,7 @@ function roam(s: GameState, rng: Rng, e: Enemy, steps: number, turn: BossTurn) {
     const step = info.chase ? options[0] : rng.pick(options);
     path.push(step);
     e.tile = step;
-    const victims = alive(s).filter((p) => p.tile === step);
+    const victims = alive(s).filter((p) => p.tile === step && !kitSafe(s, p));
     if (victims.length === 0) continue;
     if (info.steal) {
       for (const p of victims) {
@@ -783,7 +788,13 @@ function roam(s: GameState, rng: Rng, e: Enemy, steps: number, turn: BossTurn) {
       }
       continue;
     }
-    for (const p of victims) hit(s, rng, p, e.atk, turn, e.name);
+    // 쫓아와 거는 전투: 몬스터 공격 vs 아군 방어 (주사위 1~6씩, 최소 1)
+    for (const p of victims) {
+      if (isOver(s)) break;
+      const dmg = Math.max(1, e.atk + kitEnemyAtk(e, p) + rng.d6() - (p.def + statusDef(p) + kitDef(s, p) + rng.d6()));
+      kitFought(s, p, e);
+      hit(s, rng, p, dmg, turn, e.name);
+    }
     break;
   }
   if (path.length > 1) turn.moved.push({ enemy: e.id, path });

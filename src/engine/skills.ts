@@ -2,7 +2,7 @@
 // 문구 · 수치는 data/characters.ts, 상태 변화(피해 · 처치 · 보상)는 game.ts가 맡는다.
 
 import { CHARACTERS } from '../data/characters';
-import { distances, handLimit, targetable } from './cards';
+import { distances, targetable } from './cards';
 import { hasRelic } from './relics';
 import type { Enemy, GameState, Player } from './types';
 
@@ -38,10 +38,8 @@ export function skillTargets(s: GameState, p: Player): number[] | null {
   const dist = distances(s.board, p.tile);
   const near = (tile: number) => (dist.get(tile) ?? Infinity) <= range;
   if (target === 'enemy') return s.enemies.filter((e) => targetable(s, e) && near(e.tile)).map((e) => e.id);
-  // 모나 역조공: 손패에 자리가 있는 다른 아군
-  return s.players
-    .filter((o) => o.id !== p.id && !o.ko && near(o.tile) && o.hand.length < handLimit(o))
-    .map((o) => o.id);
+  // 아군: 다른 아군만 (ally) 또는 나 포함 (anyAlly)
+  return s.players.filter((o) => (target === 'anyAlly' || o.id !== p.id) && !o.ko && near(o.tile)).map((o) => o.id);
 }
 
 /** 이 플레이어와 싸울 때 에너미의 방어력 (Soda: 연마 · 조나단 러시로 깎인다). 그로기인 보스는 0 */

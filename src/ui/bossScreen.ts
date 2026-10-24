@@ -1,7 +1,6 @@
 import { BOSSES } from '../data/bosses';
-import { DIFFICULTIES, DIFFICULTY_IDS, type DifficultyId } from '../data/difficulty';
+import { DIFFICULTIES, DIFFICULTY_IDS, OPEN_DIFFICULTIES, type DifficultyId } from '../data/difficulty';
 import { loadAccount, type Account } from '../meta/account';
-import { SEASON_BONUS, seasonBoss } from '../meta/rules';
 import { ENEMIES } from '../data/enemies';
 import type { BossDef, BossMove, EnemyKind, GimmickAction } from '../engine/types';
 import { LOBBY_ART } from './assets';
@@ -42,10 +41,9 @@ const stars = (n = 1) => `<span class="bs-stars" title="난이도">${'★'.repea
 export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, difficulty: DifficultyId) => void, onBack: () => void) {
   let current = BOSSES.find((b) => b.id === loadChoice(KEY, BOSSES[0].id)) ?? BOSSES[0];
   let level = loadChoice(LEVEL_KEY, 'normal') as DifficultyId;
-  if (!DIFFICULTIES[level]) level = 'normal';
+  if (!OPEN_DIFFICULTIES.includes(level)) level = OPEN_DIFFICULTIES[0];
   let tab: Tab = 'moves';
   const acc = loadAccount();
-  const season = seasonBoss();
 
   const render = () => {
     const list = BOSSES.map((b) => {
@@ -55,13 +53,12 @@ export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, diff
         <button class="boss-ticket ${b.id === current.id ? 'on' : ''}" data-boss="${b.id}">
           <span class="bt-face">${bossFace(b)}</span>
           <span class="bt-text"><small>${esc(b.title ?? '')}</small><b>${esc(b.name)}</b></span>
-          ${b.id === season ? `<span class="bt-season" title="보상 ×${SEASON_BONUS}">SEASON</span>` : ''}
           ${best ? `<span class="bt-clear" style="--lv:${DIFFICULTIES[best].color}" title="처치">${DIFFICULTIES[best].name}</span>` : seen ? '' : '<span class="bt-new">NEW</span>'}
           ${stars(b.stars)}
         </button>`;
     }).join('');
     const rec = acc.records[current.id] ?? {};
-    const levels = DIFFICULTY_IDS.map((d) => {
+    const levels = OPEN_DIFFICULTIES.map((d) => {
       const r = rec[d];
       return `
         <button class="lv-btn ${d === level ? 'on' : ''} ${r?.clears ? 'clear' : ''}" data-level="${d}" style="--lv:${DIFFICULTIES[d].color}">
@@ -81,7 +78,7 @@ export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, diff
           </header>
           <nav class="boss-list">${list}</nav>
           <section class="ba-panel boss-detail">
-            ${hero(current, current.id === season)}
+            ${hero(current)}
             <nav class="ba-tabs">
               <button class="ba-tab ${tab === 'moves' ? 'on' : ''}" data-tab="moves">행동</button>
               <button class="ba-tab ${tab === 'rules' ? 'on' : ''}" data-tab="rules">규칙 · 진행도</button>
@@ -127,14 +124,14 @@ export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, diff
   render();
 }
 
-function hero(b: BossDef, season: boolean): string {
+function hero(b: BossDef): string {
   const appear = b.timeline.find((g) => g.actions.some((a) => a.type === 'bossAppear'))?.at;
   const stat = (label: string, value: string) => `<div><small>${label}</small><b>${value}</b></div>`;
   return `
     <div class="bd-hero">
       <div class="bd-face">${bossFace(b)}</div>
       <div class="bd-text">
-        <div class="bd-tags">${b.title ? `<span class="bd-title">${esc(b.title)}</span>` : ''}${season ? `<span class="bt-season">SEASON · 보상 ×${SEASON_BONUS}</span>` : ''}</div>
+        <div class="bd-tags">${b.title ? `<span class="bd-title">${esc(b.title)}</span>` : ''}</div>
         <div class="bd-name">${esc(b.name)} ${stars(b.stars)}</div>
         ${b.summary ? `<p class="bd-summary">${esc(b.summary)}</p>` : ''}
         <div class="bd-stats">

@@ -4,6 +4,8 @@ import { BOSSES } from '../data/bosses';
 import { ENEMIES } from '../data/enemies';
 import { activePart, bossEnemy, currentIntent } from './boss';
 import { MAPS } from '../data/maps';
+import { CHARACTER_IDS } from '../data/characters';
+import { cpuAction } from '../ui/cpu';
 import { RELICS } from '../data/relics';
 import { statusAtk } from './cards';
 import { rollOffer } from './relics';
@@ -493,6 +495,9 @@ function autoplay(def: BossDef, seed: number, players: number): GameState {
       case 'shop':
         action = { type: 'LEAVE_SHOP', player: me };
         break;
+      case 'stopChoice':
+        action = { type: 'STOP_HERE', player: me, stop: rng.next() < 0.5 };
+        break;
       default:
         action = { type: 'END_TURN', player: me };
     }
@@ -593,7 +598,7 @@ describe('유물', () => {
     s.players[0].relics = ['bank1', 'medkit1'];
     for (let i = 0; i < 40; i++) {
       s.players[0].relicOffer = null;
-      s.phase = { kind: 'shop', stepsLeft: 0, offers: [], free: false };
+      s.phase = { kind: 'shop', stepsLeft: 0, offers: [], free: false, chips: true };
       s.players[0].coins = 999;
       const u = applyAction(s, { type: 'BUY_RELIC', player: 0 });
       for (const id of u.players[0].relicOffer!.ids) {
@@ -604,10 +609,10 @@ describe('유물', () => {
     }
   });
 
-  it('유물 상점: 10코인, 살 때마다 +5', () => {
+  it('칩 상점: 10코인, 살 때마다 +5', () => {
     let s = start(boss({ nothing }, ['nothing'], { timeline: [] }));
     s = structuredClone(s);
-    s.phase = { kind: 'shop', stepsLeft: 0, offers: [], free: false };
+    s.phase = { kind: 'shop', stepsLeft: 0, offers: [], free: false, chips: true };
     s.players[0].coins = 30;
     s = applyAction(s, { type: 'BUY_RELIC', player: 0 });
     expect(s.players[0].coins).toBe(20);
@@ -743,5 +748,29 @@ describe('맵 기믹', () => {
     t = rollExactly(t, 1);
     expect(me(t).ko).toBe(true);
     expect(t.progress).toBe(progress);
+  });
+});
+
+describe('캐릭터 전부', () => {
+  it.each(CHARACTER_IDS.map((id) => [id] as const))('%s: CPU가 스킬을 쓰며 끝까지 둔다', (id) => {
+    const others = CHARACTER_IDS.filter((x) => x !== id);
+    for (const seed of [1, 2]) {
+      const players = [id, others[seed * 3 % others.length], others[seed * 7 % others.length], others[seed * 11 % others.length]].map((character, i) => ({
+        name: `P${i}`,
+        color: '#fff',
+        character,
+        cpu: true,
+      }));
+      const def = BOSSES[seed % BOSSES.length];
+      let s = createGame({ board: MAPS[def.map!], boss: def, players, seed });
+      let used = 0;
+      for (let i = 0; i < 6000 && s.phase.kind !== 'gameOver'; i++) {
+        const a = cpuAction(s);
+        if (a.type === 'USE_SKILL' && a.player === 0) used++;
+        s = applyAction(s, a);
+      }
+      expect(s.phase.kind).toBe('gameOver');
+      expect(used).toBeGreaterThan(0);
+    }
   });
 });

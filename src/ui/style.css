@@ -400,10 +400,10 @@ button.seat-char:hover {
   gap: 4px;
 }
 .tile.kind-empty { --mark: var(--sky-light); }
-.tile.kind-coinPlus { --mark: var(--yellow); }
-.tile.kind-coinMinus { --mark: var(--danger); }
+.tile.kind-windfall { --mark: var(--yellow); }
+.tile.kind-calamity { --mark: var(--danger); }
 .tile.kind-card { --mark: var(--sky); }
-.tile.kind-spawn { --mark: var(--violet); }
+.tile.kind-monster { --mark: var(--violet); }
 .tile.kind-heal { --mark: #ff8fbf; }
 .tile.kind-warp { --mark: #38d0e6; }
 .tile.kind-base { --mark: var(--yellow); }
@@ -419,6 +419,9 @@ button.seat-char:hover {
 .tile.kind-stage { --mark: #ffd166; }
 .tile.kind-candy { --mark: #ff6fae; }
 .tile.kind-detention { --mark: #5d6598; }
+.tile.kind-checkpoint { --mark: #ffdd45; }
+.tile.kind-chipShop { --mark: #9b6bff; }
+.tile.kind-haste { --mark: #4fd1a5; }
 
 /* 그림이 준비된 칸만 교체하고, 칸 이름과 선택 영역은 유지한다. */
 .tile.has-art,

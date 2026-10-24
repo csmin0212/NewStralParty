@@ -1,21 +1,16 @@
 import { CHARACTER_IDS, CHARACTERS } from '../data/characters';
-import { loadAccount, rollDaily, saveAccount, today } from '../meta/account';
-import { BOSSES } from '../data/bosses';
-import { ACHIEVEMENTS, ATTENDANCE, checkAttendance, DAILY_MISSIONS, rewardText, SEASON_BONUS, seasonBoss, teacherLevel } from '../meta/rules';
+import { loadAccount } from '../meta/account';
+import { teacherLevel } from '../meta/rules';
 import { openSettings } from './modal';
-import { CHARACTER_ART, CHARACTER_MEMORIAL_ANIMATION, CHARACTER_MEMORIAL_ART, ENEMY_ART, UI_ART } from './assets';
+import { CHARACTER_MEMORIAL_ANIMATION, CHARACTER_MEMORIAL_ART, ENEMY_ART, UI_ART } from './assets';
 import type { CharacterId } from '../engine/types';
-import { currencyBar } from './currency';
 import { loadGame } from './saveGame';
+import { myArt } from './skins';
 
 export interface LobbyHandlers {
   start: () => void;
   resume: () => void;
   characters: () => void;
-  deck: () => void;
-  recruit: () => void;
-  shop: () => void;
-  missions: () => void;
   codex: () => void;
 }
 
@@ -60,17 +55,10 @@ export function renderLobby(root: HTMLElement, on: LobbyHandlers) {
   let bg = loadBg();
   const featured = CHARACTER_IDS[0];
   const c = CHARACTERS[featured];
-  const art = CHARACTER_ART[featured];
+  const art = myArt(featured);
   const acc = loadAccount();
-  rollDaily(acc);
-  const attended = checkAttendance(acc, today());
-  if (attended) saveAccount(acc);
   const lv = teacherLevel(acc.exp);
   const saved = loadGame();
-  // 받을 수 있는 미션 보상 수 (메뉴에 빨간 점)
-  const claimable =
-    DAILY_MISSIONS.filter((m) => (acc.daily.progress[m.id] ?? 0) >= m.goal && !acc.daily.claimed.includes(m.id)).length +
-    ACHIEVEMENTS.filter((a) => a.value(acc) >= a.goal && !acc.achievements.includes(a.id)).length;
 
   root.innerHTML = `
     <div class="lobby" style="--c:${c.color}">
@@ -85,7 +73,7 @@ export function renderLobby(root: HTMLElement, on: LobbyHandlers) {
           <span class="lp-text"><b>선생님</b><i class="lp-exp"><b style="width:${(lv.into / lv.need) * 100}%"></b></i></span>
         </div>
       </header>
-      <div class="lobby-cur">${currencyBar(acc)}<button class="lobby-gear" data-go="settings" title="설정">⚙</button></div>
+      <div class="lobby-cur"><button class="lobby-gear" data-go="settings" title="설정">⚙</button></div>
 
       <nav class="lobby-menu">
         <button class="menu-card menu-card--big" data-go="characters" style="--i:0">
@@ -96,18 +84,8 @@ export function renderLobby(root: HTMLElement, on: LobbyHandlers) {
         <button class="menu-card" data-go="codex" style="--i:1">
           <img class="menu-art menu-art--enemy" src="${ENEMY_ART.robot}" alt="" draggable="false">
           <span class="menu-tab">ENEMY</span>
-          <b>에너미 도감</b>
+          <b>도감</b>
         </button>
-        <button class="menu-card" data-go="deck" style="--i:2">
-          <img class="menu-art menu-art--deck" src="${UI_ART.cardBack}" alt="" draggable="false">
-          <span class="menu-tab">DECK</span>
-          <b>덱 편성</b>
-        </button>
-        <div class="menu-row">
-          <button class="menu-tile" data-go="recruit"><i class="mt-icon">✉</i><span class="menu-tab">RECRUIT</span><b>모집</b></button>
-          <button class="menu-tile" data-go="shop"><i class="mt-icon">🛍</i><span class="menu-tab">SHOP</span><b>상점</b></button>
-          <button class="menu-tile" data-go="missions"><i class="mt-icon">✔</i><span class="menu-tab">MISSION</span><b>미션</b>${claimable ? `<em class="mt-dot">${claimable}</em>` : ''}</button>
-        </div>
       </nav>
 
       ${saved ? `<button class="lobby-resume" data-go="resume"><small>CONTINUE</small><b>이어하기</b><span>${saved.state.boss.name} · ROUND ${saved.state.round}</span></button>` : ''}
@@ -120,31 +98,16 @@ export function renderLobby(root: HTMLElement, on: LobbyHandlers) {
       ${
         BG_IDS.length > 1
           ? `<nav class="lobby-bgpick">${BG_IDS.map(
-              (id) => `<button class="${id === bg ? 'on' : ''}" data-bg="${id}" title="${CHARACTERS[id].name}" style="--c:${CHARACTERS[id].color}"><img src="${CHARACTER_ART[id].portrait}" alt=""></button>`,
+              (id) => `<button class="${id === bg ? 'on' : ''}" data-bg="${id}" title="${CHARACTERS[id].name}" style="--c:${CHARACTERS[id].color}"><img src="${myArt(id).portrait}" alt=""></button>`,
             ).join('')}</nav>`
           : ''
       }
 
       <footer class="lobby-news">
-        <span class="news-tag season">SEASON</span>
-        <p>총력전 <b>${BOSSES.find((x) => x.id === seasonBoss())?.name ?? ''}</b> · 보상 ×${SEASON_BONUS}</p>
         <span class="news-tag">NEW</span>
         <p>신규 캐릭터 <b>${c.name}</b></p>
       </footer>
       <div class="lobby-toast"></div>
-      ${
-        attended
-          ? `<div class="attend" data-go="attend-close">
-              <div class="at-panel">
-                <div class="ba-band">출석 ${attended}일차</div>
-                <ol class="at-days">${ATTENDANCE.map(
-                  (r, i) => `<li class="${i + 1 < attended ? 'got' : i + 1 === attended ? 'today' : ''}"><small>${i + 1}일</small><b>${rewardText(r)}</b></li>`,
-                ).join('')}</ol>
-                <button class="ba-btn ba-btn--yellow" data-go="attend-close">확인</button>
-              </div>
-            </div>`
-          : ''
-      }
       </div>
     </div>`;
 
@@ -202,13 +165,8 @@ export function renderLobby(root: HTMLElement, on: LobbyHandlers) {
     if (go === 'start') on.start();
     else if (go === 'resume') on.resume();
     else if (go === 'characters') on.characters();
-    else if (go === 'deck') on.deck();
-    else if (go === 'recruit') on.recruit();
-    else if (go === 'shop') on.shop();
-    else if (go === 'missions') on.missions();
     else if (go === 'codex') on.codex();
     else if (go === 'settings') openSettings();
-    else if (go === 'attend-close') root.querySelector('.attend')?.remove();
     else if (go === 'soon') {
       toast.textContent = '아직 준비 중이에요';
       toast.classList.remove('show');

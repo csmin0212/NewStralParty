@@ -1,7 +1,6 @@
 import { DEFAULT_BOARD } from '../data/board';
 import { MAPS } from '../data/maps';
 import { currentIntent } from '../engine/boss';
-import { canEditDeck } from '../engine/cards';
 import { applyAction, createGame, currentPlayer, RuleError, type PlayerSetup } from '../engine/game';
 import type { DifficultyId } from '../data/difficulty';
 import type { Action, BossDef, BossTurn, EnemyKind, GameState } from '../engine/types';
@@ -14,7 +13,7 @@ import { wait } from './settings';
 import { cpuAction } from './cpu';
 import { CARDS } from '../data/cards';
 import { CHARACTERS } from '../data/characters';
-import { CHARACTER_ART } from './assets';
+import { skinArt } from './skins';
 import { BattleView } from './battleView';
 import { cardFace } from './cardView';
 import { diceHtml } from './dice';
@@ -50,7 +49,6 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     });
   let busy = false;
   let logOpen = false;
-  let deckOpen = false;
   const cleanup = new AbortController();
 
   root.innerHTML = `<div class="game"><main class="board-area"></main><div class="hud"></div></div>`;
@@ -101,7 +99,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
           text: p!.name,
           sub: `ROUND ${String(s.round).padStart(2, '0')}`,
           color: p!.color,
-          face: { label: String(ev.player + 1), image: CHARACTER_ART[p!.character].portrait },
+          face: { label: String(ev.player + 1), image: skinArt(p!.character, p!.skin).portrait },
         });
         break;
       case 'skill':
@@ -109,8 +107,8 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
           kind: 'skill',
           text: CHARACTERS[p!.character].active.name,
           sub: 'SKILL',
-          color: CHARACTER_ART[p!.character].color,
-          art: CHARACTER_ART[p!.character].main,
+          color: skinArt(p!.character, p!.skin).color,
+          art: skinArt(p!.character, p!.skin).main,
         });
         break;
       case 'revive':
@@ -220,7 +218,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
   let shownState = state;
   const draw = (s: GameState, isBusy: boolean) => {
     shownState = s;
-    renderHud(hud, s, isBusy, logOpen, deckOpen, handlers);
+    renderHud(hud, s, isBusy, logOpen, handlers);
   };
 
   const handlers: HudHandlers = {
@@ -228,10 +226,6 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     newGame() {
       cleanup.abort();
       onExit();
-    },
-    toggleDeck() {
-      deckOpen = !deckOpen;
-      draw(shownState, busy);
     },
     refresh() {
       draw(shownState, busy);
@@ -299,8 +293,8 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     if (state.phase.kind !== 'gameOver') saveGame(state, players);
     if (cpuTurn()) return;
 
-    // 원작처럼 이동이 끝나고 할 일이 없으면 턴을 알아서 넘긴다 (내 거점에 멈췄으면 덱 정비를 할 수 있게 기다린다)
-    if (state.phase.kind === 'endTurn' && !canEditDeck(state, currentPlayer(state)) && !currentPlayer(state).relicOffer) {
+    // 원작처럼 이동이 끝나고 할 일이 없으면 턴을 알아서 넘긴다
+    if (state.phase.kind === 'endTurn' && !currentPlayer(state).relicOffer) {
       await wait(700);
       if (state.phase.kind === 'endTurn' && !busy) dispatch({ type: 'END_TURN', player: state.current });
     }

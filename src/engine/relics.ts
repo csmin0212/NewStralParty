@@ -18,6 +18,7 @@ import { drawCards, heal, log, notice, strikeEnemy } from './game';
 import type { Rng } from './rng';
 import type { CharacterId, Enemy, GameState, MapRes, Player } from './types';
 import { MAP_RES_INFO } from '../data/board';
+import { kitEffectCard, kitKill, kitTurnEnd, kitTurnStart } from './kits';
 
 export function hasRelic(p: Player, id: RelicId): boolean {
   return p.relics?.includes(id) ?? false;
@@ -243,6 +244,7 @@ export function useOverclock(s: GameState, p: Player): number {
 
 /** 에너미를 쓰러뜨렸다 (테이저 · 저주받은 검) */
 export function onKill(s: GameState, rng: Rng, p: Player, e: Enemy) {
+  kitKill(s, rng, p, e);
   if (hasRelic(p, 'taser') && e.counter) gainRes(s, rng, p, 'mind', 1);
   if (hasRelic(p, 'cursedSword')) p.relicVars.cursed = Math.min(5, (p.relicVars.cursed ?? 0) + 1);
 }
@@ -305,6 +307,7 @@ export function relicShopDiscount(p: Player): number {
 
 /** 자기 차례 시작 (다른 시작 효과 다음) */
 export function onTurnStart(s: GameState, rng: Rng, p: Player) {
+  kitTurnStart(s, rng, p);
   const v = p.relicVars;
   if (hasRelic(p, 'perpetual') && p.energy < 6) p.energy = 6;
   if (v.anchor) v.anchor -= 1;
@@ -342,6 +345,7 @@ export function onTurnStart(s: GameState, rng: Rng, p: Player) {
 
 /** 자기 차례 끝 */
 export function onTurnEnd(s: GameState, rng: Rng, p: Player) {
+  kitTurnEnd(s, rng, p);
   if (hasRelic(p, 'smartwatch') && p.hand.length < 5) drawCards(s, p, rng, 1);
   if (hasRelic(p, 'satellite') && p.hand.length < 6) p.hand.push({ card: 'railgun', shop: true });
   if (hasRelic(p, 'shockGloves') && p.energy >= 4) {
@@ -414,6 +418,7 @@ export function onBoostTile(p: Player) {
 
 /** 주사위 전 카드(효과 카드)를 썼다. target: 대상 몬스터 */
 export function onEffectCard(s: GameState, rng: Rng, p: Player, card: Player['hand'][number], target?: Enemy, dealt?: number) {
+  kitEffectCard(s, rng, p, card);
   const v = p.relicVars;
   v.effects = (v.effects ?? 0) + 1;
   if (hasRelic(p, 'tome') && v.effects % 3 === 0) {

@@ -28,24 +28,26 @@ export interface EnemyInfo {
 
 /** 학원 도시의 에너미. icon은 그림이 없을 때 쓰는 임시 아이콘 */
 export const ENEMIES: Record<EnemyKind, EnemyInfo> = {
-  robot: { name: '경비 로봇', icon: '🤖', hp: 6, atk: 1, def: 0, counter: false, defense: 'block', reward: 4 },
-  drone: { name: '정찰 드론', icon: '🛸', hp: 4, atk: 1, def: 0, counter: false, defense: 'evade', reward: 5 },
-  delinquent: { name: '불량배', icon: '😼', hp: 10, atk: 2, def: 1, counter: true, defense: 'block', reward: 8 },
+  // 원작 몬스터 체급 (보통): 海盗鲨鱼 4/1/9/6 · 金小鱼 2/0/6/5 · 惊喜猴子盒 4/0/8/6
+  robot: { name: '경비 로봇', icon: '🤖', hp: 9, atk: 4, def: 1, counter: false, defense: 'block', reward: 6, roam: 2, chase: true },
+  drone: { name: '정찰 드론', icon: '🛸', hp: 6, atk: 2, def: 0, counter: true, defense: 'evade', reward: 5 },
+  delinquent: { name: '불량배', icon: '😼', hp: 10, atk: 3, def: 1, counter: true, defense: 'block', reward: 8 },
   thief: {
-    name: '헬멧단 좀도둑', icon: '🪖', hp: 6, atk: 0, def: 0, counter: false, defense: 'evade', reward: 3,
+    name: '헬멧단 좀도둑', icon: '🪖', hp: 6, atk: 0, def: 0, counter: false, defense: 'block', reward: 5,
     roam: 3, steal: 4,
   },
   elite: {
-    name: '스케반 간부', icon: '🏏', hp: 16, atk: 3, def: 1, counter: true, defense: 'block', reward: 12,
-    calls: { every: 3, kind: 'robot' },
+    // 海盗精锐 4/2/25/15
+    name: '스케반 간부', icon: '🏏', hp: 25, atk: 4, def: 2, counter: true, defense: 'block', reward: 15,
+    calls: { every: 3, kind: 'robot' }, roam: 1, chase: true,
   },
   automaton: {
-    name: '오토마타 병사', icon: '🦾', hp: 6, atk: 1, def: 1, counter: false, defense: 'block', reward: 3,
+    name: '오토마타 병사', icon: '🦾', hp: 8, atk: 3, def: 1, counter: false, defense: 'block', reward: 5,
     fuse: { turns: 3, amount: 3, range: 1 },
   },
   kaitenger: {
-    name: '카이텐저', icon: '🍣', hp: 6, atk: 2, def: 0, counter: true, defense: 'block', reward: 5,
-    roam: 2,
+    name: '카이텐저', icon: '🍣', hp: 9, atk: 3, def: 0, counter: true, defense: 'block', reward: 6,
+    roam: 2, chase: true,
   },
   perorominion: {
     name: '페로로 미니언', icon: '🐤', hp: 4, atk: 1, def: 0, counter: false, defense: 'block', reward: 2,
@@ -57,7 +59,7 @@ export const ENEMIES: Record<EnemyKind, EnemyInfo> = {
     decoy: true,
   },
   slumpia: {
-    name: '슬럼피아 병사', icon: '🎪', hp: 4, atk: 1, def: 0, counter: false, defense: 'evade', reward: 3,
+    name: '슬럼피아 병사', icon: '🎪', hp: 7, atk: 2, def: 0, counter: false, defense: 'block', reward: 5,
     roam: 3,
   },
   missile: {
@@ -69,7 +71,8 @@ export const ENEMIES: Record<EnemyKind, EnemyInfo> = {
     link: true,
   },
   teapot: {
-    name: '찻주전자 병정', icon: '🫖', hp: 8, atk: 2, def: 1, counter: true, defense: 'block', reward: 6,
+    // 魔法茶壶 3/1/10/6
+    name: '찻주전자 병정', icon: '🫖', hp: 10, atk: 3, def: 1, counter: false, defense: 'block', reward: 6, roam: 2, chase: true,
   },
   incarnation: {
     name: '묘귀의 화신', icon: '🐈‍⬛', hp: 4, atk: 2, def: 0, counter: false, defense: 'block', reward: 3,

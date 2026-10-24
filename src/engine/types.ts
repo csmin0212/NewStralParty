@@ -8,10 +8,19 @@ export type MapRes = 'evidence' | 'overclock' | 'mind' | 'problem';
 
 export type TileKind =
   | 'empty'
-  | 'coinPlus'
-  | 'coinMinus'
+  /** 횡재: 코인 2 · 3 · 4 · 5 · 10 (원작 天降横财) */
+  | 'windfall'
+  /** 재앙: 2 피해 (天降横祸) */
+  | 'calamity'
+  /** 확인 지점: 누구나 멈춰서 회복 · 성 오름 (保障点) */
+  | 'checkpoint'
+  /** 칩 상점: 지나가며 유물 (筹码商店) */
+  | 'chipShop'
+  /** 질주: 한 번 더 굴린다 (疾行) */
+  | 'haste'
   | 'card'
-  | 'spawn'
+  /** 몬스터: 멈추면 맵 몬스터가 나와 바로 전투 (怪物) */
+  | 'monster'
   | 'heal'
   | 'warp'
   | 'shop'
@@ -69,6 +78,8 @@ export interface Board {
   bossTile: number;
   /** 돌격문에서 나오는 에너미 */
   assault?: EnemyKind;
+  /** 몬스터 칸에서 나오는 에너미 (없으면 기본 셋) */
+  monsters?: EnemyKind[];
 }
 
 /** 카드 목록과 효과 글은 data/cards.ts, 효과는 engine/cards.ts */
@@ -114,17 +125,32 @@ export type CardId =
   | 'defG'
   | 'rainbow'
   | 'retreat'
-  | 'shieldCounter';
+  | 'shieldCounter'
+  // 캐릭터 · 원작 협동 카드
+  | 'livingPage'
+  | 'talismanFu'
+  | 'talismanHuo'
+  | 'bite';
 
 export interface HandCard {
   card: CardId;
   /** 상점에서 산 카드: 쓰면 사라지고 덱으로 돌아가지 않는다 */
   shop?: boolean;
-  /** 다른 플레이어가 준 카드 (모나 역조공): 준 사람 id. 쓰면 준 사람의 버린 더미로 */
+  /** 다른 플레이어가 준 카드 (모나 역조공): 준 사람 id */
   from?: number;
+  /** 임시 카드: 차례 끝에 버린다 (나디스) */
+  temp?: boolean;
 }
 
-export type CharacterId = 'mutbyeol' | 'soda' | 'mona';
+export type CharacterId =
+  | 'mutbyeol'
+  | 'soda'
+  | 'mona'
+  // 아스트랄 파티
+  | 'parunan' | 'fanny' | 'alana' | 'komachi' | 'padman' | 'papara' | 'ren' | 'mimi' | 'z3000' | 'pandaman'
+  | 'inkshadow' | 'lulu' | 'fen' | 'haiqing' | 'misaki' | 'nardis' | 'jasmine' | 'al' | 'luka' | 'nancy'
+  | 'rin' | 'megas' | 'zhao' | 'teru' | 'moses' | 'mamushi' | 'bonnie' | 'lingling' | 'sykes'
+  | 'kangel' | 'ame' | 'jill' | 'dorothy' | 'hanna' | 'sherry';
 
 export interface Player {
   id: number;
@@ -145,6 +171,8 @@ export interface Player {
   move: number;
   /** 내 거점 칸: 여기서 시작하고, 지나가거나 멈추면 레벨업 · 덱 정비 */
   home: number;
+  /** 스킨 (그림만 바뀐다) */
+  skin?: string;
   /** 유물 (한 판 동안) */
   relics: RelicId[];
   /** 고를 유물 후보 (tier: 확률표 줄). 고르기 전에는 주사위를 굴릴 수 없다 */
@@ -161,6 +189,10 @@ export interface Player {
   relicBuys: number;
   /** 맵 자원 (증거 · 오버클럭 · 마인드 · 문제아 남은 차례) */
   mapRes: Partial<Record<MapRes, number>>;
+  /** 캐릭터 스킬이 세는 값 (engine/kits.ts) */
+  charVars: Record<string, number>;
+  /** 캐릭터가 깔아 둔 칸 (묵영 그림자): 칸 → 남은 차례 */
+  charTiles: Record<number, number>;
   /** 지금 임무 (base: 받을 때 값) · 끝낸 임무 */
   task: { id: string; base: number } | null;
   tasksDone: string[];
@@ -168,10 +200,6 @@ export interface Player {
   cpu?: boolean;
   /** 카드 효과로 붙은 상태 */
   status: PlayerStatus;
-  /** 내 덱 구성 (최대 10장). 뽑을 더미 · 버린 더미 · 손패를 오가며 내 덱 안에서만 돈다 */
-  deck: CardId[];
-  drawPile: CardId[];
-  discard: CardId[];
   hand: HandCard[];
   /** 액티브 스킬 재사용 대기 (라운드). 0이면 쓸 수 있다 */
   skillCooldown: number;
@@ -230,6 +258,10 @@ export interface Enemy {
   timer?: number;
   /** 표식: 있으면 모든 피해 +1, 보스 차례마다 -1 */
   mark?: number;
+  /** 캐릭터 스킬이 붙인 상태 (engine/kits.ts): 받는 피해 + · 팬 · 빈틈 · 조사 · 붙잡힘 · 침식 · 마역 */
+  tags?: Partial<Record<'vuln' | 'fan' | 'flaw' | 'probe' | 'grab' | 'erode' | 'abyss', number>>;
+  /** tags를 건 플레이어 */
+  tagBy?: Partial<Record<'vuln' | 'flaw' | 'probe', number>>;
 }
 
 /** 보드 위의 표식. 플레이어가 그 칸에 멈추면 발동한다 */
@@ -503,7 +535,9 @@ export type Phase =
   /** 반격: 에너미가 먼저 굴린 공격 주사위(attackRoll)를 보고 방어 · 회피와 카드를 고른다 (원작 순서) */
   | { kind: 'defend'; enemy: number; stepsLeft: number; attackRoll: number }
   /** 상점 칸: 지나가거나 멈추면 연다. 멈췄으면 첫 구매가 무료 */
-  | { kind: 'shop'; stepsLeft: number; offers: ShopOffer[]; free: boolean }
+  | { kind: 'shop'; stepsLeft: number; offers: ShopOffer[]; free: boolean; chips?: boolean; sent?: boolean }
+  /** 내 거점 · 확인 지점을 지나갈 때: 멈출지 고른다 */
+  | { kind: 'stopChoice'; stepsLeft: number }
   | { kind: 'endTurn' }
   | { kind: 'gameOver'; result: 'victory' | 'defeat' };
 
@@ -551,6 +585,29 @@ export interface BattleMods {
 
 /** 현재 턴의 임시 값 */
 export interface TurnInfo {
+  /** 질주 칸: 이번 차례 한 번 더 굴린다 */
+  haste?: boolean;
+  /** 멈춘 칸의 효과를 이미 받았다 */
+  landed?: boolean;
+  /** 이동 주사위를 6면으로 (루카 액티브) */
+  sixDice?: boolean;
+  /** 이동 중 전투 없음 (루카 · 링링 돌진) */
+  noBattle?: boolean;
+  /** 링링 돌진 · 붙잡은 몬스터 */
+  charge?: boolean;
+  grabbed?: number[];
+  /** 멈춘 뒤 이벤트 1번 더 (페니) */
+  extraEvent?: boolean;
+  /** 이번 차례 몬스터에게 도전했다 (희몽풍) */
+  challenged?: boolean;
+  /** 원격 도전 중 (낸시): 끝나면 주사위 전으로 · 멀면 반격 없음 */
+  remote?: boolean;
+  remoteFar?: boolean;
+  /** 차례마다 1번 */
+  lukaCut?: boolean;
+  sherryDone?: boolean;
+  /** 원격 상점 (파루난): 나가면 주사위 전으로 */
+  remoteShop?: boolean;
   /** 주사위 전 카드(부스트 · 지원 · 이벤트)를 썼는지 */
   /** 이번 차례에 쓴 주사위 전 카드 수 */
   cardsPlayed: number;
@@ -660,7 +717,7 @@ export type Action =
   | { type: 'ENCOUNTER'; player: number; choice: 'attack' | 'release' }
   | { type: 'DEFEND'; player: number; mode: DefenseMode }
   /** target: 대상을 고르는 액티브의 대상 (Soda: 에너미 id · 모나: 아군 id) · cards: 모나가 줄 손패 번호 */
-  | { type: 'USE_SKILL'; player: number; target?: number; cards?: number[] }
-  /** 본부에서 덱 정비: 카드 1장 넣기 또는 빼기 */
-  | { type: 'EDIT_DECK'; player: number; add?: CardId; remove?: CardId }
+  | { type: 'USE_SKILL'; player: number; target?: number; cards?: number[]; value?: number }
+  /** 거점 · 확인 지점에서 멈출지 */
+  | { type: 'STOP_HERE'; player: number; stop: boolean }
   | { type: 'END_TURN'; player: number };

@@ -8,17 +8,13 @@ import './ui/boss.css';
 import './ui/meta.css';
 import { BACKGROUND_ART } from './ui/assets';
 import { renderCharacterScreen } from './ui/characterScreen';
-import { renderDeckScreen } from './ui/deckScreen';
 import { startHotseat, type HotseatOptions } from './ui/hotseat';
 import { renderLobby } from './ui/lobby';
 import { watchUiScale } from './ui/stage';
 import { renderSetup } from './ui/setup';
 import { renderBossScreen } from './ui/bossScreen';
 import { renderCodexScreen } from './ui/codexScreen';
-import { renderMissionScreen } from './ui/missionScreen';
-import { renderRecruitScreen } from './ui/recruitScreen';
 import { loadGame } from './ui/saveGame';
-import { renderShopScreen } from './ui/shopScreen';
 import type { DifficultyId } from './data/difficulty';
 import type { BossDef } from './engine/types';
 
@@ -27,22 +23,14 @@ document.documentElement.style.setProperty('--sky-art', `url("${BACKGROUND_ART}"
 const root = document.querySelector<HTMLElement>('#app')!;
 watchUiScale();
 
-// 화면 흐름: 로비 → (캐릭터 · 덱 · 모집 · 상점 · 미션 · 도감) / (보스 · 난이도 → 인원 · 캐릭터 → 게임 → 결과) → 로비
+// 화면 흐름: 로비 → (캐릭터 · 도감) / (보스 · 난이도 → 인원 · 캐릭터 → 게임 → 결과) → 로비
 function showLobby() {
   renderLobby(root, {
     start: showBossSelect,
     resume: resumeGame,
     characters: showCharacters,
-    deck: showDeck,
-    recruit: () => renderRecruitScreen(root, showLobby),
-    shop: () => renderShopScreen(root, showLobby),
-    missions: () => renderMissionScreen(root, showLobby),
     codex: () => renderCodexScreen(root, showLobby),
   });
-}
-
-function showDeck() {
-  renderDeckScreen(root, showLobby);
 }
 
 function showCharacters() {

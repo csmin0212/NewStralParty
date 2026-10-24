@@ -16,6 +16,8 @@ export interface DifficultyInfo {
 }
 
 export const DIFFICULTY_IDS: DifficultyId[] = ['normal', 'hard', 'veryhard', 'hardcore', 'extreme'];
+/** 고를 수 있는 난이도 (밸런스를 맞추는 동안 NORMAL만) */
+export const OPEN_DIFFICULTIES: DifficultyId[] = ['normal'];
 
 export const DIFFICULTIES: Record<DifficultyId, DifficultyInfo> = {
   normal: { name: 'NORMAL', hp: 1, atk: 0, enemyAtk: 0, enemyDef: 0, reward: 1, color: '#4fb6f5' },

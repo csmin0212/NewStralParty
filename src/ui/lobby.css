@@ -969,3 +969,129 @@ button.char-card:hover {
 .setup-screen .count button {
   padding: 9px 0;
 }
+
+/* 캐릭터 → 스킨 */
+.skin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 4px 2px;
+}
+.skin-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--ba-line), 0 3px 8px rgba(42, 59, 85, 0.12);
+  color: var(--ba-ink);
+  cursor: pointer;
+  text-align: left;
+}
+.skin-card.on {
+  box-shadow: 0 0 0 3px var(--ba-sky), 0 3px 10px rgba(42, 59, 85, 0.2);
+}
+.skin-art {
+  height: 220px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f3f7fb, color-mix(in srgb, var(--c) 22%, #fff));
+}
+.skin-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 12%;
+}
+.skin-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 3px solid var(--ba-navy);
+}
+.skin-foot b {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 900;
+}
+.skin-foot i {
+  font-style: normal;
+  font-weight: 900;
+  color: var(--ba-sky);
+}
+.skin-token {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+/* 시작 화면 · 캐릭터 고르기 */
+.cp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(27, 44, 74, 0.45);
+}
+.cp-panel {
+  width: min(1100px, 94vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--ba-panel);
+  box-shadow: 0 12px 40px rgba(27, 44, 74, 0.35);
+}
+.cp-grid {
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+  padding: 2px;
+}
+.cp-card {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--ba-line);
+  color: var(--ba-ink);
+  cursor: pointer;
+}
+.cp-card.on {
+  box-shadow: 0 0 0 3px var(--ba-sky);
+}
+.cp-card:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.cp-face {
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 3px solid var(--c);
+  background: #eef3f8;
+}
+.cp-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cp-card b {
+  font-size: 14px;
+  font-weight: 900;
+}
+.cp-card small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ba-gray);
+}

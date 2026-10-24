@@ -1,8 +1,8 @@
 // 카드 · 덱 규칙 중 상태를 바꾸지 않는 부분 (검사 · 섞기 · 거리). 효과 자체는 game.ts의 cardEffect.
 
-import { CARDS } from '../data/cards';
+import { CARDS, DECK_CARD_IDS } from '../data/cards';
 import { cardPlayLimit, relicRange } from './relics';
-import { CHARACTERS } from '../data/characters';
+import { kitRange } from './kits';
 import type { Rng } from './rng';
 import { RULES } from './rules';
 import type { BattleMods, Board, CardId, Enemy, GameState, HandCard, Player, PlayerStatus } from './types';
@@ -67,44 +67,14 @@ export function shuffle<T>(list: T[], rng: Rng): T[] {
   return out;
 }
 
-export function deckPoints(cards: CardId[]): number {
-  return cards.reduce((sum, id) => sum + (CARDS[id]?.points ?? 0), 0);
+/** 공용 카드에서 무작위 1장 (원작: 덱이 없다). 무게 = 카드 limit */
+export function randomCard(rng: Rng): CardId {
+  let r = rng.next() * POOL_TOTAL;
+  for (const [id, w] of POOL) if ((r -= w) < 0) return id;
+  return POOL[POOL.length - 1][0];
 }
-
-/** 덱 구성 오류 목록. 비어 있으면 정상 */
-export function validateDeck(cards: CardId[], budget: number): string[] {
-  const problems: string[] = [];
-  if (cards.length > RULES.deckSize) problems.push(`덱은 ${RULES.deckSize}장까지`);
-  if (cards.length < RULES.deckMin) problems.push(`덱은 ${RULES.deckMin}장 이상`);
-  const counts = new Map<CardId, number>();
-  for (const id of cards) {
-    if (!CARDS[id]) {
-      problems.push(`없는 카드: ${id}`);
-      continue;
-    }
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  for (const [id, n] of counts) {
-    if (n > CARDS[id].limit) problems.push(CARDS[id].limit === 0 ? `${CARDS[id].name}는 덱에 못 넣는다` : `${CARDS[id].name}는 ${CARDS[id].limit}장까지`);
-  }
-  const points = deckPoints(cards);
-  if (points > budget) problems.push(`덱 포인트 ${points} / ${budget}`);
-  return problems;
-}
-
-/** 덱에 이 카드를 1장 더 넣을 수 있는지 */
-export function canAddToDeck(cards: CardId[], id: CardId, budget: number): boolean {
-  const info = CARDS[id];
-  return (
-    cards.length < RULES.deckSize &&
-    cards.filter((c) => c === id).length < info.limit &&
-    deckPoints(cards) + info.points <= budget
-  );
-}
-
-export function deckBudget(p: Player): number {
-  return CHARACTERS[p.character].deckPoints;
-}
+const POOL: [CardId, number][] = DECK_CARD_IDS.map((id) => [id, CARDS[id].limit]);
+const POOL_TOTAL = POOL.reduce((a, [, w]) => a + w, 0);
 
 /** 카드를 쓸 때 내는 코인. 성에 따라 오르는 카드도 있다 (전술적 후퇴) */
 export function cardCoinCost(id: CardId, p: Player): number {
@@ -146,7 +116,7 @@ export function cardTargets(s: GameState, p: Player, id: CardId): number[] | nul
   if (!info.target) return null;
   if (info.target === 'enemy') {
     const dist = distances(s.board, p.tile);
-    const range = info.range! + relicRange(p);
+    const range = info.range! + (relicRange(p) + kitRange(p));
     return s.enemies.filter((e) => targetable(s, e) && (dist.get(e.tile) ?? Infinity) <= range).map((e) => e.id);
   }
   return s.players.filter((o) => !o.ko && (info.target === 'ally' || o.id !== p.id)).map((o) => o.id);
@@ -193,7 +163,3 @@ export function cardBlocker(s: GameState, p: Player, hand: HandCard): string | n
   return null;
 }
 
-/** 덱 정비는 내 거점 칸에서, 주사위 전이나 턴을 끝내기 전에만 */
-export function canEditDeck(s: GameState, p: Player): boolean {
-  return p.tile === p.home && (s.phase.kind === 'preRoll' || s.phase.kind === 'endTurn');
-}

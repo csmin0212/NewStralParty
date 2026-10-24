@@ -164,10 +164,20 @@ export const CARDS: Record<CardId, CardInfo> = {
   shieldCounter: card('shieldCounter', '실드 카운터', 'battle', '↩', '에너미에게 (공격력 − 내 방어력, 최소 1) 피해 · 반격을 받지 않는다', 'OJ Shield Counter (Lv4 20★, 1장)', {
     timing: 'defend', battleCost: 4, level: 3, points: 5, limit: 1, battle: { escape: true },
   }),
+
+  // ── 캐릭터가 만드는 카드 (공용 카드에는 없다) ──
+  livingPage: card('livingPage', '살아있는 책장', 'event', '📖', '6칸 안 에너미 2 피해 (린: 쓸 때마다 +1)', 'AP 活体书页 (린)', {
+    limit: 0, target: 'enemy', range: 6,
+  }),
+  talismanFu: card('talismanFu', '부적-복', 'support', '🧧', '아군 체력 +2', 'AP 符卡-福 (희몽조)', { limit: 0, target: 'ally' }),
+  talismanHuo: card('talismanHuo', '부적-화', 'boost', '🀄', '체력 -1', 'AP 符卡-祸 (희몽조)', { limit: 0 }),
+  bite: card('bite', '물어뜯기', 'battle', '🦷', '공격력 +2 · 반격 없음', 'AP 撕咬 (마무시)', {
+    timing: 'attack', battleCost: 1, limit: 0, battle: { atk: [2, 2], noCounter: true },
+  }),
 };
 
 export const CARD_IDS = Object.keys(CARDS) as CardId[];
-/** 덱에 넣을 수 있는 카드 */
+/** 공용 카드 (무게 = limit) */
 export const DECK_CARD_IDS = CARD_IDS.filter((id) => CARDS[id].limit > 0);
 
 export const CARD_TYPE_NAMES: Record<CardType, string> = {
@@ -176,26 +186,3 @@ export const CARD_TYPE_NAMES: Record<CardType, string> = {
   event: '이벤트',
   battle: '전투',
 };
-
-export interface DeckPreset {
-  name: string;
-  cards: CardId[];
-}
-
-/** 덱 슬롯 5개의 처음 값. 덱 편성 화면에서 고치고 저장한다 */
-export const DEFAULT_PRESETS: DeckPreset[] = [
-  {
-    name: '기본 덱',
-    cards: ['dash', 'dash', 'doubleDice', 'cake', 'cake', 'atkM', 'atkM', 'defM', 'rainbow', 'laser'],
-  },
-  {
-    name: '돌격 덱',
-    cards: ['atkM', 'atkM', 'atkL', 'atkL', 'shadowRaid', 'onFire', 'magnum', 'gawu', 'brick', 'dash'],
-  },
-  {
-    name: '서포트 덱',
-    cards: ['hurry', 'hurry', 'share', 'share', 'feast', 'backup', 'cake', 'cake', 'defM', 'retreat'],
-  },
-  { name: '덱 4', cards: [] },
-  { name: '덱 5', cards: [] },
-];

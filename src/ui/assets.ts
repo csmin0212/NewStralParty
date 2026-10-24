@@ -1,3 +1,4 @@
+import { CHARACTER_IDS, CHARACTERS } from '../data/characters';
 import { RELIC_IDS, relicFamily, type RelicId } from '../data/relics';
 import type { CardId, CharacterId, Enemy, MarkKind, TileKind } from '../engine/types';
 
@@ -8,9 +9,9 @@ export const BACKGROUND_ART = `${root}board/background.webp`;
 
 export const TILE_ART: Partial<Record<TileKind, string>> = {
   base: `${root}tiles/base.webp`,
-  coinPlus: `${root}tiles/coin-plus.webp`,
-  spawn: `${root}tiles/spawn.webp`,
-  coinMinus: `${root}tiles/coin-minus.webp`,
+  windfall: `${root}tiles/coin-plus.webp`,
+  monster: `${root}tiles/spawn.webp`,
+  calamity: `${root}tiles/coin-minus.webp`,
   card: `${root}tiles/card.webp`,
   heal: `${root}tiles/heal.webp`,
   warp: `${root}tiles/warp.webp`,
@@ -136,10 +137,10 @@ export const MEMORIAL_ART = {
   },
 };
 
-export const CHARACTER_MEMORIAL_ART: Record<CharacterId, string> = {
+export const CHARACTER_MEMORIAL_ART: Partial<Record<CharacterId, string>> = {
   mutbyeol: `${root}characters/mutbyeol/memorial/night-v3/original.webp`,
-  soda: `${root}characters/soda/memorial/scene-v6-swim.webp`,
-  mona: `${root}characters/mona/memorial/scene-v4.webp`,
+  soda: `${root}characters/soda/memorial/scene-v7-pastel.webp`,
+  mona: `${root}characters/mona/memorial/scene-v7-pastel.webp`,
 };
 
 export const CHARACTER_MEMORIAL_ANIMATION: Partial<Record<CharacterId, string>> = {
@@ -164,7 +165,7 @@ export interface CharacterArt {
   poses: Record<CharacterPose, string>;
 }
 
-export const CHARACTER_ART: Record<CharacterId, CharacterArt> = {
+const DRAWN_ART: Partial<Record<CharacterId, CharacterArt>> = {
   mutbyeol: {
     name: '뭇별',
     color: '#8EDBD9',
@@ -219,6 +220,33 @@ export const CHARACTER_ART: Record<CharacterId, CharacterArt> = {
     },
   },
 };
+
+/** 그림이 아직 없는 캐릭터 (원작 캐릭터): 대표 색 바탕 + 이름 첫 글자. docs/ASSETS.md 8차 요청 */
+function placeholderArt(id: CharacterId): CharacterArt {
+  const c = CHARACTERS[id];
+  const letter = c.name.slice(0, 1);
+  const svg = (w: number, h: number, round: boolean) =>
+    `data:image/svg+xml;utf8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">` +
+        (round
+          ? `<circle cx="${w / 2}" cy="${h / 2}" r="${w / 2 - 4}" fill="${c.color}" stroke="#fff" stroke-width="8"/>`
+          : `<rect x="4" y="4" width="${w - 8}" height="${h - 8}" rx="${w * 0.1}" fill="${c.color}" stroke="#fff" stroke-width="8"/>`) +
+        `<text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-weight="900" font-size="${w * 0.44}" fill="#fff">${letter}</text></svg>`,
+    )}`;
+  const main = svg(400, 560, false);
+  return {
+    name: c.name,
+    color: c.color,
+    main,
+    token: svg(256, 256, true),
+    portrait: svg(256, 256, true),
+    poses: { idle: main, attack: main, hit: main, block: main, evade: main, down: main },
+  };
+}
+
+export const CHARACTER_ART: Record<CharacterId, CharacterArt> = Object.fromEntries(
+  CHARACTER_IDS.map((id) => [id, DRAWN_ART[id] ?? placeholderArt(id)]),
+) as Record<CharacterId, CharacterArt>;
 
 const sodaRiderRoot = `${root}characters/soda/skins/rider/`;
 export const CHARACTER_SKINS: Partial<Record<CharacterId, Record<string, { name: string; art: CharacterArt }>>> = {

@@ -85,6 +85,8 @@ export interface MapDef {
   fixed?: Partial<Record<string, TileKind>>;
   /** 돌격문에서 나오는 에너미 */
   assault?: EnemyKind;
+  /** 몬스터 칸에서 나오는 에너미 */
+  monsters: EnemyKind[];
   theme: MapTheme;
 }
 
@@ -179,6 +181,9 @@ export function buildMap(def: MapDef): Board {
     tiles[f].warpTo = index.get(key(to))!;
   }
   for (const [k, kind] of Object.entries(def.fixed ?? {})) if (kind) kinds.set(index.get(k)!, kind);
+  // 확인 지점: 지름길 가운데 (원작 保障点은 맵 가운데 하나)
+  const mid = branchIds.filter((id) => !kinds.has(id))[Math.floor(branchIds.length / 2)];
+  if (mid !== undefined) kinds.set(mid, 'checkpoint');
   const rand = seeded(def.id);
   spread(loopIds, def.loopMix, rand, kinds);
   spread(branchIds, def.branchMix, rand, kinds);
@@ -191,19 +196,22 @@ export function buildMap(def: MapDef): Board {
     tiles,
     baseTile: homes[0],
     homeTiles: homes,
-    spawnTiles: tiles.filter((t) => t.kind === 'spawn').map((t) => t.id),
+    spawnTiles: tiles.filter((t) => t.kind === 'monster').map((t) => t.id),
     bossTile,
     assault: def.assault,
+    monsters: def.monsters,
   };
 }
 
 // ───────────────────────── 맵 ─────────────────────────
 
-const LOOP_BASE: Mix = { coinPlus: 7, coinMinus: 2, card: 5, heal: 3, shop: 2, event: 2, spawn: 3 };
+/** 원작 맵 구성 비율 (星趴·梦想号 56칸): 횡재 5 · 재앙 6 · 카드 4 · 회복 4 · 상점 3 · 칩 상점 1 · 이벤트 8 · 몬스터 8 · 질주 4 */
+const LOOP_BASE: Mix = { windfall: 4, calamity: 3, card: 3, heal: 3, shop: 2, chipShop: 1, event: 4, monster: 4, haste: 2 };
 
 export const MAP_DEFS: MapDef[] = [
   {
     id: 'abydos',
+    monsters: ['robot', 'drone', 'thief'],
     name: '아비도스 사막',
     loop: [[0, 0], [11, 0], [11, 7], [0, 7]],
     branches: [{ from: [3, 0], via: [[3, 3], [8, 3]], to: [8, 7] }],
@@ -211,7 +219,7 @@ export const MAP_DEFS: MapDef[] = [
     boss: [5, 3],
     warps: [[[6, 7], [11, 3]]],
     loopMix: { ...LOOP_BASE, sand: 4, boost: 2 },
-    branchMix: { sand: 3, card: 1, spawn: 1, boost: 1 },
+    branchMix: { sand: 3, card: 1, monster: 1, boost: 1 },
     assault: 'drone',
     theme: {
       ground: '#f3dcb0', grid: '#e6c792', side: '#c99a5b', road: ['#d8b27a', '#fff3dc', '#fbe7c2'],
@@ -222,13 +230,14 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'factory',
+    monsters: ['automaton', 'robot', 'drone'],
     name: '데카그라마톤 생산 시설',
     loop: [[0, 0], [6, 0], [6, 2], [11, 2], [11, 8], [0, 8]],
     branches: [{ from: [3, 0], via: [[3, 5]], to: [11, 5] }],
     homes: [[0, 0], [11, 2], [11, 8], [0, 8]],
     boss: [7, 5],
     loopMix: { ...LOOP_BASE, conveyor: 3, assault: 2 },
-    branchMix: { conveyor: 4, assault: 1, spawn: 1, card: 1 },
+    branchMix: { conveyor: 4, assault: 1, monster: 1, card: 1 },
     assault: 'automaton',
     theme: {
       ground: '#d9e1ea', grid: '#c2ccd8', side: '#7d8ba0', road: ['#9aa8b9', '#f4f7fa', '#e3e9f0'],
@@ -239,6 +248,7 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'slumpia-park',
+    monsters: ['slumpia', 'thief', 'drone'],
     name: '슬럼피아 놀이공원',
     loop: [[0, 0], [11, 0], [11, 7], [6, 7], [6, 4], [5, 4], [5, 7], [0, 7]],
     branches: [{ from: [2, 0], via: [[2, 3], [9, 3]], to: [9, 0] }],
@@ -246,7 +256,7 @@ export const MAP_DEFS: MapDef[] = [
     boss: [6, 3],
     warps: [[[3, 7], [10, 0]]],
     loopMix: { ...LOOP_BASE, boost: 3, trap: 2 },
-    branchMix: { boost: 4, event: 1, spawn: 1 },
+    branchMix: { boost: 4, event: 1, monster: 1 },
     assault: 'slumpia',
     theme: {
       ground: '#ffe7f1', grid: '#f9cfe0', side: '#d88aab', road: ['#f3a8c6', '#fffafc', '#ffeef6'],
@@ -257,6 +267,7 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'cathedral',
+    monsters: ['delinquent', 'robot', 'thief'],
     name: '트리니티 고성당',
     loop: [[3, 0], [8, 0], [8, 3], [11, 3], [11, 6], [8, 6], [8, 8], [3, 8], [3, 6], [0, 6], [0, 3], [3, 3]],
     branches: [
@@ -266,7 +277,7 @@ export const MAP_DEFS: MapDef[] = [
     homes: [[3, 0], [11, 3], [8, 8], [0, 6]],
     boss: [5, 4],
     loopMix: { ...LOOP_BASE, heal: 5, trap: 2 },
-    branchMix: { heal: 2, card: 2, spawn: 1, event: 1 },
+    branchMix: { heal: 2, card: 2, monster: 1, event: 1 },
     assault: 'delinquent',
     theme: {
       ground: '#f6efe2', grid: '#e6d9c2', side: '#b59a74', road: ['#d9c39d', '#fffbf3', '#f6ead4'],
@@ -277,6 +288,7 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'arena',
+    monsters: ['kaitenger', 'robot', 'drone'],
     name: '카이텐 특촬 결승 무대',
     loop: [[2, 0], [9, 0], [9, 1], [11, 1], [11, 6], [9, 6], [9, 7], [2, 7], [2, 6], [0, 6], [0, 1], [2, 1]],
     branches: [
@@ -286,7 +298,7 @@ export const MAP_DEFS: MapDef[] = [
     homes: [[2, 0], [11, 1], [9, 7], [0, 6]],
     boss: [5, 3],
     loopMix: { ...LOOP_BASE, stage: 4, boost: 2 },
-    branchMix: { stage: 3, assault: 1, spawn: 1 },
+    branchMix: { stage: 3, assault: 1, monster: 1 },
     assault: 'kaitenger',
     theme: {
       ground: '#e8eaf6', grid: '#d0d4ea', side: '#5d6598', road: ['#aab0d6', '#ffffff', '#eef0fb'],
@@ -297,6 +309,7 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'library',
+    monsters: ['perorominion', 'robot', 'thief'],
     name: '무한 도서관',
     loop: [[0, 0], [11, 0], [11, 8], [0, 8]],
     branches: [
@@ -308,7 +321,7 @@ export const MAP_DEFS: MapDef[] = [
     boss: [5, 4],
     warps: [[[2, 8], [9, 0]], [[9, 8], [2, 0]]],
     loopMix: { ...LOOP_BASE, clue: 5 },
-    branchMix: { clue: 3, card: 2, spawn: 1 },
+    branchMix: { clue: 3, card: 2, monster: 1 },
     assault: 'perorominion',
     theme: {
       ground: '#efe2cf', grid: '#ddc8aa', side: '#8a6a47', road: ['#c9a97c', '#fffaf1', '#f4e7d2'],
@@ -319,13 +332,14 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'datatower',
+    monsters: ['robot', 'drone', 'pillar'],
     name: '데이터 타워',
     loop: [[0, 0], [11, 0], [11, 7], [0, 7]],
     branches: [{ from: [2, 0], via: [[2, 2], [9, 2], [9, 5], [4, 5]], to: [4, 7] }],
     homes: [[0, 0], [11, 0], [11, 7], [0, 7]],
     boss: [9, 3],
     loopMix: { ...LOOP_BASE, boost: 3, trap: 2 },
-    branchMix: { boost: 3, trap: 2, spawn: 1, card: 1 },
+    branchMix: { boost: 3, trap: 2, monster: 1, card: 1 },
     assault: 'robot',
     theme: {
       ground: '#dfe9f5', grid: '#bfd2ea', side: '#3d5478', road: ['#7fa7d9', '#f5faff', '#dceafb'],
@@ -336,13 +350,14 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'circus',
+    monsters: ['slumpia', 'thief', 'delinquent'],
     name: '슬럼피아 서커스 거리',
     loop: [[0, 0], [3, 0], [3, 1], [6, 1], [6, 0], [11, 0], [11, 7], [8, 7], [8, 6], [5, 6], [5, 7], [0, 7]],
     branches: [{ from: [3, 1], via: [[3, 4], [8, 4]], to: [8, 6] }],
     homes: [[0, 0], [11, 0], [11, 7], [0, 7]],
     boss: [5, 4],
     loopMix: { ...LOOP_BASE, event: 5, boost: 2 },
-    branchMix: { event: 3, spawn: 1, card: 1 },
+    branchMix: { event: 3, monster: 1, card: 1 },
     assault: 'slumpia',
     theme: {
       ground: '#fff1dc', grid: '#f6dcb6', side: '#b0603f', road: ['#e8a068', '#fffaf2', '#fdebd2'],
@@ -353,13 +368,14 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'resort',
+    monsters: ['drone', 'robot', 'thief'],
     name: '여름 해변 리조트',
     loop: [[0, 0], [11, 0], [11, 5], [8, 5], [8, 8], [0, 8]],
     branches: [{ from: [4, 0], via: [[4, 5]], to: [8, 5] }],
     homes: [[0, 0], [11, 0], [8, 8], [0, 8]],
     boss: [4, 4],
     loopMix: { ...LOOP_BASE, current: 4, heal: 4 },
-    branchMix: { current: 3, spawn: 1, card: 1 },
+    branchMix: { current: 3, monster: 1, card: 1 },
     assault: 'drone',
     theme: {
       ground: '#fbefd2', grid: '#efdcb0', side: '#3fa3c9', road: ['#e6c98e', '#fffdf6', '#fdf2d8'],
@@ -370,13 +386,14 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'ghost-alley',
+    monsters: ['incarnation', 'delinquent', 'thief'],
     name: '백귀야행 골목',
     loop: [[0, 0], [5, 0], [5, 2], [11, 2], [11, 8], [6, 8], [6, 6], [0, 6]],
     branches: [{ from: [2, 0], via: [[2, 4], [8, 4]], to: [8, 8] }],
     homes: [[0, 0], [11, 2], [11, 8], [0, 6]],
     boss: [5, 4],
     loopMix: { ...LOOP_BASE, clock: 3, candy: 2, trap: 2 },
-    branchMix: { clock: 2, trap: 2, spawn: 1, candy: 1 },
+    branchMix: { clock: 2, trap: 2, monster: 1, candy: 1 },
     assault: 'incarnation',
     theme: {
       ground: '#3b3458', grid: '#4c4470', side: '#221d38', road: ['#6b5f9a', '#f2e8ff', '#cdbff0'],
@@ -387,6 +404,7 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'undercroft',
+    monsters: ['teapot', 'delinquent', 'robot'],
     name: '지하 대성당 학원',
     loop: [[0, 0], [11, 0], [11, 8], [0, 8]],
     branches: [
@@ -397,7 +415,7 @@ export const MAP_DEFS: MapDef[] = [
     homes: [[0, 0], [11, 0], [11, 8], [0, 8]],
     boss: [5, 5],
     loopMix: { ...LOOP_BASE, detention: 3 },
-    branchMix: { detention: 2, heal: 2, card: 1, spawn: 1 },
+    branchMix: { detention: 2, heal: 2, card: 1, monster: 1 },
     assault: 'teapot',
     theme: {
       ground: '#e6e9f4', grid: '#cfd5ea', side: '#4a4f7a', road: ['#a3a9d0', '#ffffff', '#eceffb'],
@@ -408,6 +426,7 @@ export const MAP_DEFS: MapDef[] = [
   },
   {
     id: 'snowfield',
+    monsters: ['robot', 'drone', 'delinquent'],
     name: '설원 전초 기지',
     loop: [[0, 0], [11, 0], [11, 7], [0, 7]],
     branches: [
@@ -417,7 +436,7 @@ export const MAP_DEFS: MapDef[] = [
     homes: [[0, 0], [11, 0], [11, 7], [0, 7]],
     boss: [5, 3],
     loopMix: { ...LOOP_BASE, heal: 2, ice: 5 },
-    branchMix: { ice: 4, spawn: 1, card: 1 },
+    branchMix: { ice: 4, monster: 1, card: 1 },
     assault: 'robot',
     theme: {
       ground: '#f4f9ff', grid: '#dbe9f7', side: '#8fb4d6', road: ['#b9d3ec', '#ffffff', '#eaf4ff'],

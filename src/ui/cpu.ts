@@ -3,8 +3,11 @@
 import { CARDS } from '../data/cards';
 import { RELICS } from '../data/relics';
 import { bossEnemy } from '../engine/boss';
+import { CHARACTERS } from '../data/characters';
+import { skillTargets } from '../engine/skills';
 import { cardBlocker, cardTargets, distances, handLimit } from '../engine/cards';
-import { applyAction, currentPlayer, RuleError } from '../engine/game';
+import { applyAction, currentPlayer, relicPrice, RuleError } from '../engine/game';
+import { RULES } from '../engine/rules';
 import type { Action, GameState, Player } from '../engine/types';
 
 /** 이 행동이 지금 통하는지 */
@@ -55,6 +58,8 @@ export function cpuAction(s: GameState): Action {
   }
   switch (s.phase.kind) {
     case 'preRoll': {
+      const skill = skillAction(s, p);
+      if (skill) return skill;
       // 쓸 수 있는 주사위 전 카드 하나 (대상이 있으면 보스 우선)
       const boss = bossEnemy(s);
       for (let i = 0; i < p.hand.length; i++) {
@@ -88,9 +93,20 @@ export function cpuAction(s: GameState): Action {
       // 상대 눈이 낮으면 회피가 유리하다
       return { type: 'DEFEND', player: me, mode: roll <= 3 ? 'evade' : 'block' };
     }
+    case 'stopChoice': {
+      // 성을 올릴 수 있거나 체력이 깎였으면 멈춘다
+      const cost = RULES.levelUpCost[p.level];
+      const stop = (cost !== undefined && p.coins >= cost) || p.hp <= p.maxHp - 2;
+      return { type: 'STOP_HERE', player: me, stop };
+    }
     case 'shop': {
       const shop = s.phase;
-      if (p.coins >= 30 && ok(s, { type: 'BUY_RELIC', player: me })) return { type: 'BUY_RELIC', player: me };
+      if (shop.chips) {
+        // 성 오름 돈은 남기고 산다
+        const keep = RULES.levelUpCost[p.level] ?? 0;
+        if (p.coins - relicPrice(p) >= Math.min(keep, 10) && ok(s, { type: 'BUY_RELIC', player: me })) return { type: 'BUY_RELIC', player: me };
+        return { type: 'LEAVE_SHOP', player: me };
+      }
       if (p.hand.length < handLimit(p)) {
         const offer = shop.offers.findIndex((o) => !o.sold && (shop.free || p.coins - o.price >= 15));
         if (offer >= 0 && ok(s, { type: 'BUY_CARD', player: me, offer })) return { type: 'BUY_CARD', player: me, offer };
@@ -100,4 +116,26 @@ export function cpuAction(s: GameState): Action {
     default:
       return { type: 'END_TURN', player: me };
   }
+}
+
+/** 액티브 스킬: 쓸 수 있으면 쓴다 (대상은 보스 · 체력이 가장 낮은 아군 우선) */
+function skillAction(s: GameState, p: Player): Action | null {
+  if (s.turn.skillUsed || p.skillCooldown > 0) return null;
+  const def = CHARACTERS[p.character].active;
+  const targets = skillTargets(s, p);
+  if (targets && targets.length === 0) return null;
+  let target: number | undefined;
+  if (targets) {
+    if (def.target === 'enemy') {
+      const boss = bossEnemy(s);
+      target = boss && targets.includes(boss.id) ? boss.id : targets[0];
+    } else {
+      target = [...targets].sort((a, b) => s.players[a].hp / s.players[a].maxHp - s.players[b].hp / s.players[b].maxHp)[0];
+    }
+  }
+  const cards = def.cards ? Array.from({ length: Math.min(def.cards[1], p.hand.length) }, (_, i) => i) : undefined;
+  if (def.cards && (cards?.length ?? 0) < def.cards[0]) return null;
+  const value = def.value ? def.value[1] : undefined;
+  const a: Action = { type: 'USE_SKILL', player: p.id, target, cards, value };
+  return ok(s, a) ? a : null;
 }
