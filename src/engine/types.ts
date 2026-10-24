@@ -691,6 +691,16 @@ export interface BossTurn {
   /** 움직인 에너미 (보스 포함): 지나간 칸 */
   moved: { enemy: number; path: number[] }[];
   lines: string[];
+  /** 원작 맵: 몬스터마다 차례대로 한 일 (스킬 · 이동 · 맞힌 캐릭터) */
+  acts?: EnemyAct[];
+}
+
+export interface EnemyAct {
+  enemy: number;
+  tile: number;
+  skill?: string;
+  path?: number[];
+  hits: { player: number; amount: number; note?: string }[];
 }
 
 export interface AttackResult {

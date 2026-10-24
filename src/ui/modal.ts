@@ -4,7 +4,7 @@ import { getSpeed, getVolumeSetting, setSpeed, setVolume, type Speed, type Volum
 import { sfx } from './sound';
 
 /** 가운데 흰 판 (블루 아카이브 팝업): 남색 머리띠 + 내용 + 아래 버튼. 바깥을 누르면 닫힌다 */
-function openModal(title: string, body: string, wide = false): HTMLElement {
+export function openModal(title: string, body: string, wide = false): HTMLElement {
   const el = document.createElement('div');
   el.className = 'ba-modal';
   el.innerHTML = `

@@ -1,7 +1,8 @@
 import { TILE_INFO } from '../data/board';
 import { ENEMIES } from '../data/enemies';
 import { bossEnemy, dangerTiles, markName } from '../engine/boss';
-import type { Board, BossTurn, Enemy, EnemyKind, GameState, Mark } from '../engine/types';
+import { apIntent, AP_MOVE_DIE } from '../engine/ap';
+import type { Board, BossTurn, Enemy, EnemyAct, EnemyKind, GameState, Mark } from '../engine/types';
 import { esc } from './html';
 import { BOSS_ART, ENEMY_ART, MARK_ART, TILE_ART } from './assets';
 import { campusLayout, campusScenery } from './campusMap';
@@ -13,12 +14,17 @@ import { skinArt } from './skins';
 
 const TILE = 70; // 칸 크기(px)
 const STEP_MS = 230;
+const ENEMY_STEP_MS = 140;
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 3;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** 보드와 말. 이동은 한 칸씩 애니메이션한다 */
 export class BoardView {
   onTileClick: (tileId: number) => void = () => {};
+  onTokenClick: (player: number) => void = () => {};
+  onEnemyClick: (enemy: number) => void = () => {};
 
   private readonly el: HTMLElement;
   private readonly tileEls: HTMLElement[];
@@ -26,9 +32,18 @@ export class BoardView {
   private readonly enemyEls = new Map<number, HTMLElement>();
   private readonly markEls = new Map<number, HTMLElement>();
   private readonly layout: ReturnType<typeof campusLayout>;
+  /** 몬스터에 마우스를 올리면 노리는 캐릭터까지 선 */
+  private readonly aimSvg: SVGSVGElement;
+  /** 몬스터마다 노리는 캐릭터 (추격 · 스킬) */
+  private aims = new Map<number, { prey: number | null; skill: number[] }>();
   /** 화면에 표시 중인 각 플레이어의 칸 */
   private shown: number[];
   private lastSeq = 0;
+  /** 카메라: 화면 맞춤 배율 위에 확대 · 이동 (화면 px) */
+  private readonly fit: HTMLElement;
+  private fitScale = 1;
+  private zoom = 1;
+  private pan = { x: 0, y: 0 };
 
   constructor(root: HTMLElement, private readonly board: Board, state: GameState) {
     this.layout = campusLayout(board);
@@ -38,7 +53,9 @@ export class BoardView {
     this.el.style.width = `${width}px`;
     this.el.style.height = `${height}px`;
     const theme = board.id ? MAP_THEMES[board.id] : undefined;
-    this.el.append(theme ? mapScenery(board, this.layout, theme) : campusScenery(board, this.layout), this.drawEdges());
+    this.aimSvg = document.createElementNS(SVG_NS, 'svg');
+    this.aimSvg.classList.add('aim-lines');
+    this.el.append(theme ? mapScenery(board, this.layout, theme) : campusScenery(board, this.layout), this.drawEdges(), this.aimSvg);
     if (theme) root.style.setProperty('--map-sky', theme.sky);
 
     this.tileEls = board.tiles.map((tile) => {
@@ -71,6 +88,7 @@ export class BoardView {
         tok.textContent = String(p.id + 1);
       }
       tok.title = p.name;
+      tok.onclick = () => this.onTokenClick(p.id);
       this.el.append(tok);
       return tok;
     });
@@ -93,15 +111,18 @@ export class BoardView {
     const fit = document.createElement('div');
     fit.className = 'board-fit';
     fit.append(this.el);
-    root.append(fit);
+    root.append(fit, this.cameraButtons());
+    this.fit = fit;
     new ResizeObserver(() => {
       const style = getComputedStyle(root);
       const availW = root.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       const availH = root.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
       const scale = Math.min(1.6, availW / width, availH / height);
+      this.fitScale = scale;
       this.el.style.transform = `scale(${scale})`;
       fit.style.width = `${width * scale}px`;
       fit.style.height = `${height * scale}px`;
+      this.applyCamera();
     }).observe(root);
 
     this.shown = state.players.map((p) => p.tile);
@@ -118,28 +139,127 @@ export class BoardView {
    * 끝나면 밀려난 말 · 새 표식까지 모두 새 상태로 맞춘다
    */
   async playBossTurn(state: GameState, turn: BossTurn) {
-    await Promise.all(
-      turn.moved.map(async ({ enemy, path }) => {
-        const el = this.enemyEls.get(enemy);
-        if (!el) return;
-        for (const tileId of path.slice(1)) {
-          this.placeEnemy(el, tileId);
-          await sleep(STEP_MS);
-        }
-      }),
-    );
-    for (const hit of turn.hits) {
-      if (hit.amount <= 0) continue;
-      const tok = this.tokenEls[hit.player];
-      tok.classList.remove('struck');
-      void tok.offsetWidth;
-      tok.classList.add('struck');
+    this.clearAim();
+    if (turn.acts) await this.playActs(turn.acts);
+    else {
+      await Promise.all(
+        turn.moved.map(async ({ enemy, path }) => {
+          const el = this.enemyEls.get(enemy);
+          if (!el) return;
+          for (const tileId of path.slice(1)) {
+            this.placeEnemy(el, tileId);
+            await sleep(STEP_MS);
+          }
+        }),
+      );
+      for (const hit of turn.hits) if (hit.amount > 0) this.strike(hit.player);
     }
     this.shown = state.players.map((p) => p.tile);
     this.layoutTokens(state.current);
     this.renderEnemies(state);
     this.renderMarks(state);
     this.highlight(state);
+  }
+
+  /**
+   * 원작 맵 몬스터 차례: 몬스터마다 스킬 이름 → 이동 → 맞은 말 순서로.
+   * 아무도 안 맞히고 걷기만 하는 몬스터는 다음 일 있는 몬스터 전에 한꺼번에 걷는다
+   */
+  private async playActs(acts: EnemyAct[]) {
+    let calm: EnemyAct[] = [];
+    const flush = async () => {
+      await Promise.all(calm.map((a) => this.walkEnemy(a, false)));
+      calm = [];
+    };
+    for (const a of acts) {
+      if (!a.skill && !a.hits.length) {
+        calm.push(a);
+        continue;
+      }
+      await flush();
+      const el = this.enemyEls.get(a.enemy);
+      this.follow(a.tile);
+      if (a.skill && el) {
+        this.say(el, a.skill);
+        sfx('boss');
+        await sleep(560);
+      }
+      await this.walkEnemy(a, true);
+      for (const hit of a.hits) {
+        if (hit.amount > 0) this.strike(hit.player);
+        this.pop(hit.player, hit.amount > 0 ? `-${hit.amount}` : (hit.note ?? ''));
+      }
+      if (a.hits.length) {
+        sfx('hurt');
+        await sleep(520);
+      }
+    }
+    await flush();
+  }
+
+  private async walkEnemy(a: EnemyAct, follow: boolean) {
+    const el = this.enemyEls.get(a.enemy);
+    if (!el || !a.path) return;
+    for (const tileId of a.path.slice(1)) {
+      this.placeEnemy(el, tileId);
+      if (follow) this.follow(tileId);
+      await sleep(ENEMY_STEP_MS);
+    }
+  }
+
+  private strike(player: number) {
+    const tok = this.tokenEls[player];
+    tok.classList.remove('struck');
+    void tok.offsetWidth;
+    tok.classList.add('struck');
+  }
+
+  /** 몬스터 머리 위 말풍선 (스킬 이름) */
+  private say(el: HTMLElement, text: string) {
+    const b = document.createElement('span');
+    b.className = 'enemy-say';
+    b.textContent = text;
+    el.append(b);
+    setTimeout(() => b.remove(), 1400);
+  }
+
+  /** 말 위로 피해 숫자 */
+  private pop(player: number, text: string) {
+    if (!text) return;
+    const c = this.layout.centers[this.shown[player]];
+    const b = document.createElement('span');
+    b.className = 'hit-pop';
+    b.textContent = text;
+    b.style.left = `${c.x}px`;
+    b.style.top = `${c.y - 40}px`;
+    this.el.append(b);
+    setTimeout(() => b.remove(), 1100);
+  }
+
+  private showAim(enemyId: number) {
+    const aim = this.aims.get(enemyId);
+    const el = this.enemyEls.get(enemyId);
+    this.clearAim();
+    if (!aim || !el) return;
+    const from = { x: parseFloat(el.style.left) + 18, y: parseFloat(el.style.top) + 18 };
+    const line = (player: number, cls: string) => {
+      const c = this.layout.centers[this.shown[player]];
+      const l = document.createElementNS(SVG_NS, 'line');
+      l.setAttribute('x1', String(from.x));
+      l.setAttribute('y1', String(from.y));
+      l.setAttribute('x2', String(c.x));
+      l.setAttribute('y2', String(c.y));
+      l.classList.add(cls);
+      this.aimSvg.append(l);
+      this.tokenEls[player].classList.add('aimed');
+    };
+    if (aim.prey !== null) line(aim.prey, 'chase');
+    for (const id of aim.skill) if (id !== aim.prey) line(id, 'skill');
+  }
+
+  private clearAim() {
+    this.aimSvg.replaceChildren();
+    for (const t of this.tokenEls) t.classList.remove('aimed');
   }
 
   /** 이 보드 그림인지 (매직 아카데미 2단처럼 맵이 바뀌면 새로 그린다) */
@@ -175,6 +295,7 @@ export class BoardView {
       for (const [i, tileId] of path.entries()) {
         this.shown[move.player] = tileId;
         this.layoutTokens(move.player);
+        this.follow(tileId);
         tok.classList.remove('hop');
         void tok.offsetWidth;
         tok.classList.add('hop');
@@ -197,6 +318,95 @@ export class BoardView {
     this.renderEnemies(state);
     this.renderMarks(state);
     this.highlight(state);
+    if (state.current !== this.followed) {
+      this.followed = state.current;
+      this.follow(state.players[state.current].tile);
+    }
+  }
+
+  // ───────── 카메라 ─────────
+
+  private followed = -1;
+
+  /** 확대해 있으면 이 칸으로 시점을 옮긴다 */
+  private follow(tileId: number) {
+    if (this.zoom > 1.05) this.lookAt(tileId, true);
+  }
+
+  /** 칸을 화면 가운데로 */
+  lookAt(tileId: number, ease = false) {
+    const c = this.layout.centers[tileId];
+    const s = this.fitScale;
+    this.pan = {
+      x: -this.zoom * (c.x * s - (this.layout.width * s) / 2),
+      y: -this.zoom * (c.y * s - (this.layout.height * s) / 2),
+    };
+    this.applyCamera(ease);
+  }
+
+  focusPlayer(player: number) {
+    if (this.zoom < 1.8) this.zoom = 1.8;
+    this.lookAt(this.shown[player], true);
+  }
+
+  /** 화면 좌표 (x, y)를 중심으로 확대 · 축소 */
+  zoomAt(factor: number, x?: number, y?: number) {
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, this.zoom * factor));
+    if (next === this.zoom) return;
+    const r = this.fit.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const mx = x ?? cx;
+    const my = y ?? cy;
+    // 커서 아래 지점이 그대로 커서 아래에 남도록
+    const k = next / this.zoom;
+    this.pan = { x: this.pan.x + (mx - cx) * (1 - k), y: this.pan.y + (my - cy) * (1 - k) };
+    this.zoom = next;
+    this.applyCamera();
+  }
+
+  panBy(dx: number, dy: number) {
+    this.pan = { x: this.pan.x + dx, y: this.pan.y + dy };
+    this.applyCamera();
+  }
+
+  resetCamera() {
+    this.zoom = 1;
+    this.pan = { x: 0, y: 0 };
+    this.applyCamera(true);
+  }
+
+  private applyCamera(ease = false) {
+    const w = this.layout.width * this.fitScale;
+    const h = this.layout.height * this.fitScale;
+    // 보드 가장자리가 화면 안쪽으로 너무 들어오지 않게 (맞춤 배율에서도 조금은 움직인다)
+    const limX = (w * (this.zoom - 1)) / 2 + w * 0.2;
+    const limY = (h * (this.zoom - 1)) / 2 + h * 0.2;
+    this.pan.x = Math.max(-limX, Math.min(limX, this.pan.x));
+    this.pan.y = Math.max(-limY, Math.min(limY, this.pan.y));
+    this.fit.classList.toggle('cam-ease', ease);
+    this.fit.style.transform = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
+    this.fit.parentElement?.classList.toggle('zoomed', this.zoom > 1.05);
+  }
+
+  private cameraButtons(): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'cam-ctl';
+    el.innerHTML = `
+      <button class="icon-btn" data-cam="in" title="확대 (휠 · +)">＋</button>
+      <button class="icon-btn" data-cam="out" title="축소 (휠 · -)">－</button>
+      <button class="icon-btn" data-cam="me" title="지금 차례 (F)">🎯</button>
+      <button class="icon-btn" data-cam="fit" title="전체 (R)">⛶</button>`;
+    el.onclick = (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-cam]');
+      if (!b) return;
+      const cam = b.dataset.cam;
+      if (cam === 'in') this.zoomAt(1.25);
+      else if (cam === 'out') this.zoomAt(0.8);
+      else if (cam === 'me') this.focusPlayer(this.followed < 0 ? 0 : this.followed);
+      else this.resetCamera();
+    };
+    return el;
   }
 
   private placeEnemy(el: HTMLElement, tileId: number) {
@@ -254,8 +464,12 @@ export class BoardView {
       if (!el) {
         el = document.createElement('div');
         el.className = `enemy enemy-${looksBoss ? 'boss' : enemy.kind}${looksBoss ? ' boss' : ''}`;
-        el.innerHTML = `<span class="enemy-art-clip"></span><i class="ehp"><b></b></i><i class="emark"></i>
+        el.innerHTML = `<span class="enemy-art-clip"></span><i class="ehp"><b></b></i><i class="emark"></i><i class="eaim"></i>
           <span class="elabel"><b class="ename"></b><span class="ehp-text"></span></span>`;
+        const id = enemy.id;
+        el.onclick = () => this.onEnemyClick(id);
+        el.onmouseenter = () => this.showAim(id);
+        el.onmouseleave = () => this.clearAim();
         this.el.append(el);
         this.enemyEls.set(enemy.id, el);
         this.placeEnemy(el, enemy.tile);
@@ -272,7 +486,7 @@ export class BoardView {
       el.classList.toggle('counter', shown.counter);
       el.classList.toggle('burrowed', enemy.isBoss && state.bossState.hidden);
       el.classList.toggle('groggy', enemy.isBoss && state.bossState.groggy > 0);
-      el.title = `${shown.name} HP ${shown.hp}/${shown.maxHp} · 공격 ${shown.atk} 방어 ${shown.def}${shown.counter ? ' · 반격형' : ''}${enemyTrait(enemy)}`;
+      el.title = `${shown.name} HP ${shown.hp}/${shown.maxHp} · 공격 ${shown.atk} 방어 ${shown.def}${shown.counter ? ' · 반격형' : ''}${enemyTrait(enemy, !!state.ap)}`;
       el.querySelector<HTMLElement>('.ehp b')!.style.width = `${(shown.hp / shown.maxHp) * 100}%`;
       // 원작처럼 머리 위에 이름 · ⚔공격, 그 아래 HP 숫자
       el.querySelector('.ename')!.innerHTML = `${esc(shown.name)} <small>⚔${shown.atk}</small>`;
@@ -280,7 +494,26 @@ export class BoardView {
       const markEl = el.querySelector<HTMLElement>('.emark')!;
       markEl.textContent = enemy.mark ? `🎯${enemy.mark}` : '';
       markEl.title = enemy.mark ? `표식 ${enemy.mark} · 모든 피해 +1` : '';
+      this.renderAim(state, enemy, el);
     }
+  }
+
+  /** 다음 차례 미리보기: 쫓는 캐릭터 번호 (자리 색) · 스킬 준비 */
+  private renderAim(state: GameState, enemy: Enemy, el: HTMLElement) {
+    const badge = el.querySelector<HTMLElement>('.eaim')!;
+    if (!state.ap) {
+      badge.innerHTML = '';
+      return;
+    }
+    const it = apIntent(state, enemy);
+    this.aims.set(enemy.id, { prey: it.prey, skill: it.skill?.targets ?? [] });
+    const prey = it.prey !== null ? state.players[it.prey] : null;
+    badge.innerHTML = [
+      it.sleeping ? '<b class="zz">💤</b>' : '',
+      prey ? `<b class="prey" style="--c:${prey.color}">${prey.id + 1}</b>` : it.randomPrey ? '<b class="prey" style="--c:#8a9bb5">?</b>' : '',
+      it.skill?.ready ? '<b class="ready">✦</b>' : '',
+    ].join('');
+    el.classList.toggle('skill-ready', !!it.skill?.ready);
   }
 
   /** 연출용: 플레이어 말의 화면 좌표 (말 머리 위) */
@@ -422,13 +655,14 @@ function markTitle(state: GameState, m: Mark): string {
 }
 
 /** 에너미 특성 한 줄 (툴팁) */
-function enemyTrait(e: Enemy): string {
+function enemyTrait(e: Enemy, ap: boolean): string {
   if (e.isBoss) return '';
   const info = ENEMIES[e.kind as EnemyKind];
   const parts: string[] = [];
   if (info.decoy) return '';
+  const roam = ap ? (info.fixedMove ?? (info.roam ? AP_MOVE_DIE : 0)) : info.roam;
   if (info.steal) parts.push(`덮치면 코인 ${info.steal} 훔침${e.loot ? ` (훔친 코인 ${e.loot})` : ''}`);
-  else if (info.roam) parts.push(`보스 차례마다 ${info.chase ? '가까운 아군을 쫓아' : ''} 1~${info.roam}칸 이동`);
+  else if (roam) parts.push(`보스 차례마다 ${info.chase ? '가까운 아군을 쫓아' : ''} 1~${roam}칸 이동`);
   if (info.fuse) parts.push(`${e.timer ?? info.fuse.turns}차례 뒤 자폭 (주변 ${info.fuse.range}칸 ${info.fuse.amount})`);
   if (info.calls) parts.push(`${info.calls.every}차례마다 ${ENEMIES[info.calls.kind].name} 호출`);
   if (info.link) parts.push('받은 피해를 보스도 받는다');

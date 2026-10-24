@@ -1,6 +1,7 @@
 import { ENEMIES } from '../data/enemies';
 import { activePart, bossEnemy, currentIntent } from '../engine/boss';
 import { bossDefBonus } from '../engine/skills';
+import { apIntent } from '../engine/ap';
 import type { BossDef, Enemy, GameState } from '../engine/types';
 import { BOSS_ART } from './assets';
 import { esc } from './html';
@@ -95,10 +96,13 @@ function apChips(state: GameState, boss: Enemy, chip: (cls: string, text: string
   const ap = state.boss.ap;
   if (!a || !ap) return;
   if (!a.awake) chip('sleep', '💤 잠', '깨어나기 전에는 움직이지도 스킬을 쓰지도 않는다');
-  if (ap.skill) {
-    const cd = boss.cd ?? 0;
-    chip('skill', `${esc(ap.skill.name)} ${cd > 0 ? `${cd}R` : '준비'}`, ap.skill.text);
+  const it = apIntent(state, boss);
+  const who = (ids: number[]) => ids.map((id) => esc(state.players[id].name)).join(' · ');
+  if (it.skill) {
+    const to = it.skill.ready && it.skill.targets.length ? ` → ${who(it.skill.targets)}` : '';
+    chip('skill', `✦ ${esc(it.skill.name)} ${it.skill.ready ? '준비' : `${it.skill.cd}R`}${to}`, ap.skill?.text ?? '');
   }
+  if (it.prey !== null) chip('aim', `👣 ${who([it.prey])}`, '쫓는 캐릭터');
   const st = boss.st ?? {};
   if ((a.vars.shield ?? 0) > 0) chip('shield', `심도 개조 ${a.vars.shield}`, '인공생명체를 쓰러뜨릴 때마다 -1. 남아 있으면 공격 · 지정할 수 없다');
   if (st.scale) chip('scale', `금린 ${st.scale}`, '층마다 공격력 · 방어력 +1');

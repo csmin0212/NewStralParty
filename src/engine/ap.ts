@@ -10,7 +10,7 @@ import { distances, randomCard, statusDef } from './cards';
 import { bossEnemy, bossTurnHit, freeTileFor } from './boss';
 import { damage, drawCards, heal, isOver, log, notice, spawnEnemy } from './game';
 import { gainRelic, offerRelic } from './relics';
-import { kitDef, kitEnemyAtk, kitFought, kitSafe } from './kits';
+import { kitDef, kitEnemyAtk, kitFought, kitSafe, kitSlow, kitTaunter } from './kits';
 import type { Rng } from './rng';
 import type { ApState, BossTurn, CardId, Enemy, EnemyKind, GameState, MapTask, Player } from './types';
 
@@ -432,26 +432,37 @@ function gardenGate(s: GameState) {
 /** 라운드 끝 몬스터 · 보스 차례 (원작 몬스터 행동: 스킬을 쓰고 움직인다) */
 export function apEnemyPhase(s: GameState, rng: Rng, turn: BossTurn) {
   const order = [...s.enemies].sort((a, b) => rank(a) - rank(b) || a.id - b.id);
+  turn.acts = [];
   for (const e of order) {
     if (!s.enemies.includes(e) || isOver(s)) continue;
     if (e.isBoss && !ap(s).awake) continue;
-    const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
-    if (info?.ally) {
-      allyAct(s, rng, e);
-      continue;
-    }
-    turnStartPassive(s, rng, e, turn);
-    if (!s.enemies.includes(e) || isOver(s)) continue;
-    const skill = e.isBoss ? s.boss.ap?.skill : info?.skill;
-    if (skill && !(e.isBoss && e.st?.silenced === s.round)) {
-      if ((e.cd ?? 0) <= 0) {
-        useSkill(s, rng, e, turn);
-        e.cd = skill.cd - 1;
-      } else e.cd = (e.cd ?? 0) - 1;
-    }
-    if (!s.enemies.includes(e) || isOver(s)) continue;
-    moveEnemy(s, rng, e, turn);
+    const from = { tile: e.tile, hits: turn.hits.length, moved: turn.moved.length, lines: turn.lines.length };
+    act(s, rng, e, turn);
+    const path = turn.moved.slice(from.moved).find((m) => m.enemy === e.id)?.path;
+    const skill = turn.lines.slice(from.lines).map((l) => l.split(': ').slice(1).join(': ')).join(' · ');
+    const hits = turn.hits.slice(from.hits);
+    if (path || skill || hits.length) turn.acts.push({ enemy: e.id, tile: from.tile, skill: skill || undefined, path, hits });
   }
+}
+
+/** 몬스터 하나의 차례: 시작 패시브 → 스킬 → 이동 */
+function act(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
+  const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
+  if (info?.ally) {
+    allyAct(s, rng, e);
+    return;
+  }
+  turnStartPassive(s, rng, e, turn);
+  if (!s.enemies.includes(e) || isOver(s)) return;
+  const skill = e.isBoss ? s.boss.ap?.skill : info?.skill;
+  if (skill && !(e.isBoss && e.st?.silenced === s.round)) {
+    if ((e.cd ?? 0) <= 0) {
+      useSkill(s, rng, e, turn);
+      e.cd = skill.cd - 1;
+    } else e.cd = (e.cd ?? 0) - 1;
+  }
+  if (!s.enemies.includes(e) || isOver(s)) return;
+  moveEnemy(s, rng, e, turn);
 }
 
 /** 원작 행동 순서: 도둑이 먼저, 보스와 소환된 것이 뒤 */
@@ -479,22 +490,21 @@ function useSkill(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
       break;
     }
     case 'shootTop': {
-      const p = topHp(playersNear(s, e.tile, range));
+      const [p] = skillTargets(s, e);
       if (!p) return;
       line();
       hurt(p, skill.amount ?? e.atk);
       break;
     }
     case 'shootFar': {
-      const d = dist(s, e.tile);
-      const p = topHp(alive(s).filter((x) => (d.get(x.tile) ?? 99) > range));
+      const [p] = skillTargets(s, e);
       if (!p) return;
       line();
       hurt(p, skill.amount ?? e.atk);
       break;
     }
     case 'poisonTop': {
-      const p = topHp(playersNear(s, e.tile, range));
+      const [p] = skillTargets(s, e);
       if (!p) return;
       line();
       hurt(p, skill.amount ?? 2);
@@ -523,7 +533,7 @@ function useSkill(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
     }
     case 'aoe':
     case 'noise': {
-      const hit = playersNear(s, e.tile, range);
+      const hit = skillTargets(s, e);
       if (!hit.length) return;
       line();
       for (const p of hit) hurt(p, skill.amount ?? 2);
@@ -531,7 +541,7 @@ function useSkill(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
       break;
     }
     case 'mushroom': {
-      const p = playersNear(s, e.tile, range)[0];
+      const [p] = skillTargets(s, e);
       if (!p) return;
       line();
       hurt(p, skill.amount ?? 2);
@@ -539,7 +549,7 @@ function useSkill(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
       break;
     }
     case 'saw': {
-      const p = playersNear(s, e.tile, range).find((x) => !x.ap?.overclock);
+      const [p] = skillTargets(s, e);
       if (!p) return;
       line();
       heal(p, 1);
@@ -593,8 +603,7 @@ function useSkill(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
       break;
     }
     case 'indicate': {
-      const n = e.hp * 2 <= e.maxHp ? 2 : 1;
-      const near = playersNear(s, e.tile, 99).slice(0, n);
+      const near = skillTargets(s, e);
       for (const p of near) give(p, 'hisFault');
       if (near.length) line();
       break;
@@ -611,7 +620,7 @@ function useSkill(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
       break;
     }
     case 'scientist': {
-      const p = playersNear(s, e.tile, 99).find((x) => !x.ap?.overclock);
+      const [p] = skillTargets(s, e);
       if (p) addOverclock(p, 3);
       placeMist(s);
       line();
@@ -625,7 +634,7 @@ function useSkill(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
       break;
     }
     case 'bond': {
-      const p = playersNear(s, e.tile, 99).find((x) => !x.ap?.bond);
+      const [p] = skillTargets(s, e);
       if (!p) return;
       pst(p).bond = 3;
       line();
@@ -699,44 +708,154 @@ function allyAct(s: GameState, rng: Rng, e: Enemy) {
 
 // ───────────────────────── 이동 ─────────────────────────
 
-function moveEnemy(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
-  const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
-  if (e.kind === 'trainee' && !e.st?.moves) return;
-  const fixed = info?.fixedMove;
-  let roam = e.isBoss ? (s.boss.ap?.roam ?? 0) : (info?.roam ?? (e.st?.moves ? 2 : 0));
-  if (e.isBoss && e.st?.solitude) roam += 2;
-  if (e.isBoss && has(s, 'rebirth') && e.hp * 2 <= e.maxHp) roam += 2;
-  if (!fixed && !roam) return;
-  const slow = e.tags?.slow ?? 0;
-  const steps = fixed ?? Math.max(0, rng.int(1, roam) - slow);
-  if (steps <= 0) return;
-  const target = chaseTarget(s, rng, e);
-  walk(s, rng, e, steps, target, turn);
+/** 원작 몬스터 이동 주사위 (플레이어와 같은 10면) */
+export const AP_MOVE_DIE = 10;
+
+/** 움직이는 몬스터인지 (원작: 공격형 · 추격형 · 정해진 칸 수) */
+function mover(s: GameState, e: Enemy): boolean {
+  if (e.isBoss) return !!s.boss.ap?.roam && !!s.ap?.awake;
+  const info = ENEMIES[e.kind as EnemyKind];
+  if (info.ally) return false;
+  if (e.kind === 'trainee') return !!e.st?.moves;
+  return !!(info.roam || info.fixedMove);
 }
 
-/** 쫓는 캐릭터: 학원 안전관은 문제아 · 원앙은 연리 · 가우 왕은 무작위 · 그 밖은 가장 가까운 캐릭터 */
-function chaseTarget(s: GameState, rng: Rng, e: Enemy): Player[] | null {
-  const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
-  if (!e.isBoss && !info?.chase && !e.st?.moves) return null;
+function chaser(e: Enemy): boolean {
+  if (e.isBoss) return true;
+  return !!ENEMIES[e.kind as EnemyKind].chase || e.kind === 'trainee';
+}
+
+/**
+ * 노리는 캐릭터 (원작: 길 위에서 가장 가까운 캐릭터 · 같으면 앞자리).
+ * 도발 · 문제아 · 연리 · 가우 왕 무작위 추격이 먼저. rng가 없으면 미리보기 (아직 안 정한 무작위는 null)
+ */
+export function apPrey(s: GameState, e: Enemy, rng?: Rng): Player | null {
+  if (!chaser(e)) return null;
   const targets = alive(s).filter((p) => !kitSafe(s, p));
   if (!targets.length) return null;
+  const taunt = kitTaunter(s, e);
+  if (taunt && targets.includes(taunt)) return taunt;
+  let pool = targets;
   if (e.isBoss && has(s, 'fury')) {
     const problem = targets.filter((p) => p.ap?.problem);
-    if (problem.length) return problem;
+    if (problem.length) pool = problem;
   }
   if (e.kind === 'lovebirdChalice') {
     const bonded = targets.filter((p) => p.ap?.bond);
-    if (bonded.length) return bonded;
+    if (bonded.length) pool = bonded;
   }
   if (e.isBoss && has(s, 'chaseRandom')) {
-    const id = (e.st?.prey ?? -1) >= 0 && targets.some((p) => p.id === e.st!.prey) ? e.st!.prey : rng.pick(targets).id;
-    st(e).prey = id;
-    return targets.filter((p) => p.id === id);
+    const kept = targets.find((p) => p.id === e.st?.prey);
+    if (kept) return kept;
+    if (!rng) return null;
+    const p = rng.pick(targets);
+    st(e).prey = p.id;
+    return p;
   }
-  return targets;
+  const d = dist(s, e.tile);
+  return [...pool].sort((a, b) => (d.get(a.tile) ?? 99) - (d.get(b.tile) ?? 99) || a.id - b.id)[0];
 }
 
-function walk(s: GameState, rng: Rng, e: Enemy, steps: number, prey: Player[] | null, turn: BossTurn) {
+/** 이번 이동 칸 수: 10면 주사위 (빨간 영혼 3 · 피냐타 4) · 라쿤은 6칸 안에 아무도 없으면 +3 · 고독 · 부활 +2 · 이동 감소 */
+function apSteps(s: GameState, rng: Rng, e: Enemy): number {
+  const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
+  if (info?.fixedMove) return info.fixedMove;
+  let n = rng.int(1, AP_MOVE_DIE);
+  if (e.kind === 'thief' && playersNear(s, e.tile, 6).length === 0) n += 3;
+  if (e.isBoss && e.st?.solitude) n += 2;
+  if (e.isBoss && has(s, 'rebirth') && e.hp * 2 <= e.maxHp) n += 2;
+  return Math.max(0, n - kitSlow(s, e));
+}
+
+function moveEnemy(s: GameState, rng: Rng, e: Enemy, turn: BossTurn) {
+  if (!mover(s, e)) return;
+  const steps = apSteps(s, rng, e);
+  if (steps <= 0) return;
+  walk(s, rng, e, steps, apPrey(s, e, rng), turn);
+}
+
+/** 몬스터가 다음 차례에 할 일 (화면 미리보기: 노리는 캐릭터 · 스킬과 맞을 캐릭터) */
+export interface EnemyIntent {
+  /** 쫓아가 공격할 캐릭터 */
+  prey: number | null;
+  /** 아직 안 정한 무작위 추격 (가우 왕) */
+  randomPrey: boolean;
+  moves: boolean;
+  sleeping: boolean;
+  skill: { name: string; text: string; cd: number; ready: boolean; targets: number[] } | null;
+}
+
+export function apIntent(s: GameState, e: Enemy): EnemyIntent {
+  const sleeping = e.isBoss && !s.ap?.awake;
+  const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
+  const skill = e.isBoss ? s.boss.ap?.skill : info?.skill;
+  const moves = !sleeping && mover(s, e);
+  const prey = moves ? apPrey(s, e) : null;
+  const ready = !!skill && !sleeping && (e.cd ?? 0) <= 0 && !(e.isBoss && e.st?.silenced === s.round);
+  return {
+    prey: prey?.id ?? null,
+    randomPrey: moves && !prey && e.isBoss && has(s, 'chaseRandom'),
+    moves,
+    sleeping,
+    skill: skill
+      ? { name: skill.name, text: skill.text, cd: Math.max(0, e.cd ?? 0), ready, targets: ready ? skillTargets(s, e).map((p) => p.id) : [] }
+      : null,
+  };
+}
+
+/** 캐릭터마다 노리는 몬스터 수 (어그로) */
+export function apAggro(s: GameState): number[] {
+  const out = s.players.map(() => 0);
+  if (!s.ap) return out;
+  for (const e of s.enemies) {
+    const it = apIntent(s, e);
+    const hit = new Set([...(it.prey !== null ? [it.prey] : []), ...(it.skill?.targets ?? [])]);
+    for (const id of hit) out[id] += 1;
+  }
+  return out;
+}
+
+/** 스킬이 맞힐 캐릭터 (정해진 규칙만, 무작위 · 소환은 빈 목록) */
+function skillTargets(s: GameState, e: Enemy): Player[] {
+  const skill = e.isBoss ? s.boss.ap?.skill : ENEMIES[e.kind as EnemyKind]?.skill;
+  if (!skill) return [];
+  const range = skill.range ?? 99;
+  const one = (p: Player | undefined) => (p ? [p] : []);
+  switch (skill.id) {
+    case 'shootTop':
+    case 'poisonTop':
+      return one(topHp(playersNear(s, e.tile, range)));
+    case 'shootFar': {
+      const d = dist(s, e.tile);
+      return one(topHp(alive(s).filter((x) => (d.get(x.tile) ?? 99) > range)));
+    }
+    case 'mushroom':
+      return one(playersNear(s, e.tile, range)[0]);
+    case 'saw':
+      return one(playersNear(s, e.tile, range).find((x) => !x.ap?.overclock));
+    case 'aoe':
+    case 'noise':
+    case 'mamushiChain':
+      return playersNear(s, e.tile, range);
+    case 'chain':
+      return alive(s).filter((p) => p.ap?.overclock);
+    case 'indicate':
+      return playersNear(s, e.tile, 99).slice(0, e.hp * 2 <= e.maxHp ? 2 : 1);
+    case 'scientist':
+      return one(playersNear(s, e.tile, 99).find((x) => !x.ap?.overclock));
+    case 'display':
+      return one(topHp(alive(s)));
+    case 'bond':
+      return one(playersNear(s, e.tile, 99).find((x) => !x.ap?.bond));
+    case 'wings':
+      return alive(s);
+    default:
+      return [];
+  }
+}
+
+function walk(s: GameState, rng: Rng, e: Enemy, steps: number, target: Player | null, turn: BossTurn) {
+  const prey = target ? [target] : null;
   const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
   const fly = !!info?.fly;
   const path = [e.tile];

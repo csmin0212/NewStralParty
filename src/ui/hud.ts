@@ -20,6 +20,8 @@ import { skinArt } from './skins';
 import { cardFace } from './cardView';
 import { bossBar } from './bossHud';
 import { openBossInfo, openSettings } from './modal';
+import { openPlayerInfo } from './playerInfo';
+import { apAggro } from '../engine/ap';
 
 export interface HudHandlers {
   dispatch(action: Action): void;
@@ -52,6 +54,7 @@ export function renderHud(
   logOpen: boolean,
   h: HudHandlers,
 ) {
+  const aggro = apAggro(state);
   el.innerHTML = `
     <div class="hud-top">
       ${roundBadge(state)}
@@ -60,7 +63,7 @@ export function renderHud(
         <button class="icon-btn ${logOpen ? 'on' : ''}" data-action="log" title="기록">📜</button>
       </div>
     </div>
-    <ul class="hud-players">${state.players.map((p) => playerCard(state, p)).join('')}</ul>
+    <ul class="hud-players">${state.players.map((p) => playerCard(state, p, aggro[p.id])).join('')}</ul>
     ${currentCard(state)}
     ${handCards(state)}
     <div class="hud-action ${busy ? 'busy' : ''}">${actionArea(state)}</div>
@@ -79,6 +82,8 @@ export function renderHud(
   log.scrollTop = log.scrollHeight;
 
   el.onclick = (e) => {
+    const info = (e.target as HTMLElement).closest<HTMLElement>('.hud-player');
+    if (info) return openPlayerInfo(state, Number(info.dataset.player));
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!btn || btn.disabled) return;
     const player = state.current;
@@ -217,12 +222,13 @@ function levelBadge(level: number): string {
   return `<span class="lv-badge" title="${level}성 / ${max}성"><b>${level}</b>성<span class="pips">${pips}</span></span>`;
 }
 
-function playerCard(state: GameState, p: Player): string {
+function playerCard(state: GameState, p: Player, aggro = 0): string {
   const cls = ['hud-player', p.id === state.current ? 'current' : '', p.ko ? 'ko' : ''].join(' ');
   const cost = RULES.levelUpCost[p.level];
   return `
-    <li class="${cls}" style="--c:${p.color}">
+    <li class="${cls}" style="--c:${p.color}" data-player="${p.id}">
       <div class="pc-avatar"><img src="${skinArt(p.character, p.skin).portrait}" alt="" draggable="false"><span>${p.id + 1}</span></div>
+      ${aggro ? `<i class="pc-aggro" title="노리는 몬스터 ${aggro}">👹${aggro}</i>` : ''}
       <div class="pc-hp"><img class="hp-icon" src="${UI_ART.heart}" alt="HP"><b>${p.hp}</b>/${p.maxHp}</div>
       <div class="pc-body">
         <div class="pc-name">${p.cpu ? '<span class="cpu-tag">CPU</span>' : ''}${esc(p.name)}${p.ko ? ` <span class="ko-tag">KO · ${p.reviveRound}R 부활</span>` : ''}</div>
@@ -254,7 +260,7 @@ function relicRow(p: Player): string {
   return `<div class="pc-relics">${stacks}${icons}</div>`;
 }
 
-function relicIcon(id: RelicId): string {
+export function relicIcon(id: RelicId): string {
   const art = RELIC_ART[id];
   return art ? `<img src="${art}" alt="">` : RELICS[id].icon;
 }
@@ -295,7 +301,7 @@ function relicPicker(state: GameState): string {
 }
 
 /** 카드 강화 · 보스 약화 (턴 수는 자기 차례 시작마다 줄어든다) */
-function statusChips(p: Player): string {
+export function statusChips(p: Player): string {
   const st = p.status;
   const chips: string[] = [];
   const chip = (cls: string, text: string, tip: string) => chips.push(`<i class="st-chip ${cls}" title="${esc(tip)}">${text}</i>`);
@@ -373,7 +379,7 @@ const AP_STATUS: Record<string, [string, string]> = {
 };
 
 /** 원작 맵 상태 아이콘 */
-function apStatusChips(p: Player): string {
+export function apStatusChips(p: Player): string {
   const a = p.ap;
   if (!a) return '';
   return Object.entries(AP_STATUS)

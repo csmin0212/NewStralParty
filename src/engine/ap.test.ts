@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AP_BOARD_MAP } from '../data/apBoards';
 import { AP_BOSSES, KING_GAWU, KID_GAWU, LION_GAWU, MAD_SCIENTIST, MASAO } from '../data/apMaps';
 import { MAPS } from '../data/maps';
-import { apChallengeable, apKill, apPass, apTurnEnd } from './ap';
+import { apAggro, apChallengeable, apIntent, apKill, apPass, apPrey, apTurnEnd } from './ap';
 import { applyAction, createGame, forward, validateBoard } from './game';
 import { hurtEnemy } from './boss';
 import { createRng } from './rng';
@@ -63,6 +63,40 @@ describe('원작 협동 맵 보드', () => {
 
   it('8개 맵 모두 보스 고르기 목록에 있다', () => {
     expect(AP_BOSSES.map((b) => b.map)).toEqual(['dreama', 'soul', 'watertown', 'academy', 'dragonpalace', 'ghostalley', 'autumnwood', 'garden']);
+  });
+});
+
+describe('몬스터 AI', () => {
+  it('가장 가까운 캐릭터를 노린다 · 같으면 앞자리', () => {
+    const s = game(KID_GAWU);
+    const boss = { ...s.enemies[0], id: 98, isBoss: true, tile: s.players[2].tile };
+    s.ap!.awake = true;
+    expect(apPrey(s, boss)?.id).toBe(2);
+    for (const p of s.players) p.tile = s.players[3].home;
+    expect(apPrey(s, boss)?.id).toBe(0);
+  });
+
+  it('미리보기: 다음 차례 이동 · 스킬 준비', () => {
+    let s = game(KING_GAWU);
+    s.progress = 2;
+    s = nextRound(s);
+    const boss = s.enemies.find((e) => e.isBoss)!;
+    expect(apIntent(s, boss).sleeping).toBe(true);
+    s.ap!.awake = true;
+    const it = apIntent(s, boss);
+    expect(it.moves).toBe(true);
+    expect(it.randomPrey).toBe(true);
+    boss.st = { ...boss.st, prey: 1 };
+    expect(apIntent(s, boss).prey).toBe(1);
+    expect(apAggro(s).reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+  });
+
+  it('몬스터 차례는 몬스터마다 한 일을 차례대로 남긴다', () => {
+    let s = game(KING_GAWU);
+    s = nextRound(s);
+    const acts = s.bossTurn?.acts ?? [];
+    expect(acts.length).toBeGreaterThan(0);
+    for (const a of acts) expect(a.path || a.skill || a.hits.length).toBeTruthy();
   });
 });
 

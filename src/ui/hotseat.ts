@@ -21,6 +21,7 @@ import { BoardView } from './boardView';
 import { FxLayer } from './fx';
 import { deltaEvents, resultEvents, turnEvents, type FxEvent } from './fxEvents';
 import { renderHud, type HudHandlers } from './hud';
+import { openEnemyInfo, openPlayerInfo } from './playerInfo';
 
 /**
  * 핫시트: 한 화면에서 모두가 돌아가며 조작한다.
@@ -277,9 +278,9 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
       // 원작 매직 아카데미: 젤리 전사를 쓰러뜨리면 둘째 맵으로
       const area = root.querySelector<HTMLElement>('.board-area')!;
       area.innerHTML = '';
-      const onTile = board.onTileClick;
+      const { onTileClick, onTokenClick, onEnemyClick } = board;
       board = new BoardView(area, state.board, state);
-      board.onTileClick = onTile;
+      Object.assign(board, { onTileClick, onTokenClick, onEnemyClick });
     }
     await board.show(state);
     floats(deltaEvents(prev, state));
@@ -328,6 +329,16 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
       dispatch({ type: 'CHOOSE_PATH', player: state.current, to: tileId });
     }
   };
+  // 말을 누르면 그 캐릭터 정보 (갈림길에서 고를 칸 위의 말이면 그 칸으로)
+  board.onTokenClick = (player) => {
+    const tile = state.players[player].tile;
+    if (state.phase.kind === 'choosePath' && state.phase.options.includes(tile)) board.onTileClick(tile);
+    else openPlayerInfo(state, player);
+  };
+  board.onEnemyClick = (id) => {
+    const e = state.enemies.find((x) => x.id === id);
+    if (e) openEnemyInfo(state, e);
+  };
 
   document.addEventListener(
     'keydown',
@@ -338,6 +349,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     },
     { signal: cleanup.signal },
   );
+  cameraInput(root.querySelector<HTMLElement>('.board-area')!, () => board, cleanup.signal);
 
   // 게임 시작: 시작하자마자 발동한 기믹(진행도 1) → ROUND 01 → 첫 차례
   busy = true;
@@ -352,4 +364,110 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     saveGame(state, players);
     cpuTurn();
   })();
+}
+
+/** 맵 시점: 휠 · +/- 확대, 끌기 · WASD · 화살표 이동, F 지금 차례, R 전체 */
+function cameraInput(area: HTMLElement, board: () => BoardView, signal: AbortSignal) {
+  const on = { signal };
+  area.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      board().zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
+    },
+    { signal, passive: false },
+  );
+
+  // 끌기: 6px 넘게 움직이면 시점 이동, 그때는 놓을 때의 클릭을 먹는다
+  let drag: { x: number; y: number; moved: boolean } | null = null;
+  area.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.button !== 0 && e.button !== 1) return;
+      if ((e.target as HTMLElement).closest('.cam-ctl')) return;
+      drag = { x: e.clientX, y: e.clientY, moved: false };
+    },
+    on,
+  );
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      drag.moved = true;
+      area.classList.add('panning');
+      board().panBy(dx, dy);
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+    },
+    on,
+  );
+  const eat = (e: Event) => {
+    e.stopPropagation();
+    e.preventDefault();
+  };
+  window.addEventListener(
+    'pointerup',
+    () => {
+      if (drag?.moved) {
+        area.addEventListener('click', eat, { capture: true, once: true });
+        setTimeout(() => area.removeEventListener('click', eat, { capture: true }), 0);
+      }
+      drag = null;
+      area.classList.remove('panning');
+    },
+    on,
+  );
+
+  // 키보드: 누르고 있는 동안 계속 움직인다
+  const DIRS: Record<string, [number, number]> = {
+    KeyW: [0, 1],
+    ArrowUp: [0, 1],
+    KeyS: [0, -1],
+    ArrowDown: [0, -1],
+    KeyA: [1, 0],
+    ArrowLeft: [1, 0],
+    KeyD: [-1, 0],
+    ArrowRight: [-1, 0],
+  };
+  const held = new Set<string>();
+  let frame = 0;
+  let last = 0;
+  const tick = (now: number) => {
+    const dt = Math.min(50, now - last);
+    last = now;
+    let x = 0;
+    let y = 0;
+    for (const k of held) {
+      x += DIRS[k][0];
+      y += DIRS[k][1];
+    }
+    if (x || y) board().panBy(x * dt * 0.7, y * dt * 0.7);
+    frame = held.size ? requestAnimationFrame(tick) : 0;
+  };
+  const typing = (e: KeyboardEvent) =>
+    e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]') !== null);
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (typing(e) || document.querySelector('.ba-modal')) return;
+      if (DIRS[e.code]) {
+        e.preventDefault();
+        if (!held.has(e.code)) board().panBy(DIRS[e.code][0] * 24, DIRS[e.code][1] * 24);
+        held.add(e.code);
+        if (!frame) {
+          last = performance.now();
+          frame = requestAnimationFrame(tick);
+        }
+      } else if (e.code === 'Equal' || e.code === 'NumpadAdd') board().zoomAt(1.25);
+      else if (e.code === 'Minus' || e.code === 'NumpadSubtract') board().zoomAt(0.8);
+      else if (e.code === 'KeyR' && !e.repeat) board().resetCamera();
+      else if (e.code === 'KeyF' && !e.repeat) area.querySelector<HTMLElement>('[data-cam="me"]')?.click();
+    },
+    on,
+  );
+  document.addEventListener('keyup', (e) => held.delete(e.code), on);
+  window.addEventListener('blur', () => held.clear(), on);
 }
