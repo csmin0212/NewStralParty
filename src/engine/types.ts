@@ -174,6 +174,7 @@ export type CharacterId =
   | 'mutbyeol'
   | 'soda'
   | 'mona'
+  | 'laurel'
   // 아스트랄 파티
   | 'parunan' | 'fanny' | 'alana' | 'komachi' | 'padman' | 'papara' | 'ren' | 'mimi' | 'z3000' | 'pandaman'
   | 'inkshadow' | 'lulu' | 'fen' | 'haiqing' | 'misaki' | 'nardis' | 'jasmine' | 'al' | 'luka' | 'nancy'
@@ -442,9 +443,9 @@ export interface Enemy {
   /** 표식: 있으면 모든 피해 +1, 보스 차례마다 -1 */
   mark?: number;
   /** 캐릭터 스킬이 붙인 상태 (engine/kits.ts): 받는 피해 + · 팬 · 약점 · 조사 · 붙잡힘 · 침식 · 마역 */
-  tags?: Partial<Record<'vuln' | 'fan' | 'flaw' | 'probe' | 'grab' | 'erode' | 'abyss' | 'taunt' | 'slow' | 'roar' | 'fanDown', number>>;
+  tags?: Partial<Record<'vuln' | 'fan' | 'flaw' | 'probe' | 'grab' | 'erode' | 'abyss' | 'taunt' | 'slow' | 'roar' | 'fanDown' | 'unluck', number>>;
   /** tags를 건 플레이어 */
-  tagBy?: Partial<Record<'vuln' | 'flaw' | 'probe' | 'taunt', number>>;
+  tagBy?: Partial<Record<'vuln' | 'flaw' | 'probe' | 'taunt' | 'unluck', number>>;
   /** 지나온 칸 (양방향 맵) */
   prev?: number;
   /** 원작 스킬 재사용 대기 (남은 라운드) */

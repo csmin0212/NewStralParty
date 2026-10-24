@@ -492,8 +492,11 @@ export class BoardView {
       el.querySelector('.ename')!.innerHTML = `${esc(shown.name)} <small>⚔${shown.atk}</small>`;
       el.querySelector('.ehp-text')!.textContent = enemy.isBoss && state.bossState.hidden ? '땅속' : `${shown.hp}/${shown.maxHp}`;
       const markEl = el.querySelector<HTMLElement>('.emark')!;
-      markEl.textContent = enemy.mark ? `🎯${enemy.mark}` : '';
-      markEl.title = enemy.mark ? `표식 ${enemy.mark} · 모든 피해 +1` : '';
+      const unluck = enemy.tags?.unluck ?? 0;
+      markEl.textContent = [enemy.mark ? `🎯${enemy.mark}` : '', unluck ? `🌀${unluck}` : ''].filter(Boolean).join(' ');
+      markEl.title = [enemy.mark ? `표식 ${enemy.mark} · 모든 피해 +1` : '', unluck ? `불운 ${unluck} · 라우렐에게 받는 피해 +${unluck}` : '']
+        .filter(Boolean)
+        .join(' · ');
       this.renderAim(state, enemy, el);
     }
   }

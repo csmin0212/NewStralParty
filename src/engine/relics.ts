@@ -39,6 +39,7 @@ const CLASS_WEIGHTS: Partial<Record<CharacterId, Partial<Record<RelicPool, numbe
   mutbyeol: { attack: 100 },
   soda: { attack: 100 },
   mona: { support: 80, cards: 30 },
+  laurel: { attack: 100 },
 };
 
 function classWeight(c: CharacterId, pool: RelicPool): number {

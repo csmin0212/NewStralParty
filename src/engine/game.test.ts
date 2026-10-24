@@ -1564,3 +1564,66 @@ describe('원작 공식 문구 3', () => {
     expect([CARDS.dragonRoar.battleCost, CARDS.bite.battleCost]).toEqual([3, 2]);
   });
 });
+
+describe('라우렐', () => {
+  const game = () => newGame(ring(empties(30)), { character: 'laurel' });
+  const skill = (s: GameState, target: number) => applyAction(s, { type: 'USE_SKILL', player: s.current, target });
+
+  it('능력치 · 시작 코인 +6', () => {
+    const p = game().players[0];
+    expect(p).toMatchObject({ hp: 8, maxHp: 8, atk: 2, def: 0, coins: RULES.startCoins + 6 });
+    expect(CHARACTERS.laurel.stars).toEqual([{ atk: 1, maxHp: 2 }, { atk: 1 }, { maxHp: 1 }]);
+  });
+
+  it('너 때문이야: 10칸 안 또는 불운이 있는 몬스터 · 불운 1 뒤 전투 · 전투하면 불운 +1', async () => {
+    const { skillTargets } = await import('./skills');
+    let s = withEnemy(withEnemy(game(), 'robot', 4), 'robot', 15);
+    const [near, far] = s.enemies;
+    expect(skillTargets(s, s.players[0])).toEqual([near.id]);
+    s.enemies[1].tags = { unluck: 1 };
+    s.enemies[1].tagBy = { unluck: 0 };
+    expect(skillTargets(s, s.players[0])).toEqual([near.id, far.id]);
+    s = skill(s, near.id);
+    expect(s.phase.kind).toBe('encounter');
+    expect(s.enemies[0].tags?.unluck).toBe(1);
+    s = attack(s);
+    expect(s.enemies.find((e) => e.id === near.id)?.tags?.unluck ?? 2).toBe(2);
+  });
+
+  it('불운: 라우렐이 주는 피해 + · 방어력 + · 최대 3', async () => {
+    const { kitDef, kitFought } = await import('./kits');
+    const { strikeEnemy } = await import('./game');
+    const { createRng } = await import('./rng');
+    const s = withEnemy(game(), 'elite', 3);
+    const [p, other] = s.players;
+    const e = s.enemies[0];
+    for (let i = 0; i < 5; i++) kitFought(s, p, e);
+    expect(e.tags?.unluck).toBe(3);
+    expect(kitDef(s, p, e)).toBe(3);
+    expect(kitDef(s, other, e)).toBe(0);
+    const hp = e.hp;
+    strikeEnemy(s, createRng(1), p, e, 2);
+    expect(e.hp).toBe(hp - 5);
+    strikeEnemy(s, createRng(1), other, e, 2);
+    expect(e.hp).toBe(hp - 7);
+  });
+
+  it('액티브 전투로 처치: 재사용 -2 · 2마리마다 공격력 +1', async () => {
+    const { kitKill } = await import('./kits');
+    const { createRng } = await import('./rng');
+    const s = withEnemy(game(), 'robot', 3);
+    const p = s.players[0];
+    const atk = p.atk;
+    for (let i = 0; i < 2; i++) {
+      p.skillCooldown = 3;
+      p.charVars.skillBattle = 1;
+      kitKill(s, createRng(1), p, s.enemies[0]);
+      expect(p.skillCooldown).toBe(1);
+    }
+    expect(p.atk).toBe(atk + 1);
+    // 액티브 전투가 아니면 그대로
+    p.skillCooldown = 3;
+    kitKill(s, createRng(1), p, s.enemies[0]);
+    expect(p.skillCooldown).toBe(3);
+  });
+});

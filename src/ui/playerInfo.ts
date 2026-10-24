@@ -108,6 +108,7 @@ export function openEnemyInfo(s: GameState, e: Enemy) {
       `<li><b>✦ ${esc(it.skill.name)}</b><span>${it.skill.ready ? (it.skill.targets.length ? it.skill.targets.map(name).join(' · ') : '준비') : `${it.skill.cd}R`}</span></li>`,
     );
   const traits = [info?.fly ? '비행' : '', e.counter ? '반격' : '', info?.ally ? '아군' : ''].filter(Boolean).join(' · ');
+  const tags = [e.mark ? `🎯 표식 ${e.mark}` : '', e.tags?.unluck ? `🌀 불운 ${e.tags.unluck}` : ''].filter(Boolean);
   const body = `
     <div class="pi">
       <div class="pi-top">
@@ -118,6 +119,7 @@ export function openEnemyInfo(s: GameState, e: Enemy) {
           <div class="pi-stats">${stat('⚔', '공격력', e.atk)}${stat('🛡', '방어력', e.def)}</div>
         </div>
       </div>
+      ${tags.length ? `<div class="pi-chips">${tags.map((t) => `<span class="pi-chip">${t}</span>`).join('')}</div>` : ''}
       ${it?.skill ? skillRow('스킬', it.skill.name, it.skill.text) : ''}
       ${rows.length ? `<h4 class="bs-h">다음 차례</h4><ul class="bs-rows pi-aim">${rows.join('')}</ul>` : ''}
     </div>

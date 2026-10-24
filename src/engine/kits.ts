@@ -46,6 +46,20 @@ function tag(e: Enemy, key: keyof NonNullable<Enemy['tags']>, n: number) {
   e.tags = { ...e.tags, [key]: n };
 }
 
+/** 라우렐 불운: 스택당 라우렐에게 받는 피해 +1 (최대 3) */
+export const UNLUCK_MAX = 3;
+
+export function unluck(e: Enemy, p: Player): number {
+  return e.tagBy?.unluck === p.id ? (e.tags?.unluck ?? 0) : 0;
+}
+
+function addUnluck(s: GameState, p: Player, e: Enemy) {
+  const n = Math.min(UNLUCK_MAX, unluck(e, p) + 1);
+  tag(e, 'unluck', n);
+  e.tagBy = { ...e.tagBy, unluck: p.id };
+  log(s, `  ${e.name}: 불운 ${n}`);
+}
+
 const isBattle = (c: CardId) => CARDS[c].type === 'battle';
 const FOOD = new Set<CardId>(['cookie', 'cake', 'bandage', 'pudding']);
 const isAttackCard = (c: CardId) => CARDS[c].type === 'battle' && CARDS[c].timing === 'attack';
@@ -350,10 +364,11 @@ export function kitAtk(s: GameState, p: Player, e: Enemy): number {
   return n;
 }
 
-/** 방어할 때 더하는 방어력 */
-export function kitDef(s: GameState, p: Player): number {
+/** 방어할 때 더하는 방어력. e: 싸우는 몬스터 (라우렐: 그 몬스터의 불운만큼) */
+export function kitDef(s: GameState, p: Player, e?: Enemy): number {
   const c = v(p);
   let n = 0;
+  if (p.character === 'laurel' && e) n += unluck(e, p);
   if (p.character === 'padman') n += c.dDef ?? 0;
   if (p.character === 'fen' && p.stacks > 0) n += 2;
   if (p.character === 'jasmine' && on(s, p, 'overload')) n -= 3;
@@ -364,6 +379,16 @@ export function kitDef(s: GameState, p: Player): number {
   if (p.character === 'ame') n -= p.stacks;
   if (p.character === 'dorothy') n += p.stacks;
   return n;
+}
+
+/** 내가 주는 피해 + (라우렐: 불운) */
+export function kitDamageBonus(p: Player, e: Enemy): number {
+  return p.character === 'laurel' ? unluck(e, p) : 0;
+}
+
+/** 사거리 밖이어도 액티브로 고를 수 있는 몬스터 (라우렐: 불운) */
+export function kitSkillReach(p: Player, e: Enemy): boolean {
+  return p.character === 'laurel' && unluck(e, p) > 0;
 }
 
 /** 이 몬스터가 이 플레이어를 공격할 때 공격력 - (팬) */
@@ -447,6 +472,7 @@ export function kitHit(s: GameState, rng: Rng, p: Player, e: Enemy, dealt: numbe
 /** 몬스터와 싸웠다 (공격 · 반격 · 쫓아온 전투): 팬 */
 export function kitFought(s: GameState, p: Player, e: Enemy) {
   if (p.character === 'kangel' || (p.character === 'ame' && teammate(s, 'kangel'))) tag(e, 'fan', 1);
+  if (p.character === 'laurel' && s.enemies.includes(e)) addUnluck(s, p, e);
 }
 
 /** 회피 성공 */
@@ -456,6 +482,7 @@ export function kitEvaded(p: Player) {
 
 /** 내가 건 전투가 끝났다 */
 export function kitBattleEnd(s: GameState, p: Player) {
+  if (p.character === 'laurel') v(p).skillBattle = 0;
   switch (p.character) {
     case 'fen':
       p.stacks = Math.max(0, p.stacks - 1);
@@ -481,6 +508,17 @@ export function kitBattleEnd(s: GameState, p: Player) {
 
 /** 에너미를 쓰러뜨렸다 */
 export function kitKill(s: GameState, rng: Rng, p: Player, e: Enemy) {
+  // 라우렐: 너 때문이야로 건 전투에서 처치 → 재사용 -2 · 2마리마다 공격력 +1
+  if (p.character === 'laurel' && v(p).skillBattle) {
+    v(p).skillBattle = 0;
+    p.skillCooldown = Math.max(0, p.skillCooldown - 2);
+    v(p).skillKills = (v(p).skillKills ?? 0) + 1;
+    log(s, `${p.name}: 재사용 -2`);
+    if (v(p).skillKills % 2 === 0) {
+      p.atk += 1;
+      log(s, `${p.name}: 공격력 +1`);
+    }
+  }
   if (p.character === 'z3000') {
     p.skillCooldown = Math.max(0, p.skillCooldown - 2);
     // 잠재: 2마리마다 공격력 +1 (계속)
@@ -881,6 +919,10 @@ export function kitActive(s: GameState, rng: Rng, p: Player, input: KitInput): K
       s.turn.diceCount = Math.max(2, s.turn.diceCount);
       s.turn.noBattle = true;
       break;
+    case 'laurel':
+      addUnluck(s, p, enemy!);
+      c.skillBattle = 1;
+      return { kind: 'challenge', enemy: enemy!.id, far: false };
     case 'nancy': {
       const d = distances(s.board, p.tile).get(enemy!.tile) ?? 99;
       // 잠재: 6칸보다 멀면 전투 카드 1장 · 방화벽

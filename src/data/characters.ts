@@ -147,6 +147,28 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     },
     stack: { name: '팬', max: 5 },
   },
+  laurel: {
+    id: 'laurel',
+    name: '라우렐',
+    color: '#8E7CC3',
+    hp: 8,
+    atk: 2,
+    def: 0,
+    startBonus: 6,
+    stars: [{ atk: 1, maxHp: 2 }, { atk: 1 }, { maxHp: 1 }],
+    active: {
+      name: '너 때문이야',
+      cooldown: 3,
+      target: 'enemy',
+      range: 10,
+      description: '10칸 이내, 혹은 [불운]이 1스택 이상인 적을 하나 선택한다. 선택한 적에게 [불운]을 1스택 부여하고 전투한다. 그 공격으로 적을 죽였다면 쿨타임이 2 감소한다.',
+    },
+    passive: {
+      name: '형언할 수 없는',
+      description:
+        '자신과 전투한 캐릭터에게 [불운] 1스택을 준다. 전투 시 상대의 [불운] 스택만큼 방어력이 증가한다. 액티브 스킬로 적을 2명 죽일 때마다 공격력이 1 증가한다. [불운]: 스택당 라우렐에게 받는 피해 +1 (최대 3).',
+    },
+  },
 
   // ───────── 아스트랄 파티 (협동 문구) ─────────
   parunan: ap('parunan', 101, '帕露南', '商业之主', '파루난', '#F5B940', [1, 2, 10], 'A', {

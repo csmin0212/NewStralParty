@@ -819,7 +819,7 @@ function roam(s: GameState, rng: Rng, e: Enemy, steps: number, turn: BossTurn) {
     // 쫓아와 거는 전투: 몬스터 공격 vs 아군 방어 (주사위 1~6씩, 최소 1)
     for (const p of victims) {
       if (isOver(s)) break;
-      const dmg = Math.max(1, e.atk + kitEnemyAtk(e, p) + rng.d6() - (p.def + statusDef(p) + kitDef(s, p) + rng.d6()));
+      const dmg = Math.max(1, e.atk + kitEnemyAtk(e, p) + rng.d6() - (p.def + statusDef(p) + kitDef(s, p, e) + rng.d6()));
       kitFought(s, p, e);
       hit(s, rng, p, dmg, turn, e.name);
       if (!p.ko && !isOver(s)) kitRetaliate(s, rng, p, e, true);

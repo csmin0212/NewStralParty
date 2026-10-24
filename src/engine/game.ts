@@ -138,6 +138,7 @@ import {
   kitBattleCost,
   kitCardDamage,
   kitSpare,
+  kitDamageBonus,
 } from './kits';
 import { createRng, type Rng } from './rng';
 import { RULES } from './rules';
@@ -702,7 +703,7 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       if (s.phase.kind !== 'defend') break;
       const { stepsLeft } = s.phase;
       const foe = findEnemy(s, s.phase.enemy);
-      const dmg = hurtEnemy(s, rng, foe, Math.max(1, foe.atk - (p.def + statusDef(p) + relicDefense(p) + kitDef(s, p) + b.def)));
+      const dmg = hurtEnemy(s, rng, foe, Math.max(1, foe.atk - (p.def + statusDef(p) + relicDefense(p) + kitDef(s, p, foe) + b.def)));
       battleEvent({ damage: dmg, targetHp: foe.hp });
       log(s, `  실드 카운터 — ${foe.name}에게 ${dmg} 피해`);
       if (isOver(s)) {
@@ -718,7 +719,7 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
 
 /** 전투 밖에서 에너미에게 피해 (이벤트 카드). 쓰러뜨리면 보상, 보스면 승리. giver: 모나가 준 카드면 팬레터 */
 export function strikeEnemy(s: GameState, rng: Rng, p: Player, enemy: Enemy, amount: number, giver?: Player) {
-  const dealt = hurtEnemy(s, rng, enemy, amount);
+  const dealt = hurtEnemy(s, rng, enemy, amount > 0 ? amount + kitDamageBonus(p, enemy) : amount);
   log(s, `  ${enemy.name}에게 ${dealt} 피해 (체력 ${enemy.hp})`);
   if (enemy.hp > 0 || isOver(s)) return;
   const def = enemyDefAgainst(s, p, enemy);
@@ -917,7 +918,7 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   });
   kitAttackRolled(p, hit);
   const decoy = !enemy.isBoss && ENEMIES[enemy.kind as EnemyKind].decoy;
-  hit.damage = hurtEnemy(s, rng, enemy, hit.damage);
+  hit.damage = hurtEnemy(s, rng, enemy, hit.damage > 0 ? hit.damage + kitDamageBonus(p, enemy) : 0);
   battle.events.push({ type: 'attack', attacker: 'player', result: hit, targetHp: enemy.hp });
   log(s, `  ${p.name}의 공격 ${hit.attackValue} vs ${defenseName(hit.mode)} ${hit.defenseValue} → ${hit.damage} 피해`);
   if (isOver(s)) {
@@ -966,7 +967,7 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
 
   const mods = s.turn.battle;
   apCountered(s, rng, enemy);
-  const me = { atk: p.atk, def: p.def + statusDef(p) + relicDefense(p) + kitDef(s, p) + apDisplayBonus(p, enemy) + mods.def };
+  const me = { atk: p.atk, def: p.def + statusDef(p) + relicDefense(p) + kitDef(s, p, enemy) + apDisplayBonus(p, enemy) + mods.def };
   const dice = evadeDice(p) + mods.evadeDice;
   const foe = { atk: Math.max(0, enemy.atk + kitEnemyAtk(enemy, p) + apEnemyAtk(s, enemy, p)), def: enemy.def };
   const hit = resolveAttack(foe, me, mode, rng, mode === 'evade' ? dice : 1, { attackRoll });

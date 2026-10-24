@@ -4,7 +4,7 @@
 import { CHARACTERS } from '../data/characters';
 import { distances, targetable } from './cards';
 import { hasRelic } from './relics';
-import { kitEnemyDef, kitSkillRange } from './kits';
+import { kitEnemyDef, kitSkillRange, kitSkillReach } from './kits';
 import { apEnemyDef } from './ap';
 import type { Enemy, GameState, Player } from './types';
 
@@ -40,7 +40,7 @@ export function skillTargets(s: GameState, p: Player): number[] | null {
   if (!target || range === undefined) return null;
   const dist = distances(s.board, p.tile);
   const near = (tile: number) => (dist.get(tile) ?? Infinity) <= range;
-  if (target === 'enemy') return s.enemies.filter((e) => targetable(s, e) && near(e.tile)).map((e) => e.id);
+  if (target === 'enemy') return s.enemies.filter((e) => targetable(s, e) && (near(e.tile) || kitSkillReach(p, e))).map((e) => e.id);
   // 아군: 다른 아군만 (ally) 또는 나 포함 (anyAlly)
   return s.players.filter((o) => (target === 'anyAlly' || o.id !== p.id) && !o.ko && near(o.tile)).map((o) => o.id);
 }

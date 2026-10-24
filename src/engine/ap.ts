@@ -918,7 +918,7 @@ function walk(s: GameState, rng: Rng, e: Enemy, steps: number, target: Player | 
 /** 쫓아와 거는 전투: 몬스터 공격 vs 아군 방어 (주사위 1~6씩, 최소 1) */
 function contactFight(s: GameState, rng: Rng, e: Enemy, p: Player, turn: BossTurn) {
   const atk = e.atk + kitEnemyAtk(e, p) + apEnemyAtk(s, e, p);
-  const dmg = Math.max(1, atk + rng.d6() - (p.def + statusDef(p) + kitDef(s, p) + rng.d6()));
+  const dmg = Math.max(1, atk + rng.d6() - (p.def + statusDef(p) + kitDef(s, p, e) + rng.d6()));
   kitFought(s, p, e);
   bossTurnHit(s, rng, p, dmg, turn, e.name);
   apEnemyHit(s, rng, e, p, dmg);
