@@ -6,6 +6,8 @@ import { bossFace } from './bossHud';
 import { LOBBY_ART, UI_ART } from './assets';
 import { chosenSkin, myArt } from './skins';
 import { esc, PLAYER_COLORS } from './html';
+import { askConfirm } from './modal';
+import { loadGame } from './saveGame';
 
 interface Seat {
   name: string;
@@ -135,20 +137,24 @@ export function renderSetup(
     } else if (target.closest('[data-close-pick]') && !target.closest('.cp-panel')) {
       picking = null;
       render();
-    } else if (target.closest('.start')) {
-      root.onclick = null;
-      root.oninput = null;
-      onStart(
-        seats.slice(0, count).map((seat, i) => ({
-          name: seat.name.trim() || `플레이어 ${i + 1}`,
-          color: PLAYER_COLORS[i],
-          character: seat.character,
-          potential: seat.potential && !!CHARACTERS[seat.character].potential,
-          cpu: seat.cpu,
-          skin: chosenSkin(seat.character),
-        })),
-      );
-    }
+    } else if (target.closest('.start')) void start();
+  };
+  /** 새 판은 이어하기 기록을 덮어쓴다 */
+  const start = async () => {
+    const saved = loadGame();
+    if (saved && !(await askConfirm('새 게임', `이어하기 · ${saved.state.boss.name} ROUND ${saved.state.round} 삭제`, '시작'))) return;
+    root.onclick = null;
+    root.oninput = null;
+    onStart(
+      seats.slice(0, count).map((seat, i) => ({
+        name: seat.name.trim() || `플레이어 ${i + 1}`,
+        color: PLAYER_COLORS[i],
+        character: seat.character,
+        potential: seat.potential && !!CHARACTERS[seat.character].potential,
+        cpu: seat.cpu,
+        skin: chosenSkin(seat.character),
+      })),
+    );
   };
   root.oninput = (e) => {
     const input = e.target as HTMLInputElement;

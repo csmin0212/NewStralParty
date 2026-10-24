@@ -2,12 +2,13 @@ import { AP_BOSSES as BOSSES, AP_VARIANTS } from '../data/apMaps';
 import { DIFFICULTIES, DIFFICULTY_IDS, OPEN_DIFFICULTIES, type DifficultyId } from '../data/difficulty';
 import { loadAccount, type Account } from '../meta/account';
 import { ENEMIES } from '../data/enemies';
+import { AP_MOVE_DIE } from '../engine/ap';
 import type { BossDef, BossMove, EnemyKind, GimmickAction } from '../engine/types';
 import { LOBBY_ART } from './assets';
 import { bossFace } from './bossHud';
 import { esc } from './html';
 
-type Tab = 'moves' | 'rules' | 'enemies';
+type Tab = 'moves' | 'tasks' | 'rules' | 'enemies';
 const KEY = 'newparty.boss';
 const LEVEL_KEY = 'newparty.difficulty';
 
@@ -79,12 +80,10 @@ export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, diff
           <nav class="boss-list">${list}</nav>
           <section class="ba-panel boss-detail">
             ${hero(current)}
-            <nav class="ba-tabs">
-              <button class="ba-tab ${tab === 'moves' ? 'on' : ''}" data-tab="moves">${current.ap ? '보스 · 과제' : '행동'}</button>
-              <button class="ba-tab ${tab === 'rules' ? 'on' : ''}" data-tab="rules">규칙 · 진행도</button>
-              <button class="ba-tab ${tab === 'enemies' ? 'on' : ''}" data-tab="enemies">등장 에너미</button>
-            </nav>
-            <div class="detail-body boss-body">${tab === 'moves' ? movesTab(current) : tab === 'rules' ? rulesTab(current) : enemiesTab(current)}</div>
+            <nav class="ba-tabs">${tabs(current)
+              .map(([id, label]) => `<button class="ba-tab ${tab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`)
+              .join('')}</nav>
+            <div class="detail-body boss-body">${tabBody(current, tab)}</div>
             <div class="panel-foot boss-foot">
               <div class="lv-row">${levels}</div>
               <button class="ba-btn ba-btn--yellow" data-act="go">출격 준비</button>
@@ -103,6 +102,7 @@ export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, diff
     if (pick) {
       current = BOSSES.find((b) => b.id === pick.dataset.boss) ?? current;
       saveChoice(KEY, current.id);
+      if (!tabs(current).some(([id]) => id === tab)) tab = 'moves';
       render();
     } else if (levelBtn) {
       level = levelBtn.dataset.level as DifficultyId;
@@ -122,6 +122,31 @@ export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, diff
   };
 
   render();
+}
+
+function tabs(b: BossDef): [Tab, string][] {
+  if (b.ap)
+    return [
+      ['moves', '보스'],
+      ['tasks', '과제'],
+      ['rules', '진행도'],
+      ['enemies', '몬스터'],
+    ];
+  return [
+    ['moves', '행동'],
+    ['rules', '규칙 · 진행도'],
+    ['enemies', '등장 에너미'],
+  ];
+}
+
+function tabBody(b: BossDef, tab: Tab): string {
+  if (b.ap) {
+    if (tab === 'moves') return apBossTab(b);
+    if (tab === 'tasks') return apTasksTab(b);
+    if (tab === 'rules') return apProgressTab(b);
+    return enemiesTab(b);
+  }
+  return tab === 'moves' ? movesTab(b) : tab === 'rules' ? rulesTab(b) : enemiesTab(b);
 }
 
 function hero(b: BossDef): string {
@@ -185,38 +210,66 @@ function apForms(b: BossDef): BossDef[] {
   return [b];
 }
 
-function apMovesTab(b: BossDef): string {
-  const forms = apForms(b)
+/** 보스 (갈래가 있으면 나란히) */
+function apBossTab(b: BossDef): string {
+  const forms = apForms(b);
+  const cards = forms
     .map((f) => {
       const ap = f.ap!;
       const rules = (ap.rules ?? []).map((r) => AP_RULE[r]).filter(Boolean);
       return `
-        <div class="bm-card">
-          <div class="bm-head"><b>${f.icon} ${esc(f.name)}</b><span class="bm-tag">체력 ${ap.hp} · 공격 ${f.atk} · 방어 ${f.def}${f.counter ? ' · 반격' : ''}</span></div>
-          ${ap.skill ? `<p><b>${esc(ap.skill.name)}</b> · 재사용 ${ap.skill.cd} · ${esc(ap.skill.text)}</p>` : ''}
+        <div class="bm-card ap-form">
+          <div class="bm-head"><b>${f.icon} ${esc(f.name)}</b></div>
+          <div class="ap-form-stats"><span>♥ ${ap.hp}</span><span>⚔ ${f.atk}</span><span>🛡 ${f.def}</span><span>👣 ${ap.roam ? `1~${AP_MOVE_DIE}` : '-'}</span>${f.counter ? '<span class="warn">반격</span>' : ''}</div>
+          ${ap.skill ? `<p class="ap-skill"><b>✦ ${esc(ap.skill.name)}</b><small>${ap.skill.cd}R</small><span>${esc(ap.skill.text)}</span></p>` : ''}
           ${rules.map((r) => `<p>${esc(r)}</p>`).join('')}
         </div>`;
     })
     .join('');
-  const tasks = apForms(b)
+  return `<div class="ap-forms" style="--n:${forms.length}">${cards}</div>`;
+}
+
+/** 과제 (갈래 과제는 그 보스 이름) */
+function apTasksTab(b: BossDef): string {
+  const cards = apForms(b)
     .flatMap((f) => f.ap!.tasks)
     .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
     .map((t) => {
       const r = t.reward;
-      const reward = [r.chip ? `유물 ${r.chip}` : '', r.progress ? `진행도 ${r.progress}` : '', r.coins ? `코인 +${r.coins}` : '', r.card ? '카드' : '']
-        .filter(Boolean)
-        .join(' · ');
-      return `<li><b>${esc(t.name)} ${t.count}</b><span>${esc(reward || '맵 진행')}</span></li>`;
+      const reward = [
+        r.chip ? `<i class="rw chip">유물 ${r.chip}</i>` : '',
+        r.progress ? `<i class="rw prog">진행도 ${r.progress}</i>` : '',
+        r.coins ? `<i class="rw coin">코인 +${r.coins}</i>` : '',
+        r.card ? '<i class="rw card">카드</i>' : '',
+        r.event && !r.chip && !r.progress && !r.coins && !r.card ? '<i class="rw">맵 진행</i>' : '',
+      ].join('');
+      const branch = t.branch ? AP_VARIANTS[t.branch] : undefined;
+      return `
+        <div class="ap-task">
+          <div class="at-head"><b>${esc(t.name)}</b><em>${t.count}</em></div>
+          ${branch ? `<small>${branch.icon} ${esc(branch.name)}</small>` : ''}
+          <div class="at-reward">${reward}</div>
+        </div>`;
+    })
+    .join('');
+  return `<div class="ap-tasks">${cards}</div>`;
+}
+
+/** 진행도: 기믹 · 패배 */
+function apProgressTab(b: BossDef): string {
+  const rows = b.timeline
+    .map((g) => {
+      const text = g.actions.map((a) => gimmickText(b, a)).filter(Boolean).join(' · ');
+      return text ? `<li><b>${g.at}</b><span>${esc(text)}</span></li>` : '';
     })
     .join('');
   return `
-    <div class="bm-grid">${forms}</div>
-    <h4 class="bs-h">과제</h4>
-    <ul class="bs-rows">${tasks}</ul>`;
+    <ul class="ap-timeline">${rows}<li class="end"><b>${b.defeatAt}</b><span>패배</span></li></ul>
+    ${b.ref ? `<p class="bs-ref">${esc(b.ref)}</p>` : ''}`;
 }
 
 export function movesTab(b: BossDef): string {
-  if (b.ap) return apMovesTab(b);
+  if (b.ap) return `${apBossTab(b)}<h4 class="bs-h">과제</h4>${apTasksTab(b)}`;
   if (!b.moves) return '<p class="bs-empty">행동 카드 없음</p>';
   const order = b.deckOrder === 'shuffle' ? '무작위' : '순서';
   const deck = (b.deck ?? []).map((id, i) => moveCard(b, id, i + 1)).join('');
@@ -299,17 +352,18 @@ function enemiesTab(b: BossDef): string {
     if (f.ap?.skill?.kind) kinds.add(f.ap.skill.kind);
     for (const g of f.timeline) for (const x of g.actions) if (x.type === 'summon') x.enemies.forEach((k) => kinds.add(k));
   }
-  return `<div class="be-grid">${[...kinds].map(enemyCard).join('')}</div>`;
+  return `<div class="be-grid ${b.ap ? 'compact' : ''}">${[...kinds].map((k) => enemyCard(k, !!b.ap)).join('')}</div>`;
 }
 
-function enemyCard(kind: EnemyKind): string {
+function enemyCard(kind: EnemyKind, ap = false): string {
   const e = ENEMIES[kind];
   const traits: string[] = [];
   if (e.counter) traits.push('반격');
   if (e.defense === 'evade') traits.push('회피형');
-  if (e.roam) traits.push(`보스 차례마다 1~${e.roam}칸${e.chase ? ' · 아군 추격' : ''}`);
+  const roam = ap ? (e.fixedMove ?? (e.roam ? AP_MOVE_DIE : 0)) : e.roam;
+  if (roam) traits.push(`${ap && e.fixedMove ? `${roam}칸` : `1~${roam}칸`}${e.chase ? ' · 추격' : ''}`);
   if (e.steal) traits.push(`덮치면 코인 ${e.steal} 훔침 · 쓰러뜨리면 돌려받음`);
-  else if (e.roam) traits.push(`덮치면 ${e.atk} 피해`);
+  else if (roam && !ap) traits.push(`덮치면 ${e.atk} 피해`);
   if (e.fuse) traits.push(`${e.fuse.turns}차례 뒤 자폭 (주변 ${e.fuse.range}칸 ${e.fuse.amount})`);
   if (e.calls) traits.push(`${e.calls.every}차례마다 ${ENEMIES[e.calls.kind].name} 호출`);
   if (e.link) traits.push('받은 피해를 보스도 받는다');

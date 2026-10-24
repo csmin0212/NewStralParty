@@ -1,5 +1,6 @@
 import type { BossDef } from '../engine/types';
 import { movesTab, rulesTab } from './bossScreen';
+import { esc } from './html';
 import { getSpeed, getVolumeSetting, setSpeed, setVolume, type Speed, type Volume } from './settings';
 import { sfx } from './sound';
 
@@ -17,6 +18,38 @@ export function openModal(title: string, body: string, wide = false): HTMLElemen
   });
   document.body.append(el);
   return el;
+}
+
+/** 확인 · 취소 (브라우저 confirm 대신). 바깥 · Esc는 취소, Enter는 확인 */
+export function askConfirm(title: string, text: string, ok = '확인', cancel = '취소'): Promise<boolean> {
+  return new Promise((resolve) => {
+    const el = openModal(
+      esc(title),
+      `<p class="bm-text">${esc(text)}</p>
+       <div class="bm-foot">
+         <button class="ba-btn ba-btn--sky" data-answer="0">${esc(cancel)}</button>
+         <button class="ba-btn ba-btn--yellow" data-answer="1">${esc(ok)}</button>
+       </div>`,
+    );
+    el.classList.add('ba-confirm');
+    const done = (yes: boolean) => {
+      document.removeEventListener('keydown', onKey, true);
+      el.remove();
+      resolve(yes);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' && e.key !== 'Enter') return;
+      e.preventDefault();
+      e.stopPropagation();
+      done(e.key === 'Enter');
+    };
+    document.addEventListener('keydown', onKey, true);
+    el.addEventListener('click', (e) => {
+      const answer = (e.target as HTMLElement).closest<HTMLElement>('[data-answer]')?.dataset.answer;
+      if (answer !== undefined) done(answer === '1');
+      else if (e.target === el) done(false);
+    });
+  });
 }
 
 /** 설정: 연출 속도. exit가 있으면 (게임 중) 로비로 나가기 */

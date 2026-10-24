@@ -1094,3 +1094,181 @@
 .enemy .emark:empty {
   display: none;
 }
+
+/* ───────── 협동 챌린지 탭: 보스 · 과제 · 진행도 · 몬스터 (스크롤 없이 한 화면) ───────── */
+.boss-list {
+  overflow-x: hidden;
+}
+.ap-forms {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+.ap-form {
+  display: grid;
+  gap: 6px;
+}
+.ap-form-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ap-form-stats span {
+  padding: 1px 8px;
+  font-size: 12.5px;
+  font-weight: 900;
+  color: var(--ba-ink);
+  background: #eef2f6;
+  border-radius: 3px;
+}
+.ap-form-stats .warn {
+  color: #fff;
+  background: var(--boss);
+}
+.bm-card p.ap-skill {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #fff8dc;
+}
+.ap-skill b {
+  color: var(--ba-ink);
+}
+.ap-skill small {
+  justify-self: end;
+  font-weight: 900;
+  color: #a36b1c;
+}
+.ap-skill span {
+  grid-column: 1 / -1;
+}
+.ap-tasks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 6px;
+}
+.ap-task {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: #fff;
+  border: 1px solid var(--ba-line);
+  box-shadow: inset 4px 0 0 #3d5478;
+}
+.at-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.at-head b {
+  font-size: 14px;
+  font-weight: 900;
+}
+.at-head em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--ba-sky, #33aef3);
+}
+.ap-task small {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--ba-gray);
+}
+.at-reward {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.rw {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  font-style: normal;
+  color: #53657f;
+  background: #eef2f6;
+  border-radius: 3px;
+}
+.rw.chip {
+  color: #6b3fb5;
+  background: #efe6ff;
+}
+.rw.prog {
+  color: #1d7a4b;
+  background: #e2f6ea;
+}
+.rw.coin {
+  color: #8a5a00;
+  background: #fff3cf;
+}
+.ap-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.ap-timeline li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px 6px 6px;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid var(--ba-line);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.ap-timeline b {
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+  background: #3d5478;
+  border-radius: 3px;
+}
+.ap-timeline span {
+  color: #53657f;
+}
+.ap-timeline .end b {
+  background: var(--boss);
+}
+.be-grid.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.be-grid.compact .be-card {
+  gap: 8px;
+  padding: 6px 8px;
+  align-items: start;
+}
+.be-grid.compact .be-face {
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+}
+.be-grid.compact .be-text b {
+  font-size: 13.5px;
+}
+.be-grid.compact .be-text small,
+.be-grid.compact .be-text span {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+@media (max-width: 900px) {
+  .ap-forms,
+  .ap-timeline,
+  .be-grid.compact {
+    grid-template-columns: 1fr;
+  }
+}

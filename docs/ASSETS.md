@@ -550,3 +550,64 @@ isolated on transparent background, no text, no letters, no frame, no border
 | `cards/talisman-huo.webp` | 부적 카드 - 불행 (유메) |
 | `cards/bite.webp` | 깨물기 (마무시) |
 | `cards/dragon-roar.webp` | 용의 포효 (마무시) |
+
+## 10차 요청 — 원작 협동 맵 8개: 필드 · 보스 · 몬스터
+
+데이터: [AP_MAPS.md](AP_MAPS.md) · [src/data/apMaps.ts](../src/data/apMaps.ts) · [src/data/enemies.ts](../src/data/enemies.ts)
+
+### 필드 — `fields/<map>/`
+
+| 파일 | 용도 | 크기 |
+|---|---|---|
+| `board.png` | 보드 뒤 필드 (보드 칸 · 길은 코드가 그 위에 그린다, 가운데 비움) | 2560×1440 |
+| `battle-<boss>.png` | 그 보스와 싸우는 전투 화면 배경 | 1920×1080 |
+
+| map | 이름 | 필드 | 전투 배경 boss |
+|---|---|---|---|
+| `dreama` | 드리마 | 해적선 갑판 · 바다 · 낮 | `dreama` |
+| `soul` | 영혼 축전 | 신사 축제 · 등롱 · 밤 | `soul` |
+| `watertown` | 워터 타운 | 수향 마을 · 운하 · 노을 | `watertown` |
+| `academy` | 매직 아카데미 | 마법 학원 복도 · 도서관 · 디저트 공간 | `academy` · `academy-officer` |
+| `dragonpalace` | 드래곤 팰리스 뮤즈먼트 파크 | 용궁 놀이공원 · 물 | `dragon-mamushi` · `dragon-souri` |
+| `ghostalley` | 유령 골목 | 밤 골목 · 실험실 · 독안개 | `ghostalley` |
+| `autumnwood` | 가을숲 환상경 | 단풍 숲 · 놀이터 | `autumnwood` |
+| `garden` | 정원 안뜰 | 중국 정원 · 연못 · 회랑 | `garden-peacock` · `garden-lovebird` · `garden-phoenix` |
+
+### 보스 — `bosses/<id>/` (6차와 같은 규격: `portrait` 768 · `token` 512 · `encounter` 1024)
+
+| id | 이름 | 맵 |
+|---|---|---|
+| `dreama` | 가우 왕 | 드리마 |
+| `soul` | 텐노지 마사오 | 영혼 축전 |
+| `watertown` | 사자 가우 | 워터 타운 |
+| `academy` | 대행 학장 | 매직 아카데미 |
+| `academy-officer` | 학원 안전관 | 매직 아카데미 |
+| `dragonpalace` | 용궁 (투표 전 표지) | 드래곤 팰리스 |
+| `dragon-mamushi` | 아마카와 마무시 | 드래곤 팰리스 |
+| `dragon-souri` | 아마카와 소우리 | 드래곤 팰리스 |
+| `ghostalley` | 과학 괴인 | 유령 골목 |
+| `autumnwood` | 골목대장 가우 | 가을숲 환상경 |
+| `garden` | 정원 (루트 전 표지) | 정원 안뜰 |
+| `garden-peacock` | 펭 (공작 의식) | 정원 안뜰 |
+| `garden-lovebird` | 펭 (원앙 의식) | 정원 안뜰 |
+| `garden-phoenix` | 폭주한 봉황 | 정원 안뜰 |
+
+### 몬스터 — `enemies/<id>/idle.png` 512×512 투명
+
+| 맵 | id · 이름 |
+|---|---|
+| 드리마 | `sharkPirate` 상어 해적 · `elitePirate` 엘리트 해적 |
+| 영혼 축전 | `blueSpirit` 파란 영혼 · `redSpirit` 빨간 영혼 · `swordSpirit` 검 영혼 · `spearSpirit` 창 영혼 |
+| 워터 타운 | `ambientRobot` 분위기 로봇 · `croak` 폭죽 개구리 · `platform` 지휘대 · `snakeDragon` 기계 뱀용 |
+| 매직 아카데미 | `jellyFighter` 젤리 전사 · `jellyGuard` 젤리 호위병 · `jellyWizard` 젤리 마법사 · `mutantTeapot` 변이 찻주전자 |
+| 드래곤 팰리스 | `crab` 게 병사 · `prawn` 새우 병사 · `goldfish` 금붕어 · `loudmouth` 큰목소리 · `trainee` 무술 수련생 · `mamushiAlly` 마무시 (아군) · `souriAlly` 소우리 (아군) |
+| 유령 골목 | `synth1` 인공생명체-천붕 · `synth2` 인공생명체-흉조 · `synth3` 인공생명체-혼란 · `monkeyBox` 깜짝 원숭이 상자 · `sawMonkey` 톱날 원숭이 조수 · `madApe` 과학 원숭이 · `pinata` 사탕 피냐타 |
+| 가을숲 환상경 | `dino` 장난감 공룡 · `owl` 알람 부엉이 · `bear` 채집 곰 |
+| 정원 안뜰 | `waiter` 가금 종업원 · `swallow` 마중 제비 · `crane` 청동 학 · `peacock` 청동 공작 · `lovebirdChalice` 청동 원앙 |
+
+| 에셋 | 수량 |
+|---|---:|
+| 필드 | 8 |
+| 전투 배경 | 12 |
+| 보스 | 14 |
+| 몬스터 | 36 |
