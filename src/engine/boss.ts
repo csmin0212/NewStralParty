@@ -9,6 +9,7 @@ import type { Rng } from './rng';
 import { bossDamageTaken } from './skills';
 import { decayMarks, markBonus, onAttacked } from './relics';
 import { kitDef, kitEnemyAtk, kitFought, kitRetaliate, kitSafe, kitSlow, kitTaunter } from './kits';
+import { apDamageIn, apEnemyHurt, apEnemyPhase, apLandMark, apRoundEnd, apSharedBoss, isAp } from './ap';
 import type {
   BossDef,
   BossEffect,
@@ -109,6 +110,17 @@ export function revealIntent(s: GameState, rng: Rng) {
  */
 export function hurtEnemy(s: GameState, rng: Rng, e: Enemy, amount: number): number {
   const info = e.isBoss ? null : ENEMIES[e.kind as EnemyKind];
+  // 원작 맵: 역린 · 취약 중추 · 지휘대 체력 공유
+  amount = apDamageIn(s, e, amount);
+  const shared = apSharedBoss(s, e);
+  if (shared) {
+    apEnemyHurt(s, rng, e, amount);
+    const dealt = hurtEnemy(s, rng, shared, amount);
+    e.hp = shared.hp;
+    e.maxHp = shared.maxHp;
+    if (shared.hp === 0) bossDown(s, shared);
+    return dealt;
+  }
   if (info?.decoy) {
     e.hp = 0;
     log(s, `  🎩 분신이었다!`);
@@ -125,6 +137,9 @@ export function hurtEnemy(s: GameState, rng: Rng, e: Enemy, amount: number): num
   stats.damage += taken;
   if (e.isBoss) stats.bossDamage += taken;
   if (e.isBoss) afterBossHurt(s, rng, e, dealt);
+  apEnemyHurt(s, rng, e, dealt);
+  // 지휘대 체력도 같이 (체력 공유)
+  if (e.isBoss) for (const x of s.enemies) if (x.kind === 'platform') x.hp = e.hp;
   // 연결된 미니언: 받은 피해를 보스도 받는다
   if (info?.link && taken > 0) {
     const boss = bossEnemy(s);
@@ -308,7 +323,10 @@ export function bossTurn(s: GameState, rng: Rng) {
     }
   }
 
-  minionTurn(s, rng, turn);
+  if (isAp(s)) apEnemyPhase(s, rng, turn);
+  else minionTurn(s, rng, turn);
+  if (isOver(s)) return;
+  if (isAp(s)) apRoundEnd(s, rng);
   if (isOver(s)) return;
   tickMarks(s, rng, turn);
   if (isOver(s)) return;
@@ -390,6 +408,10 @@ function pickTargets(s: GameState, rng: Rng, target: BossTarget, range = 2, coun
 }
 
 /** 보스 · 미니언이 아군에게 주는 피해. 카이텐 가슴(빨강)이 켜져 있으면 맞은 아군은 기절 */
+export function bossTurnHit(s: GameState, rng: Rng, p: Player, amount: number, turn: BossTurn, note?: string) {
+  hit(s, rng, p, amount, turn, note);
+}
+
 function hit(s: GameState, rng: Rng, p: Player, amount: number, turn: BossTurn, note?: string) {
   if (p.ko || isOver(s)) return;
   const stun = bossEnemy(s) && activePart(s)?.id === 'red' && amount > 0;
@@ -402,6 +424,10 @@ function hit(s: GameState, rng: Rng, p: Player, amount: number, turn: BossTurn, 
 }
 
 /** 에너미가 들어갈 수 있는 빈 칸 */
+export function freeTileFor(s: GameState, id: number, ignore?: number): boolean {
+  return freeTile(s, id, ignore);
+}
+
 function freeTile(s: GameState, id: number, ignore?: number): boolean {
   const t = s.board.tiles[id];
   return t.kind !== 'base' && t.kind !== 'warp' && !s.enemies.some((e) => e.tile === id && e.id !== ignore);
@@ -813,6 +839,13 @@ const MARK_NAME: Record<MarkKind, string> = {
   organ: '파이프 오르간',
   heater: '난로',
   fire: '불길',
+  egg: '신비한 알',
+  gourd: '호리병',
+  mist: '독안개',
+  mushroom: '질주 버섯',
+  starfruit: '신선 스타프루트',
+  peach: '향기로운 복숭아',
+  moneyTree: '돈나무',
 };
 
 export function markName(kind: MarkKind) {
@@ -893,6 +926,10 @@ function tickCurses(s: GameState, rng: Rng, turn: BossTurn) {
 
 /** 플레이어가 표식 칸에 멈췄다 */
 export function landOnMark(s: GameState, rng: Rng, p: Player) {
+  if (isAp(s)) {
+    for (const m of s.marks.filter((x) => x.tile === p.tile)) apLandMark(s, rng, p, m.kind);
+    return;
+  }
   const st = s.bossState;
   for (const m of s.marks.filter((x) => x.tile === p.tile)) {
     const remove = () => (s.marks = s.marks.filter((x) => x.id !== m.id));

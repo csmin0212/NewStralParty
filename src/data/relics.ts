@@ -150,16 +150,16 @@ export const RELICS: Record<RelicId, RelicInfo> = {
   magnifier: r('돋보기', '🔍', 'purple', '증거 1마다 공격력 +1 (최대 +4)', 'Magnifying Glass · Anomalous Library', { map: 'library', pool: 'attack' }),
   hannaDoll: r('한나 인형', '🧸', 'gold', '송금하면 증거 1 · 차례 끝에 코인 + 증거', 'Hanna Doll · Anomalous Library', { map: 'library', pool: 'support' }),
   // 백귀야행 골목 ← 유령 골목
-  chronometer: r('크로노미터', '⏱️', 'blue', '오버클럭을 얻으면 1 더 · 오버클럭으로 움직이면 다음 전투 공격력 +2', 'Chronometer · Ghost Alley', { map: 'ghost-alley', pool: 'attack' }),
-  revivalDoll: r('부활 인형', '🪆', 'purple', '처음 쓰러질 때 진행도가 오르지 않는다 · 공격력 +1 · 방어력 +1', 'Revival Doll · Ghost Alley', { map: 'ghost-alley', pool: 'sustain' }),
-  candyCard: r('사탕 적립 카드', '🍭', 'gold', '사탕 자판기 공짜 · 회복 카드를 쓰면 스킬 재사용 대기 -1', 'Candy Rewards Card · Ghost Alley', { map: 'ghost-alley', pool: 'cards' }),
+  chronometer: r('크로노미터', '⏱️', 'blue', '오버클럭을 얻으면 1 더 · 오버클럭으로 움직이면 다음 전투 공격력 +2', 'Chronometer · Ghost Alley', { map: 'ghostalley', pool: 'attack' }),
+  revivalDoll: r('부활 인형', '🪆', 'purple', '처음 쓰러질 때 진행도가 오르지 않는다 · 공격력 +1 · 방어력 +1', 'Revival Doll · Ghost Alley', { map: 'ghostalley', pool: 'sustain' }),
+  candyCard: r('사탕 적립 카드', '🍭', 'gold', '사탕 자판기 공짜 · 회복 카드를 쓰면 스킬 재사용 대기 -1', 'Candy Rewards Card · Ghost Alley', { map: 'ghostalley', pool: 'cards' }),
   // 슬럼피아 놀이공원 ← 용궁
-  snakePlush: r('뱀 인형', '🐍', 'purple', '피해를 받으면 다음 전투 공격력 +2', 'Snake Plushie · Dragon Palace', { map: 'slumpia-park', pool: 'sustain' }),
-  carpPlush: r('잉어 인형', '🎏', 'purple', '액티브 스킬을 쓰면 공격력 +1 (최대 +4)', 'Carp Plushie · Dragon Palace', { map: 'slumpia-park', pool: 'attack' }),
-  ragingCharm: r('성난 파도 부적', '🌊', 'blue', '효과 카드를 쓰면 3칸 안 가장 가까운 몬스터 1 피해 · 카드를 얻으면 체력 +1', 'Raging Wave Charm · Dragon Palace', { map: 'slumpia-park', pool: 'cards' }),
-  seafoodSoup: r('몽롱한 해물탕', '🍜', 'blue', '공격 주사위가 1 또는 6만 나온다', 'Psychedelic Seafood Soup · Dragon Palace', { map: 'slumpia-park', pool: 'attack' }),
-  twinCarps: r('얽힌 쌍잉어', '🐟', 'gold', '반격을 받지 않는다 · 공격 주사위 6', 'Intertwined Twin Carps · Dragon Palace', { map: 'slumpia-park', pool: 'attack' }),
-  infiniteSerpent: r('무한의 뱀', '♾️', 'gold', '차례 시작에 손패가 4장이 될 때까지 뽑기 · 카드 사용 +1', 'Infinite Serpent · Dragon Palace', { map: 'slumpia-park', pool: 'cards' }),
+  snakePlush: r('뱀 인형', '🐍', 'purple', '피해를 받으면 다음 전투 공격력 +2', 'Snake Plushie · Dragon Palace', { map: 'dragonpalace', pool: 'sustain' }),
+  carpPlush: r('잉어 인형', '🎏', 'purple', '액티브 스킬을 쓰면 공격력 +1 (최대 +4)', 'Carp Plushie · Dragon Palace', { map: 'dragonpalace', pool: 'attack' }),
+  ragingCharm: r('성난 파도 부적', '🌊', 'blue', '효과 카드를 쓰면 3칸 안 가장 가까운 몬스터 1 피해 · 카드를 얻으면 체력 +1', 'Raging Wave Charm · Dragon Palace', { map: 'dragonpalace', pool: 'cards' }),
+  seafoodSoup: r('몽롱한 해물탕', '🍜', 'blue', '공격 주사위가 1 또는 6만 나온다', 'Psychedelic Seafood Soup · Dragon Palace', { map: 'dragonpalace', pool: 'attack' }),
+  twinCarps: r('얽힌 쌍잉어', '🐟', 'gold', '반격을 받지 않는다 · 공격 주사위 6', 'Intertwined Twin Carps · Dragon Palace', { map: 'dragonpalace', pool: 'attack' }),
+  infiniteSerpent: r('무한의 뱀', '♾️', 'gold', '차례 시작에 손패가 4장이 될 때까지 뽑기 · 카드 사용 +1', 'Infinite Serpent · Dragon Palace', { map: 'dragonpalace', pool: 'cards' }),
   // 카이텐 결승 무대 ← 결승 경기장
   taser: r('테이저', '⚡', 'purple', '반격형 에너미를 쓰러뜨리면 마인드 1 · 마인드 3 이상: 공격력 +2', 'Taser · Grand Final Arena', { map: 'arena', pool: 'attack' }),
   wristband: r('스포츠 손목 밴드', '🩳', 'purple', '공격력 +1 · 보스를 공격할 때 공격력 +3', 'Sports Wristband · Grand Final Arena', { map: 'arena', pool: 'attack' }),
@@ -169,24 +169,24 @@ export const RELICS: Record<RelicId, RelicInfo> = {
   entTerminal: r('엔터테인먼트 단말', '🎮', 'purple', '마인드가 있으면 공격력 +4 · 방어력 +4 · 차례 끝에 마인드 -1', 'Entertainment Terminal · Grand Final Arena', { map: 'arena', pool: 'attack' }),
   consciousness: r('근원 의식', '🧠', 'gold', '마인드를 얻으면 최대 체력 +1 · 공격력 +1 (최대 +5)', 'Original Consciousness · Grand Final Arena', { map: 'arena', pool: 'sustain' }),
   // 트리니티 고성당 ← 어혼 축제
-  cursedSword: r('저주받은 검', '🗡️', 'blue', '최대 체력 -2 · 에너미를 쓰러뜨릴 때마다 공격력 +1 (최대 +5)', 'Cursed Sword · Soul Celebration', { map: 'cathedral', pool: 'attack' }),
-  revengeHalberd: r('복수의 미늘창', '🔱', 'purple', '체력 50% 이하: 공격력 +5 · 체력 가득: 방어력 +3', 'Revenge Halberd · Soul Celebration', { map: 'cathedral', pool: 'attack' }),
-  piercingGun: r('관통총', '🔫', 'gold', '효과 카드 피해 +2 · 보스에게 +4', 'Piercing Gun · Soul Celebration', { map: 'cathedral', pool: 'cards' }),
+  cursedSword: r('저주받은 검', '🗡️', 'blue', '최대 체력 -2 · 에너미를 쓰러뜨릴 때마다 공격력 +1 (최대 +5)', 'Cursed Sword · Soul Celebration', { map: 'soul', pool: 'attack' }),
+  revengeHalberd: r('복수의 미늘창', '🔱', 'purple', '체력 50% 이하: 공격력 +5 · 체력 가득: 방어력 +3', 'Revenge Halberd · Soul Celebration', { map: 'soul', pool: 'attack' }),
+  piercingGun: r('관통총', '🔫', 'gold', '효과 카드 피해 +2 · 보스에게 +4', 'Piercing Gun · Soul Celebration', { map: 'soul', pool: 'cards' }),
   // 여름 해변 리조트 ← 드리마
-  ironAnchor: r('쇠닻', '⚓', 'blue', '피해를 받으면 공격력 +1 · 차례 시작마다 -1', 'Iron Anchor · Dreama', { map: 'resort', pool: 'attack' }),
-  trident: r('삼지창', '🔱', 'purple', '액티브 스킬을 쓰면 모든 아군 다음 전투 공격력 +1', 'Trident · Dreama', { map: 'resort', pool: 'support' }),
-  dreamliner: r('드림라이너 모형', '🛥️', 'gold', '이동 +2 · 15칸마다 스킬 재사용 대기 -1', 'Dreamliner Model · Dreama', { map: 'resort' }),
+  ironAnchor: r('쇠닻', '⚓', 'blue', '피해를 받으면 공격력 +1 · 차례 시작마다 -1', 'Iron Anchor · Dreama', { map: 'dreama', pool: 'attack' }),
+  trident: r('삼지창', '🔱', 'purple', '액티브 스킬을 쓰면 모든 아군 다음 전투 공격력 +1', 'Trident · Dreama', { map: 'dreama', pool: 'support' }),
+  dreamliner: r('드림라이너 모형', '🛥️', 'gold', '이동 +2 · 15칸마다 스킬 재사용 대기 -1', 'Dreamliner Model · Dreama', { map: 'dreama' }),
   // 설원 전초 기지 ← 정원 회랑
-  lovebird: r('원앙 옥패', '🕊️', 'purple', '차례 시작에 아군과 1칸 안: 이동 +2 · 아니면 다음 전투 공격력 +1', "Lovebird's Jade Pendant · Garden Courtyard", { map: 'snowfield', pool: 'support' }),
-  peacockFan: r('공작 깃털 부채', '🪶', 'purple', '최대 체력 +3 · 공격받으면 다음 전투 공격력 +1', 'Peacock Feather Fan · Garden Courtyard', { map: 'snowfield', pool: 'sustain' }),
-  featherBracelet: r('오색 깃털 팔찌', '🎐', 'gold', '액티브 스킬을 쓰면 깃털 1 · 깃털 3마다 유물', 'Colourful Feather Bracelet · Garden Courtyard', { map: 'snowfield', pool: 'support' }),
+  lovebird: r('원앙 옥패', '🕊️', 'purple', '차례 시작에 아군과 1칸 안: 이동 +2 · 아니면 다음 전투 공격력 +1', "Lovebird's Jade Pendant · Garden Courtyard", { map: 'garden', pool: 'support' }),
+  peacockFan: r('공작 깃털 부채', '🪶', 'purple', '최대 체력 +3 · 공격받으면 다음 전투 공격력 +1', 'Peacock Feather Fan · Garden Courtyard', { map: 'garden', pool: 'sustain' }),
+  featherBracelet: r('오색 깃털 팔찌', '🎐', 'gold', '액티브 스킬을 쓰면 깃털 1 · 깃털 3마다 유물', 'Colourful Feather Bracelet · Garden Courtyard', { map: 'garden', pool: 'support' }),
   // 슬럼피아 서커스 거리 ← 물의 마을
-  grandGong: r('큰 징', '🥁', 'purple', '액티브 스킬을 쓰면 4칸 안 모든 아군 다음 전투 공격력 +1', 'Giant Grand Gong · Water Town', { map: 'circus', pool: 'support' }),
-  redEnvelope: r('세뱃돈 봉투', '🧧', 'gold', '송금하면 둘 다 다음 전투 공격력 +1 · 송금 3번마다 모든 아군 코인 +5', 'Red Festival Envelopes · Water Town', { map: 'circus', pool: 'support' }),
+  grandGong: r('큰 징', '🥁', 'purple', '액티브 스킬을 쓰면 4칸 안 모든 아군 다음 전투 공격력 +1', 'Giant Grand Gong · Water Town', { map: 'watertown', pool: 'support' }),
+  redEnvelope: r('세뱃돈 봉투', '🧧', 'gold', '송금하면 둘 다 다음 전투 공격력 +1 · 송금 3번마다 모든 아군 코인 +5', 'Red Festival Envelopes · Water Town', { map: 'watertown', pool: 'support' }),
   // 지하 대성당 학원 ← 마법 학원
-  teaCake: r('찻잔 케이크', '🍰', 'blue', '공격력 +1 · 찻주전자 병정을 공격할 때 공격력 +2', 'Tea Cake · Magic Academy', { map: 'undercroft', pool: 'attack' }),
-  ancientStaff: r('고대의 지팡이', '🪄', 'purple', '효과 카드 사거리 +3 · 카드 사용 +1', 'Ancient Staff · Magic Academy', { map: 'undercroft', pool: 'cards' }),
-  swordShield: r('고급 검과 방패', '🛡️', 'gold', '공격력 +3 · 문제아일 때 방어력 +3', 'Premium Sword and Shield · Magic Academy', { map: 'undercroft', pool: 'attack' }),
+  teaCake: r('찻잔 케이크', '🍰', 'blue', '공격력 +1 · 찻주전자 병정을 공격할 때 공격력 +2', 'Tea Cake · Magic Academy', { map: 'academy', pool: 'attack' }),
+  ancientStaff: r('고대의 지팡이', '🪄', 'purple', '효과 카드 사거리 +3 · 카드 사용 +1', 'Ancient Staff · Magic Academy', { map: 'academy', pool: 'cards' }),
+  swordShield: r('고급 검과 방패', '🛡️', 'gold', '공격력 +3 · 문제아일 때 방어력 +3', 'Premium Sword and Shield · Magic Academy', { map: 'academy', pool: 'attack' }),
 };
 
 export const RELIC_IDS = Object.keys(RELICS) as RelicId[];

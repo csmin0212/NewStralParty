@@ -1,5 +1,7 @@
 # 보스 · 에너미 기믹
 
+보스 고르기 목록은 원작 협동 맵 8개 ([AP_MAPS.md](AP_MAPS.md)). 아래 총력전 보스는 목록에서 빠졌다.
+
 데이터: [src/data/bosses.ts](../src/data/bosses.ts) · [src/data/enemies.ts](../src/data/enemies.ts) · 규칙: [src/engine/boss.ts](../src/engine/boss.ts) · 테스트: [src/engine/boss.test.ts](../src/engine/boss.test.ts)
 
 ## 1. 참고한 원작

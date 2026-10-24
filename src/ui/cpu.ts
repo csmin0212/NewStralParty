@@ -22,6 +22,24 @@ function ok(s: GameState, a: Action): boolean {
   }
 }
 
+/** 원작 맵에서 먼저 잡을 몬스터 (맵 진행 · 보스 약화) */
+const KEY_MONSTERS: string[] = ['jellyFighter', 'synth1', 'synth2', 'synth3', 'loudmouth', 'trainee', 'waiter', 'elitePirate', 'swordSpirit', 'spearSpirit'];
+
+/** 원작 맵 카드 대상: 개조 치료는 개조된 아군 · 그놈 탓이야!는 체력이 가장 높은 아군. 쓰지 않을 카드면 null */
+function apCardTarget(s: GameState, p: Player, card: string, targets: number[] | null): number | undefined | null {
+  const allies = s.players.filter((o) => !o.ko);
+  if (card === 'supportGum' || card === 'smartGummy') {
+    const sick = allies.filter((o) => o.ap?.overclock).sort((a, b) => (a.ap!.overclock ?? 0) - (b.ap!.overclock ?? 0))[0];
+    if (sick) return sick.id;
+    if (card === 'supportGum' && p.hp <= p.maxHp - 2) return p.id;
+    return null;
+  }
+  if (card === 'energyBar') return null;
+  if (card === 'feather' && p.hp > p.maxHp - 3) return null;
+  if (card === 'hisFault') return targets?.slice().sort((a, b) => s.players[b].hp - s.players[a].hp)[0];
+  return undefined;
+}
+
 /** 가고 싶은 칸: 위급하면 회복 · 표식, 아니면 연결된 미니언 · 보스 */
 function goal(s: GameState, p: Player): number {
   const st = s.bossState;
@@ -38,6 +56,13 @@ function goal(s: GameState, p: Player): number {
       m.kind === 'bomb',
   );
   if (mark) return mark.tile;
+  // 원작 맵: 알 · 호리병을 줍고 과제 몬스터부터
+  if (s.ap) {
+    const pick = s.marks.find((m) => m.kind === 'egg' || m.kind === 'gourd');
+    if (pick) return pick.tile;
+    const key = s.enemies.find((e) => !e.isBoss && KEY_MONSTERS.includes(e.kind));
+    if (key) return key.tile;
+  }
   const boss = bossEnemy(s);
   const target = s.enemies.find((e) => !e.isBoss && ['perorominion', 'myoukiPiece', 'missile', 'automaton', 'pillar'].includes(e.kind));
   return (target ?? (boss && !st.hidden ? boss : undefined))?.tile ?? p.home;
@@ -68,7 +93,9 @@ export function cpuAction(s: GameState): Action {
         if (CARDS[card].type === 'battle' || cardBlocker(s, p, p.hand[i])) continue;
         if ((card === 'cookie' || card === 'cake' || card === 'bandage' || card === 'pudding') && p.hp >= p.maxHp - 1) continue;
         const targets = cardTargets(s, p, card);
-        const target = targets ? (boss && targets.includes(boss.id) ? boss.id : targets[0]) : undefined;
+        const special = apCardTarget(s, p, card, targets);
+        if (special === null) continue;
+        const target = special ?? (targets ? (boss && targets.includes(boss.id) ? boss.id : targets[0]) : undefined);
         const a: Action = { type: 'PLAY_CARD', player: me, handIndex: i, target, value: 6 };
         if (ok(s, a)) return a;
       }
@@ -96,6 +123,8 @@ export function cpuAction(s: GameState): Action {
     }
     case 'eventPick':
       return { type: 'PICK_EVENT', player: me, event: s.phase.options[0] };
+    case 'mapChoice':
+      return { type: 'MAP_CHOICE', player: me, choice: s.phase.options[0].id };
         case 'stopChoice': {
       // 성을 올릴 수 있거나 체력이 깎였으면 멈춘다
       const cost = RULES.levelUpCost[p.level];

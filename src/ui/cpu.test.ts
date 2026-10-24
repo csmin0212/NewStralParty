@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BOARD } from '../data/board';
 import { BOSSES } from '../data/bosses';
+import { AP_BOSSES } from '../data/apMaps';
 import { MAPS } from '../data/maps';
 import { applyAction, createGame } from '../engine/game';
 import { cpuAction } from './cpu';
@@ -16,6 +17,15 @@ describe('CPU', () => {
       }));
       let s = createGame({ board: MAPS[boss.map!] ?? DEFAULT_BOARD, boss, players, seed });
       for (let i = 0; i < 4000 && s.phase.kind !== 'gameOver'; i++) s = applyAction(s, cpuAction(s));
+      expect(s.phase.kind).toBe('gameOver');
+    }
+  });
+
+  it.each(AP_BOSSES.map((b) => [b.name, b] as const))('원작 맵 %s: CPU 4명만으로 끝까지 막히지 않고 둔다', (_, boss) => {
+    for (const seed of [3, 11]) {
+      const players = (['padman', 'ren', 'lulu', 'fen'] as const).map((character, i) => ({ name: `CPU ${i + 1}`, color: '#fff', character, cpu: true }));
+      let s = createGame({ board: MAPS[boss.map!], boss, players, seed });
+      for (let i = 0; i < 6000 && s.phase.kind !== 'gameOver'; i++) s = applyAction(s, cpuAction(s));
       expect(s.phase.kind).toBe('gameOver');
     }
   });

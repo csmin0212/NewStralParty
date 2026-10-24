@@ -2,6 +2,7 @@
 // 좌표: x 오른쪽, y 아래 (화면에서는 아이소메트릭). 고리는 시계 방향.
 
 import type { Board, EnemyKind, Tile, TileKind } from '../engine/types';
+import { AP_BOARD_MAP, AP_THEMES } from './apBoards';
 
 export type Pt = [number, number];
 
@@ -447,5 +448,5 @@ export const MAP_DEFS: MapDef[] = [
   },
 ];
 
-export const MAPS: Record<string, Board> = Object.fromEntries(MAP_DEFS.map((d) => [d.id, buildMap(d)]));
-export const MAP_THEMES: Record<string, MapTheme> = Object.fromEntries(MAP_DEFS.map((d) => [d.id, d.theme]));
+export const MAPS: Record<string, Board> = { ...Object.fromEntries(MAP_DEFS.map((d) => [d.id, buildMap(d)])), ...AP_BOARD_MAP };
+export const MAP_THEMES: Record<string, MapTheme> = { ...Object.fromEntries(MAP_DEFS.map((d) => [d.id, d.theme])), ...AP_THEMES };

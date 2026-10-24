@@ -30,8 +30,8 @@ export interface CardInfo {
   costPerLevel?: number;
   /** 전투 카드가 쓰는 전투 코스트 */
   battleCost?: number;
-  /** 대상: 아군 1명(자신 포함 여부) 또는 에너미 1마리 */
-  target?: 'ally' | 'otherAlly' | 'enemy';
+  /** 대상: 아군 1명(자신 포함 여부) · 에너미 1마리 · 칸 (건물 · 깃털) */
+  target?: 'ally' | 'otherAlly' | 'enemy' | 'tile';
   /** 에너미 대상 카드의 사거리 (칸) */
   range?: number;
   /** 숫자를 골라서 쓰는 카드 (스마트 주사위 1~6 · 금지 표지판 앞 칸 수) */
@@ -185,6 +185,27 @@ export const CARDS: Record<CardId, CardInfo> = {
     limit: 0, pick: [1, 10],
   }),
   fateGuide: card('fateGuide', '운명의 인도', 'boost', '🔮', '이동 1~6 중 고르기', 'AP 命运的指引 (키이세이)', { limit: 0, pick: [1, 6] }),
+
+  // ── 원작 협동 맵 카드 (docs/AP_MAPS.md) ──
+  firecracker: card('firecracker', '고승포', 'event', '🧨', '10칸 안 몬스터 3 피해 · 분위기 · 기세 해제 · 이번 라운드 반격 없음', 'AP 高升炮 (워터 타운)', {
+    limit: 0, target: 'enemy', range: 10,
+  }),
+  hisFault: card('hisFault', '그놈 탓이야!', 'support', '👉', '아군 1 피해 · 문제아 · 코인 +3 · 차례 끝에 손에 있으면 1 피해', 'AP 是他干的 (매직 아카데미)', {
+    limit: 0, target: 'otherAlly',
+  }),
+  poisonFang: card('poisonFang', '독니', 'battle', '🦷', '금린 -2 · 반격 없음', 'AP 毒牙 (드래곤 팰리스)', {
+    timing: 'attack', battleCost: 2, limit: 0, battle: { noCounter: true },
+  }),
+  gourd: card('gourd', '호리병', 'event', '🍶', '카드 3장', 'AP 葫芦 (드래곤 팰리스)', { limit: 0 }),
+  supportGum: card('supportGum', '지원 껌', 'support', '🍬', '아군 체력 +2 · 개조 해제 · 이번 턴 카드 +1', 'AP 支援口香糖 (유령 골목)', { limit: 0, target: 'ally' }),
+  energyBar: card('energyBar', '에너지 바', 'support', '🍫', '아군 공격력 +2 · 이동 +2 (2턴) · 개조 2', 'AP 能量补充棒 (유령 골목)', { limit: 0, target: 'ally' }),
+  smartGummy: card('smartGummy', '똑똑이 젤리', 'support', '🍭', '아군 카드 3장 · 개조 해제', 'AP 大聪明软糖 (유령 골목)', { limit: 0, target: 'ally' }),
+  hasteMushroom: card('hasteMushroom', '질주 버섯', 'event', '🍄', '건물: 질주 칸 · 멈추면 다음 이동 +3 · 이번 턴 카드 +1', 'AP 疾行菇 (가을숲)', { limit: 0, target: 'tile' }),
+  starfruit: card('starfruit', '신선 스타프루트', 'event', '⭐', '건물: 보장점 · 이번 턴 카드 +1', 'AP 仙品杨桃 (가을숲)', { limit: 0, target: 'tile' }),
+  peach: card('peach', '향기로운 복숭아', 'event', '🍑', '건물: 지나가면 체력 +2 · 주목 해제 · 이번 턴 카드 +1', 'AP 芳香蜜桃 (가을숲)', { limit: 0, target: 'tile' }),
+  moneyTree: card('moneyTree', '돈나무', 'event', '💰', '건물: 상점 · 이번 턴 카드 +1', 'AP 招财树 (가을숲)', { limit: 0, target: 'tile' }),
+  feather: card('feather', '오색 깃털', 'event', '🪶', '5칸 안 칸으로 순간이동 · 체력 +3', 'AP 彩羽 (정원 안뜰)', { limit: 0, target: 'tile' }),
+  ashenFeather: card('ashenFeather', '잿빛 깃털', 'boost', '🌫️', '낼 수 없다 · 차례 시작에 온염 +1', 'AP 灰烬之羽 (정원 안뜰)', { limit: 0 }),
 };
 
 export const CARD_IDS = Object.keys(CARDS) as CardId[];

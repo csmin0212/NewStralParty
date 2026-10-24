@@ -17,6 +17,42 @@
   pointer-events: auto;
 }
 
+/* 원작 맵 과제 (모두 함께) */
+.map-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  width: 640px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.map-tasks li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #d8e0ea;
+  box-shadow: 0 2px 6px rgba(42, 59, 85, 0.14);
+  color: var(--ba-ink, #2a3b55);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+.map-tasks li b {
+  color: var(--ba-navy, #2a3b55);
+  font-variant-numeric: tabular-nums;
+}
+.map-tasks li.done {
+  opacity: 0.55;
+}
+.map-tasks li.done b {
+  color: #2fa36b;
+}
+
 .boss-bar {
   position: relative;
   display: flex;

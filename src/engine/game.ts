@@ -69,6 +69,31 @@ import {
 } from './relics';
 import { resolveAttack } from './combat';
 import {
+  apBossAppear,
+  apCardEffect,
+  apChallengeable,
+  apChallenged,
+  apChoose,
+  apCountered,
+  apDisplayBonus,
+  apEnemyAtk,
+  apEnemyHit,
+  apEvent,
+  apHealed,
+  apInit,
+  apKill,
+  apMoveBonus,
+  apNoCounter,
+  apPass,
+  apStar,
+  apSummon,
+  apTurnEnd,
+  apTurnStart,
+  apWake,
+  CANDY,
+  isAp,
+} from './ap';
+import {
   isKit,
   kitActive,
   kitAtk,
@@ -245,10 +270,12 @@ export function createGame({ board, boss, players, seed, difficulty = 'normal' }
   };
 
   const rng = createRng(state.rngState);
+  apInit(state, rng);
   for (const p of state.players) {
     kitCreate(p);
     drawCards(state, p, rng, RULES.startHand);
-    assignTask(state, rng, p);
+    // 원작 맵은 개인 임무 대신 모두의 과제
+    if (!state.ap) assignTask(state, rng, p);
   }
   log(state, '── 1라운드 ──');
   runGimmicks(state, rng);
@@ -295,6 +322,10 @@ export function applyAction(state: GameState, action: Action): GameState {
       break;
     case 'PICK_EVENT':
       pickEvent(s, rng, action.event);
+      break;
+    case 'MAP_CHOICE':
+      if (s.phase.kind !== 'mapChoice' || !apChoose(s, rng, action.choice)) throw new RuleError('고를 수 없습니다');
+      s.phase = { kind: 'preRoll' };
       break;
     case 'ROLL':
       roll(s, rng);
@@ -343,8 +374,13 @@ export function describeGimmick(state: GameState, actions: GimmickAction[]): str
           return `모든 에너미 공격 +${a.atk} · 방어 +${a.def}`;
         case 'move':
           return state.boss.moves?.[a.move]?.name ?? a.move;
+        case 'wake':
+          return `${state.boss.name} 행동 시작`;
+        case 'apEvent':
+          return '';
       }
     })
+    .filter(Boolean)
     .join(', ');
 }
 
@@ -359,7 +395,7 @@ export function validateBoard(board: Board): string[] {
     for (const n of tile.next) {
       if (!exists(n)) problems.push(`${tile.id}번 칸의 다음 칸 ${n}이 없음`);
     }
-    if (tile.kind === 'warp' && !exists(tile.warpTo)) {
+    if (tile.kind === 'warp' && !board.twoWay && !exists(tile.warpTo)) {
       problems.push(`${tile.id}번 워프의 도착 칸이 없음`);
     }
   });
@@ -437,6 +473,12 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
     log(s, `  ${key === 'atk' ? '공격력' : '방어력'} +${v}`);
   };
 
+  if (card === 'firecracker') {
+    apCardEffect(s, rng, p, card, target);
+    strike(enemy!, 3 + bonus);
+    return;
+  }
+  if (apCardEffect(s, rng, p, card, target)) return;
   switch (card) {
     // 부스트
     case 'dash':
@@ -684,6 +726,7 @@ export function strikeEnemy(s: GameState, rng: Rng, p: Player, enemy: Enemy, amo
   s.stats[p.id].kills += 1;
   p.coins += enemy.reward + (enemy.loot ?? 0);
   onKill(s, rng, p, enemy);
+  apKill(s, rng, p, enemy);
   if (onEnemyDefeated(p, def)) log(s, `  ${p.name}: 「${CHARACTERS[p.character].passive.name}」 ${p.stacks}스택`);
   // 모나 팬레터: 아군이 받은 효과 카드로 처치하면 모나가 카드 1장
   if (giver?.character === 'mona' && giver.id !== p.id) {
@@ -808,7 +851,7 @@ function roll(s: GameState, rng: Rng) {
   }
   const dice =
     s.turn.fixedMove !== null ? [s.turn.fixedMove] : Array.from({ length: s.turn.diceCount }, () => (s.turn.sixDice ? rng.d6() : rng.d10()));
-  s.turn.extraSteps += p.move - p.status.slow + relicMoveBonus(p) + useOverclock(s, p) + kitMoveBonus(s, p);
+  s.turn.extraSteps += p.move - p.status.slow + relicMoveBonus(p) + useOverclock(s, p) + kitMoveBonus(s, p) + apMoveBonus(p);
   p.status.slow = 0;
   // 원작: 합이 0 이하면 제자리, 한 번 이동은 최대 10
   const steps = Math.min(RULES.moveCap, Math.max(0, dice.reduce((a, b) => a + b, 0) + s.turn.extraSteps));
@@ -860,8 +903,11 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
 
   const mods = s.turn.battle;
   s.turn.challenged = true;
+  apChallenged(s, rng, p, enemy);
   const surge = onAttackStart(s, p, enemy);
-  const atk = Math.ceil((p.atk + statusAtk(p) + mods.atk + relicAttack(p, enemy) + kitAtk(s, p, enemy) + surge) * mods.atkMult);
+  const atk = Math.ceil(
+    (p.atk + statusAtk(p) + mods.atk + relicAttack(p, enemy) + kitAtk(s, p, enemy) + apDisplayBonus(p, enemy) + surge) * mods.atkMult,
+  );
   const foe = { atk: enemy.atk, def: enemyDefAgainst(s, p, enemy) };
   const hit = resolveAttack({ atk, def: p.def }, foe, enemy.defense, rng, 1, {
     attackDice: mods.attackDice,
@@ -899,7 +945,7 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   }
 
   // 그림자 습격의 반격 없음은 보스에게는 통하지 않는다
-  if (enemy.counter && !(mods.noCounter && !enemy.isBoss) && !relicNoCounter(p) && !kitNoCounter(s)) {
+  if (enemy.counter && !(mods.noCounter && !enemy.isBoss) && !relicNoCounter(p) && !kitNoCounter(s) && !apNoCounter(s, enemy)) {
     // 원작처럼 반격하는 쪽이 먼저 굴린다. 플레이어는 이 값을 보고 방어 · 회피와 카드를 고른다
     const attackRoll = kitFlaw(enemy, p) ? 0 : rng.d6();
     s.phase = { kind: 'defend', enemy: enemy.id, stepsLeft, attackRoll };
@@ -919,9 +965,10 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   const p = currentPlayer(s);
 
   const mods = s.turn.battle;
-  const me = { atk: p.atk, def: p.def + statusDef(p) + relicDefense(p) + kitDef(s, p) + mods.def };
+  apCountered(s, rng, enemy);
+  const me = { atk: p.atk, def: p.def + statusDef(p) + relicDefense(p) + kitDef(s, p) + apDisplayBonus(p, enemy) + mods.def };
   const dice = evadeDice(p) + mods.evadeDice;
-  const foe = { atk: Math.max(0, enemy.atk + kitEnemyAtk(enemy, p)), def: enemy.def };
+  const foe = { atk: Math.max(0, enemy.atk + kitEnemyAtk(enemy, p) + apEnemyAtk(s, enemy, p)), def: enemy.def };
   const hit = resolveAttack(foe, me, mode, rng, mode === 'evade' ? dice : 1, { attackRoll });
   battle.events.push({
     type: 'attack',
@@ -935,6 +982,7 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   onAttacked(p);
   kitDefenseRolled(p, hit);
   damage(s, rng, p, hit.damage);
+  apEnemyHit(s, rng, enemy, p, hit.damage);
   if (!p.ko && !isOver(s)) kitRetaliate(s, rng, p, enemy);
   if (isOver(s)) {
     battle.done = true;
@@ -989,6 +1037,7 @@ function defeatEnemy(s: GameState, rng: Rng, p: Player, enemy: Enemy, battle: Ba
   s.stats[p.id].kills += 1;
   p.coins += reward;
   onKill(s, rng, p, enemy);
+  apKill(s, rng, p, enemy);
   battle.events.push({ type: 'enemyDefeated', reward });
   if (onEnemyDefeated(p, def)) {
     const name = CHARACTERS[p.character].passive.name;
@@ -1099,6 +1148,8 @@ function endTurn(s: GameState, rng: Rng) {
   }
   onTurnEnd(s, rng, p);
   if (isOver(s)) return;
+  apTurnEnd(s, rng, p);
+  if (isOver(s)) return;
   // 손패 한도를 넘으면 늦게 얻은 카드부터 버린다
   if (p.hand.length > handLimit(p)) {
     const dropped = p.hand.splice(handLimit(p));
@@ -1185,6 +1236,10 @@ function beginTurn(s: GameState, rng: Rng) {
     }
     tickStatus(s, p);
     onTurnStart(s, rng, p);
+    apTurnStart(s, rng, p);
+    // 원작 맵 선택 (투표 · 루트)은 다음 차례의 캐릭터가 고른다
+    const choice = s.ap?.choice;
+    if (choice) s.phase = { kind: 'mapChoice', id: choice.id, options: choice.options };
     return;
   }
 }
@@ -1231,10 +1286,18 @@ function runGimmicks(s: GameState, rng: Rng) {
     for (const action of gimmick.actions) {
       switch (action.type) {
         case 'summon':
-          for (const kind of action.enemies) summon(s, rng, kind);
+          if (isAp(s)) action.enemies.forEach((kind, i) => apSummon(s, rng, kind, action.tiles?.[i] || undefined));
+          else for (const kind of action.enemies) summon(s, rng, kind);
           break;
         case 'bossAppear':
-          bossAppear(s, rng);
+          if (isAp(s)) apBossAppear(s, action.tile);
+          else bossAppear(s, rng);
+          break;
+        case 'wake':
+          apWake(s);
+          break;
+        case 'apEvent':
+          apEvent(s, rng, action.event);
           break;
         case 'move':
           runTimelineMove(s, rng, action.move);
@@ -1263,14 +1326,14 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
   let left = steps;
 
   while (left > 0) {
-    const tile = s.board.tiles[p.tile];
-    if (tile.next.length > 1) {
-      s.phase = { kind: 'choosePath', stepsLeft: left, options: [...tile.next] };
+    const options = forward(s, p);
+    if (options.length > 1) {
+      s.phase = { kind: 'choosePath', stepsLeft: left, options };
       recordMove(s, path);
       return;
     }
     left -= 1;
-    if (enter(s, rng, tile.next[0], path, left)) {
+    if (enter(s, rng, options[0], path, left)) {
       recordMove(s, path);
       return;
     }
@@ -1279,6 +1342,14 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
   }
 
   arrive(s, rng, path);
+}
+
+/** 갈 수 있는 다음 칸. 양방향 맵에서는 지나온 칸으로 되돌아가지 않는다 (순간이동 뒤에는 다 고를 수 있다) */
+export function forward(s: GameState, p: Player): number[] {
+  const next = s.board.tiles[p.tile].next;
+  const prev = p.prevTile === p.tile ? p.prev : null;
+  const out = next.filter((t) => t !== prev);
+  return out.length ? out : [...next];
 }
 
 /** 이동이 끝난 칸: 칸 효과 → (전투 · 질주가 없으면) 차례 끝 */
@@ -1307,6 +1378,9 @@ function arrive(s: GameState, rng: Rng, path: number[]) {
   if (s.turn.haste) {
     s.turn.haste = false;
     s.turn.landed = false;
+    // 다시 굴리는 이동은 처음부터 (보정은 주사위를 굴릴 때 다시 더한다)
+    s.turn.extraSteps = 0;
+    s.turn.fixedMove = null;
     s.phase = { kind: 'preRoll' };
   } else if (s.phase.kind === 'preRoll') {
     s.phase = { kind: 'endTurn' };
@@ -1346,12 +1420,15 @@ function passBonus(s: GameState, p: Player): number {
 /** 한 칸 들어간다. 그 칸에 에너미가 있으면 인카운터, 상점이면 상점을 열고 true */
 function enter(s: GameState, rng: Rng, tileId: number, path: number[], stepsLeft: number): boolean {
   const p = currentPlayer(s);
+  p.prev = p.tile;
+  p.prevTile = tileId;
   p.tile = tileId;
   path.push(tileId);
   kitPass(s, rng, p, tileId);
+  apPass(s, rng, p, tileId);
   if (isOver(s)) return true;
 
-  const enemy = s.turn.noBattle ? undefined : s.enemies.find((e) => e.tile === tileId && targetable(s, e));
+  const enemy = s.turn.noBattle ? undefined : s.enemies.find((e) => e.tile === tileId && targetable(s, e) && apChallengeable(s, e));
   if (enemy) {
     startEncounter(s, enemy, stepsLeft);
     return true;
@@ -1443,6 +1520,7 @@ function tryLevelUp(s: GameState, rng: Rng, p: Player) {
     gains.push(`코인 +${growth.coins}`);
   }
   log(s, `${p.name}: ⭐ 코인 ${cost}개로 ${p.level}성 달성!${gains.length ? ` (${gains.join(', ')})` : ''}`);
+  apStar(s, rng, p);
   // 원작 협동 Lv6: 별마다 재선택 +1
   p.relicVars.rerolls = (p.relicVars.rerolls ?? 0) + 1;
   // 원작처럼 성이 오르면 유물 3개 중 1개 (확률표는 성 기준)
@@ -1496,6 +1574,8 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
       monsterTile(s, rng, p);
       break;
     case 'haste':
+      // 제자리(0칸)면 다시 굴리지 않는다
+      if (path.length < 2) break;
       kitHaste(s, p);
       s.turn.haste = true;
       log(s, `${p.name}: 💨 질주 — 한 번 더`);
@@ -1520,6 +1600,18 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
       break;
     }
     case 'assault': {
+      if (isAp(s)) {
+        const d = distances(s.board, p.tile);
+        const foe = s.enemies
+          .filter((e) => targetable(s, e) && apChallengeable(s, e))
+          .sort((a, b) => (d.get(a.tile) ?? 99) - (d.get(b.tile) ?? 99))[0];
+        if (!foe) break;
+        path.push(foe.tile);
+        p.tile = foe.tile;
+        log(s, `${p.name}: 🚪 몬스터 돌격문 — ${foe.name}에게`);
+        startEncounter(s, foe, 0);
+        break;
+      }
       const kind = s.board.assault ?? 'delinquent';
       summon(s, rng, kind, 'players');
       p.coins += 3;
@@ -1547,7 +1639,7 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
       const price = hasRelic(p, 'candyCard') ? 0 : 5;
       if (p.coins < price || p.hand.length >= handLimit(p)) break;
       p.coins -= price;
-      const card = rng.pick(CANDY_CARDS);
+      const card = rng.pick(isAp(s) ? CANDY : CANDY_CARDS);
       p.hand.push({ card, shop: true });
       onCardsGained(p, 1);
       log(s, `${p.name}: 🍭 사탕 자판기 — 코인 ${price} · ${CARDS[card].name}`);
@@ -1582,7 +1674,8 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
     }
     case 'warp': {
       onBoostTile(p);
-      const dest = tile.warpTo!;
+      const portals = s.board.tiles.filter((x) => x.kind === 'warp' && x.id !== tile.id).map((x) => x.id);
+      const dest = tile.warpTo ?? (portals.length ? rng.pick(portals) : tile.id);
       p.tile = dest;
       path.push(dest);
       log(s, `${p.name}: 🌀 워프! ${dest}번 칸으로`);
@@ -1813,6 +1906,7 @@ export function heal(p: Player, amount: number): number {
   p.hp = Math.min(p.maxHp, p.hp + amount);
   const healed = p.hp - before;
   kitHealed(p, healed, Math.max(0, amount - healed));
+  if (healed > 0) apHealed(p);
   return healed;
 }
 

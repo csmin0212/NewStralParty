@@ -1,7 +1,7 @@
 import { ENEMIES } from '../data/enemies';
 import { activePart, bossEnemy, currentIntent } from '../engine/boss';
 import { bossDefBonus } from '../engine/skills';
-import type { BossDef, GameState } from '../engine/types';
+import type { BossDef, Enemy, GameState } from '../engine/types';
 import { BOSS_ART } from './assets';
 import { esc } from './html';
 
@@ -21,7 +21,7 @@ export function bossBar(state: GameState): string {
   const st = state.bossState;
   const boss = bossEnemy(state);
   if (!boss) {
-    if (!def.moves) return '';
+    if (!def.moves && !def.ap) return '';
     const at = def.timeline.find((g) => g.actions.some((a) => a.type === 'bossAppear'))?.at;
     const early = def.passive?.appearWhenCleared ? ` · ${ENEMIES[def.passive.appearWhenCleared].name}를 모두 쓰러뜨리면 바로` : '';
     return `
@@ -75,6 +75,7 @@ export function bossBar(state: GameState): string {
     );
   }
   if (passive?.organ) chip(`organ ${st.organ}`, `오르간 · ${st.organ === 'players' ? '아군' : '보스'} 쪽`, '성가가 이쪽을 치유한다');
+  apChips(state, boss, chip);
 
   return `
     <div class="boss-bar ${st.groggy > 0 ? 'is-groggy' : ''} ${st.hidden ? 'is-hidden' : ''}">
@@ -86,6 +87,25 @@ export function bossBar(state: GameState): string {
       </div>
       ${nextMove(state)}
     </div>`;
+}
+
+/** 원작 맵 보스 상태: 잠 · 스킬 재사용 · 심도 개조 · 금린 · 역린 · 정력 · 기세 */
+function apChips(state: GameState, boss: Enemy, chip: (cls: string, text: string, tip: string) => void) {
+  const a = state.ap;
+  const ap = state.boss.ap;
+  if (!a || !ap) return;
+  if (!a.awake) chip('sleep', '💤 잠', '깨어나기 전에는 움직이지도 스킬을 쓰지도 않는다');
+  if (ap.skill) {
+    const cd = boss.cd ?? 0;
+    chip('skill', `${esc(ap.skill.name)} ${cd > 0 ? `${cd}R` : '준비'}`, ap.skill.text);
+  }
+  const st = boss.st ?? {};
+  if ((a.vars.shield ?? 0) > 0) chip('shield', `심도 개조 ${a.vars.shield}`, '인공생명체를 쓰러뜨릴 때마다 -1. 남아 있으면 공격 · 지정할 수 없다');
+  if (st.scale) chip('scale', `금린 ${st.scale}`, '층마다 공격력 · 방어력 +1');
+  if (st.scaleRev) chip('scale', `역린 ${st.scaleRev}`, '층마다 공격력 +2 · 받는 피해 -2 (라운드 끝까지)');
+  if (st.energy) chip('energy', `초강 정력 ${st.energy}`, '층마다 공격력 +2 · 도전받으면 -1');
+  if (st.momentum) chip('energy', `기세 +${st.momentum}`, '공격이 맞을 때마다 공격력 +2 · 고승포로 해제');
+  if (a.vars.defDown) chip('vuln', `방어력 -${a.vars.defDown}`, '과제 보상');
 }
 
 /** 다음 행동 카드. 끊을 수 있는 행동이면 남은 피해 막대 */

@@ -54,7 +54,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
   root.innerHTML = `<div class="game"><main class="board-area"></main><div class="hud"></div></div>`;
   const gameEl = root.querySelector<HTMLElement>('.game')!;
   const hud = root.querySelector<HTMLElement>('.hud')!;
-  const board = new BoardView(root.querySelector<HTMLElement>('.board-area')!, state.board, state);
+  let board = new BoardView(root.querySelector<HTMLElement>('.board-area')!, state.board, state);
   const battle = new BattleView(gameEl);
   const fx = new FxLayer(gameEl);
   // 개발 중에만: 콘솔에서 window.__fx.play({ kind: 'levelup', text: 'LEVEL UP!' })로 연출을 바로 볼 수 있다
@@ -273,6 +273,14 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     //          → 승패 → 라운드 · 차례 컷인 → 새로 만난 에너미와 전투 시작
     await battle.playPending(state);
     if (state.bossTurn && state.bossTurn.seq > lastBossTurn) await playBossTurn(state, state.bossTurn);
+    if (!board.isFor(state.board)) {
+      // 원작 매직 아카데미: 젤리 전사를 쓰러뜨리면 둘째 맵으로
+      const area = root.querySelector<HTMLElement>('.board-area')!;
+      area.innerHTML = '';
+      const onTile = board.onTileClick;
+      board = new BoardView(area, state.board, state);
+      board.onTileClick = onTile;
+    }
     await board.show(state);
     floats(deltaEvents(prev, state));
     for (const ev of resultEvents(prev, state)) {

@@ -1,4 +1,4 @@
-import { BOSSES } from '../data/bosses';
+import { AP_BOSSES as BOSSES } from '../data/apMaps';
 import { MAP_DEFS, MAPS } from '../data/maps';
 import { KEYWORD_INFO, RARITY_NAME, RELIC_IDS, RELICS, type RelicId } from '../data/relics';
 import { ENEMIES } from '../data/enemies';

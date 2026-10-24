@@ -67,7 +67,7 @@ export function rollOffer(s: GameState, rng: Rng, p: Player, tier: number): Reli
   const allowed = (id: RelicId) => {
     const info = RELICS[id];
     if (p.relics.includes(id)) return false;
-    if (info.map && info.map !== mapId) return false;
+    if (info.map && info.map !== mapId && info.map !== s.boss.map) return false;
     if (info.keyword && held.size >= 2 && !held.has(info.keyword)) return false;
     return true;
   };

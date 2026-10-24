@@ -1,4 +1,4 @@
-import { BOSSES } from '../data/bosses';
+import { AP_BOSSES as BOSSES, AP_VARIANTS } from '../data/apMaps';
 import { DIFFICULTIES, DIFFICULTY_IDS, OPEN_DIFFICULTIES, type DifficultyId } from '../data/difficulty';
 import { loadAccount, type Account } from '../meta/account';
 import { ENEMIES } from '../data/enemies';
@@ -73,14 +73,14 @@ export function renderBossScreen(root: HTMLElement, onPick: (boss: BossDef, diff
         <div class="stage">
           <header class="ba-top">
             <button class="ba-back" data-act="back" title="뒤로"><i></i></button>
-            <h2>총력전</h2>
-            <span class="ba-count">보스 <b>${BOSSES.length}</b></span>
+            <h2>협동 챌린지</h2>
+            <span class="ba-count">맵 <b>${BOSSES.length}</b></span>
           </header>
           <nav class="boss-list">${list}</nav>
           <section class="ba-panel boss-detail">
             ${hero(current)}
             <nav class="ba-tabs">
-              <button class="ba-tab ${tab === 'moves' ? 'on' : ''}" data-tab="moves">행동</button>
+              <button class="ba-tab ${tab === 'moves' ? 'on' : ''}" data-tab="moves">${current.ap ? '보스 · 과제' : '행동'}</button>
               <button class="ba-tab ${tab === 'rules' ? 'on' : ''}" data-tab="rules">규칙 · 진행도</button>
               <button class="ba-tab ${tab === 'enemies' ? 'on' : ''}" data-tab="enemies">등장 에너미</button>
             </nav>
@@ -135,7 +135,7 @@ function hero(b: BossDef): string {
         <div class="bd-name">${esc(b.name)} ${stars(b.stars)}</div>
         ${b.summary ? `<p class="bd-summary">${esc(b.summary)}</p>` : ''}
         <div class="bd-stats">
-          ${stat('체력', `${b.hpPerPlayer} × 인원`)}
+          ${stat('체력', b.ap ? String(b.ap.hp) : `${b.hpPerPlayer} × 인원`)}
           ${stat('공격', String(b.atk))}
           ${stat('방어', String(b.def))}
           ${stat('반격', b.counter ? '함' : '안 함')}
@@ -158,7 +158,65 @@ function moveCard(b: BossDef, id: string, order?: number): string {
     </div>`;
 }
 
+/** 원작 맵 보스 규칙 */
+const AP_RULE: Record<string, string> = {
+  chaseRandom: '진행도 11에 깨어나 무작위 캐릭터를 쫓는다',
+  spiritLink: '검 영혼마다 방어력 +2 · 창 영혼마다 공격력 +2 · 검 · 창 영혼이 쓰러지면 체력 -10%',
+  momentum: '공격이 맞을 때마다 공격력 +2 (고승포로 해제)',
+  sharedHp: '지휘대와 체력 공유 · 지휘대는 도전할 수 없다 (카드 · 스킬로만)',
+  sugar: '찻주전자를 흡수하지 못한 라운드 끝에 최대 체력 10%를 잃는다',
+  fury: '그놈 탓이야! 3장마다 공격력 +1 · 젤리 호위병 · 문제아를 공격할 때 공격력 +2',
+  reverseScale: '피해를 받으면 역린 1 (공격력 +2 · 받는 피해 -2, 라운드 끝까지) · 한 번에 20 넘게 받으면 풀리고 스킬 봉인',
+  goldScale: '반격하면 금린 2 (층마다 공격력 · 방어력 +1)',
+  shield: '심도 개조 3 · 인공생명체를 쓰러뜨릴 때마다 -1 · 남아 있으면 공격 · 지정할 수 없다',
+  kidGawu: '차례마다 초강 정력 +1 (공격력 +2) · 5칸 안 주목받은 캐릭터 3 피해 · 도전받으면 도전자 주목 · 정력 -1 · 체력 60% 이하 반격',
+  flameHit: '맞히면 온염 2',
+  solitude: '4칸 안에 아무도 없으면 이동 +2 · 방어력 +2 · 맞히면 연리 · 연리 대상 공격력 +3',
+  rebirth: '차례마다 5칸 안 온염 1 · 지금 체력 10% 잃음 · 잃은 체력 30마다 공격력 +1 · 절반 이하 이동 +2 · 공격력 +2',
+  vote: '큰목소리 · 무술 수련생을 쓰러뜨리면 투표로 보스를 고른다',
+  route: '가금 종업원 · 신비한 알 2개로 루트를 고른다',
+};
+
+/** 이 맵에서 나올 수 있는 보스 (갈래) */
+function apForms(b: BossDef): BossDef[] {
+  if (b.map === 'academy') return [AP_VARIANTS.dean, AP_VARIANTS.officer];
+  if (b.map === 'dragonpalace') return [AP_VARIANTS.mamushi, AP_VARIANTS.souri];
+  if (b.map === 'garden') return [AP_VARIANTS.peacock, AP_VARIANTS.lovebird, AP_VARIANTS.phoenix];
+  return [b];
+}
+
+function apMovesTab(b: BossDef): string {
+  const forms = apForms(b)
+    .map((f) => {
+      const ap = f.ap!;
+      const rules = (ap.rules ?? []).map((r) => AP_RULE[r]).filter(Boolean);
+      return `
+        <div class="bm-card">
+          <div class="bm-head"><b>${f.icon} ${esc(f.name)}</b><span class="bm-tag">체력 ${ap.hp} · 공격 ${f.atk} · 방어 ${f.def}${f.counter ? ' · 반격' : ''}</span></div>
+          ${ap.skill ? `<p><b>${esc(ap.skill.name)}</b> · 재사용 ${ap.skill.cd} · ${esc(ap.skill.text)}</p>` : ''}
+          ${rules.map((r) => `<p>${esc(r)}</p>`).join('')}
+        </div>`;
+    })
+    .join('');
+  const tasks = apForms(b)
+    .flatMap((f) => f.ap!.tasks)
+    .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
+    .map((t) => {
+      const r = t.reward;
+      const reward = [r.chip ? `유물 ${r.chip}` : '', r.progress ? `진행도 ${r.progress}` : '', r.coins ? `코인 +${r.coins}` : '', r.card ? '카드' : '']
+        .filter(Boolean)
+        .join(' · ');
+      return `<li><b>${esc(t.name)} ${t.count}</b><span>${esc(reward || '맵 진행')}</span></li>`;
+    })
+    .join('');
+  return `
+    <div class="bm-grid">${forms}</div>
+    <h4 class="bs-h">과제</h4>
+    <ul class="bs-rows">${tasks}</ul>`;
+}
+
 export function movesTab(b: BossDef): string {
+  if (b.ap) return apMovesTab(b);
   if (!b.moves) return '<p class="bs-empty">행동 카드 없음</p>';
   const order = b.deckOrder === 'shuffle' ? '무작위' : '순서';
   const deck = (b.deck ?? []).map((id, i) => moveCard(b, id, i + 1)).join('');
@@ -191,6 +249,10 @@ function gimmickText(b: BossDef, a: GimmickAction): string {
       return `모든 에너미 공격 +${a.atk}${a.def ? ` · 방어 +${a.def}` : ''}`;
     case 'move':
       return b.moves?.[a.move]?.text ?? a.move;
+    case 'wake':
+      return `${b.name} 행동 시작`;
+    case 'apEvent':
+      return '';
   }
 }
 
@@ -218,7 +280,7 @@ export function rulesTab(b: BossDef): string {
   if (p?.organ) row('오르간', '성가 방향 · 멈추면 아군 쪽 · 성가 뒤 보스 쪽');
   row('그로기', '방어 0 · 받는 피해 +1');
   const timeline = b.timeline
-    .map((g) => `<li><b>진행도 ${g.at}</b><span>${esc(g.actions.map((a) => gimmickText(b, a)).join(' · '))}</span></li>`)
+    .map((g) => `<li><b>진행도 ${g.at}</b><span>${esc(g.actions.map((a) => gimmickText(b, a)).filter(Boolean).join(' · '))}</span></li>`)
     .join('');
   return `
     <ul class="bs-rows">${rows.join('')}</ul>
@@ -233,6 +295,10 @@ function enemiesTab(b: BossDef): string {
   const effects = [...Object.values(b.moves ?? {}).flatMap((m) => m.effects), ...(b.phase2?.enter ?? [])];
   for (const fx of effects) if (fx.type === 'summon') fx.enemies.forEach((k) => kinds.add(k));
   for (const k of [b.passive?.gauge?.perMinion, b.passive?.resort?.kind, b.passive?.guard?.kind]) if (k) kinds.add(k);
+  for (const f of b.ap ? apForms(b) : []) {
+    if (f.ap?.skill?.kind) kinds.add(f.ap.skill.kind);
+    for (const g of f.timeline) for (const x of g.actions) if (x.type === 'summon') x.enemies.forEach((k) => kinds.add(k));
+  }
   return `<div class="be-grid">${[...kinds].map(enemyCard).join('')}</div>`;
 }
 
@@ -248,6 +314,8 @@ function enemyCard(kind: EnemyKind): string {
   if (e.calls) traits.push(`${e.calls.every}차례마다 ${ENEMIES[e.calls.kind].name} 호출`);
   if (e.link) traits.push('받은 피해를 보스도 받는다');
   if (e.decoy) traits.push('보스와 똑같이 보이는 분신 · 맞으면 사라진다');
+  if (e.fly) traits.push('비행 · 도전할 수 없다');
+  if (e.skill) traits.push(`${e.skill.name} (재사용 ${e.skill.cd}): ${e.skill.text}`);
   return `
     <div class="be-card">
       <span class="be-face">${e.icon}</span>

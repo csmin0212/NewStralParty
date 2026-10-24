@@ -1,5 +1,6 @@
 // 카드 · 덱 규칙 중 상태를 바꾸지 않는 부분 (검사 · 섞기 · 거리). 효과 자체는 game.ts의 cardEffect.
 
+import { apPlayerAtk, apPlayerDef, apTargetable, apTileTargets } from './ap';
 import { CARDS, DECK_CARD_IDS } from '../data/cards';
 import { cardPlayLimit, relicRange } from './relics';
 import { kitBattleCost, kitRange } from './kits';
@@ -41,11 +42,13 @@ export function freshStatus(): PlayerStatus {
 /** 카드 · 보스 약화로 바뀐 공격력 / 방어력 */
 export function statusAtk(p: Player): number {
   const res = p.mapRes ?? {};
-  return (p.status.atkUp?.amount ?? 0) - (p.status.atkDown?.amount ?? 0) + (res.problem ? 2 : 0) + ((res.mind ?? 0) >= 3 ? 1 : 0);
+  return (
+    (p.status.atkUp?.amount ?? 0) - (p.status.atkDown?.amount ?? 0) + (res.problem ? 2 : 0) + ((res.mind ?? 0) >= 3 ? 1 : 0) + apPlayerAtk(p)
+  );
 }
 
 export function statusDef(p: Player): number {
-  return (p.status.defUp?.amount ?? 0) - (p.status.defDown?.amount ?? 0) - (p.mapRes?.problem ? 2 : 0);
+  return (p.status.defUp?.amount ?? 0) - (p.status.defDown?.amount ?? 0) - (p.mapRes?.problem ? 2 : 0) + apPlayerDef(p);
 }
 
 /** 손패 한도 */
@@ -55,7 +58,7 @@ export function handLimit(_p: Player): number {
 
 /** 고르거나 부딪힐 수 있는 에너미인지 (땅속에 숨은 보스는 안 된다) */
 export function targetable(s: GameState, e: Enemy): boolean {
-  return !(e.isBoss && s.bossState.hidden);
+  return !(e.isBoss && s.bossState.hidden) && apTargetable(s, e);
 }
 
 export function shuffle<T>(list: T[], rng: Rng): T[] {
@@ -114,6 +117,7 @@ export function distances(board: Board, from: number): Map<number, number> {
 export function cardTargets(s: GameState, p: Player, id: CardId): number[] | null {
   const info = CARDS[id];
   if (!info.target) return null;
+  if (info.target === 'tile') return apTileTargets(s, p, id) ?? [];
   if (info.target === 'enemy') {
     const dist = distances(s.board, p.tile);
     const range = info.range! + (relicRange(p) + kitRange(p));
@@ -127,6 +131,7 @@ export function cardBlocker(s: GameState, p: Player, hand: HandCard): string | n
   const info = CARDS[hand.card];
   const phase = s.phase.kind;
 
+  if (hand.card === 'ashenFeather') return '낼 수 없는 카드';
   if (info.type === 'battle') {
     if (info.timing === 'attack' && phase !== 'encounter') return '공격할 때 쓰는 카드';
     if (info.timing === 'defend' && phase !== 'defend') return '반격을 받을 때 쓰는 카드';

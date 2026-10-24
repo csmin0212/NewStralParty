@@ -1110,6 +1110,14 @@ button.seat-char:hover {
   margin-bottom: 14px;
   padding-left: 44px;
 }
+.ap-st {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: var(--ba-ink, #2a3b55);
+  font-size: 11px;
+  line-height: 18px;
+}
 .me-pot {
   padding: 0 7px;
   border-radius: 999px;

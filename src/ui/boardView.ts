@@ -142,8 +142,28 @@ export class BoardView {
     this.highlight(state);
   }
 
+  /** 이 보드 그림인지 (매직 아카데미 2단처럼 맵이 바뀌면 새로 그린다) */
+  isFor(board: Board): boolean {
+    return board.id === this.board.id && board.tiles.length === this.board.tiles.length;
+  }
+
+  /** 칸 종류가 바뀌었으면 (건물) 다시 그린다 */
+  private syncTiles(state: GameState) {
+    state.board.tiles.forEach((tile, i) => {
+      const t = this.tileEls[i];
+      if (!t || t.classList.contains(`kind-${tile.kind}`)) return;
+      const info = TILE_INFO[tile.kind];
+      t.className = `tile kind-${tile.kind}`;
+      const art = TILE_ART[tile.kind];
+      t.classList.toggle('has-art', !!art);
+      t.title = `${tile.id}번 · ${info.name}${info.text ? ` · ${info.text}` : ''}`;
+      t.innerHTML = `${art ? `<img class="tile-art" src="${art}" alt="" draggable="false">` : `<span class="icon">${info.icon}</span>`}<span class="label">${info.name}</span>`;
+    });
+  }
+
   /** 새 상태를 보여 준다. 새 이동이 있으면 말이 다 움직인 뒤에 resolve */
   async show(state: GameState) {
+    this.syncTiles(state);
     this.highlight({ ...state, phase: { kind: 'endTurn' } }); // 이동 중에는 선택지 숨김
     const move = state.lastMove;
     if (move && move.seq > this.lastSeq) {
@@ -324,6 +344,9 @@ export class BoardView {
     for (const tile of this.board.tiles) {
       const a = center(tile.id);
       for (const n of tile.next) {
+        // 양방향 길은 한 번만, 화살표 없이
+        const both = this.board.twoWay && this.board.tiles[n].next.includes(tile.id);
+        if (both && n < tile.id) continue;
         const b = center(n);
         const len = Math.hypot(b.x - a.x, b.y - a.y);
         const ux = (b.x - a.x) / len;
@@ -334,8 +357,8 @@ export class BoardView {
         line.setAttribute('y1', String(a.y + uy * r));
         line.setAttribute('x2', String(b.x - ux * r));
         line.setAttribute('y2', String(b.y - uy * r));
-        line.setAttribute('marker-end', 'url(#arrow)');
-        line.classList.add(tile.next.length > 1 ? 'fork' : 'path');
+        if (!both) line.setAttribute('marker-end', 'url(#arrow)');
+        line.classList.add(!both && tile.next.length > 1 ? 'fork' : 'path');
         svg.append(line);
       }
       if (tile.kind === 'warp' && tile.warpTo !== undefined) {
@@ -363,6 +386,13 @@ const MARK_ICON: Record<Mark['kind'], string> = {
   organ: '🎹',
   heater: '🔥',
   fire: '🔥',
+  egg: '🥚',
+  gourd: '🍶',
+  mist: '🌫️',
+  mushroom: '🍄',
+  starfruit: '⭐',
+  peach: '🍑',
+  moneyTree: '💰',
 };
 
 function markCount(state: GameState, m: Mark): string {

@@ -9,6 +9,7 @@ import { skillCardOk, skillCards } from '../engine/kits';
 import { RULES } from '../engine/rules';
 import type { Action, GameState, MapRes, Player } from '../engine/types';
 import { MAP_RES_INFO } from '../data/board';
+import { MAP_THEMES } from '../data/maps';
 import { EVENTS, type EventId } from '../data/events';
 import { tileLabel } from './boardView';
 import { campusVector } from './campusMap';
@@ -54,7 +55,7 @@ export function renderHud(
   el.innerHTML = `
     <div class="hud-top">
       ${roundBadge(state)}
-      <div class="hud-center">${progressTrack(state)}${bossBar(state)}</div>
+      <div class="hud-center">${progressTrack(state)}${bossBar(state)}${mapTasks(state)}</div>
       <div class="hud-tools">
         <button class="icon-btn ${logOpen ? 'on' : ''}" data-action="log" title="기록">📜</button>
       </div>
@@ -81,7 +82,7 @@ export function renderHud(
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!btn || btn.disabled) return;
     const player = state.current;
-    const { action, card, path, buy, target, value, gift, send, relic, stop, event } = btn.dataset;
+    const { action, card, path, buy, target, value, gift, send, relic, stop, event, choice } = btn.dataset;
     if (relic) h.dispatch({ type: 'PICK_RELIC', player, relic: relic as RelicId });
     else if (action === 'reroll-relic') h.dispatch({ type: 'REROLL_RELIC', player });
     else if (action === 'buy-relic') h.dispatch({ type: 'BUY_RELIC', player });
@@ -104,6 +105,7 @@ export function renderHud(
     else if (action === 'log') h.toggleLog();
     else if (stop !== undefined) h.dispatch({ type: 'STOP_HERE', player, stop: stop === '1' });
     else if (event) h.dispatch({ type: 'PICK_EVENT', player, event: event as EventId });
+    else if (choice) h.dispatch({ type: 'MAP_CHOICE', player, choice });
     else if (buy !== undefined) h.dispatch({ type: 'BUY_CARD', player, offer: Number(buy) });
     else if (send !== undefined) h.dispatch({ type: 'SEND_COINS', player, to: Number(send) });
     else if (action === 'leave-shop') h.dispatch({ type: 'LEAVE_SHOP', player });
@@ -161,7 +163,7 @@ function roundBadge(state: GameState): string {
     <div class="hud-round">
       <button class="icon-btn" data-action="menu" title="메뉴">☰</button>
       <div class="round-box"><b>${String(state.round).padStart(2, '0')}</b><span>라운드</span></div>
-      <div class="map-name"><small>ACADEMY DISTRICT / 01</small>${esc(state.board.name)}</div>
+      <div class="map-name"><small>${esc(MAP_THEMES[state.board.id ?? '']?.label ?? 'ACADEMY DISTRICT')}</small>${esc(state.board.name)}</div>
     </div>`;
 }
 
@@ -325,10 +327,59 @@ function currentCard(state: GameState): string {
           <span title="공격력">⚔ ${p.atk}</span><span title="방어력">🛡 ${p.def}</span>${p.move ? `<span title="이동거리">👟 +${p.move}</span>` : ''}
           ${c.stack ? `<span class="me-stack" title="${esc(c.passive.description)}">${c.stack.name} ${p.stacks}/${c.stack.max}</span>` : ''}
           ${p.potential && c.potential ? `<span class="me-pot" title="${esc(c.potential.description)}">잠재 해방</span>` : ''}
+          ${apStatusChips(p)}
         </div>
         ${taskLine(state, p)}
       </div>
     </div>`;
+}
+
+/** 원작 맵 과제 (모두 함께): 이름 · 진행 */
+function mapTasks(state: GameState): string {
+  const a = state.ap;
+  const tasks = state.boss.ap?.tasks;
+  if (!a || !tasks) return '';
+  const live = tasks.filter((t) => !t.branch || t.branch === a.branch);
+  const rows = live
+    .map((t) => {
+      const done = a.done.includes(t.id);
+      const n = Math.min(t.count, a.tasks[t.id] ?? 0);
+      return `<li class="${done ? 'done' : ''}" title="${esc(taskReward(t.reward))}"><span>${esc(t.name)}</span><b>${done ? '✓' : `${n}/${t.count}`}</b></li>`;
+    })
+    .join('');
+  return `<ul class="map-tasks">${rows}</ul>`;
+}
+
+function taskReward(r: NonNullable<GameState['boss']['ap']>['tasks'][number]['reward']): string {
+  return [
+    r.chip ? `모두 유물 고르기` : '',
+    r.progress ? `진행도 ${r.progress}` : '',
+    r.coins ? `모두 코인 +${r.coins}` : '',
+    r.card ? `모두 카드` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+const AP_STATUS: Record<string, [string, string]> = {
+  poison: ['☠️', '중독: 차례 끝마다 체력 -1'],
+  curse: ['💙', '저주: 방어력 -2'],
+  overclock: ['⚙️', '개조: 차례 끝마다 -1, 0이 되면 지금 체력만큼 피해'],
+  attention: ['👀', '주목: 방어력 -1 · 이동 -1'],
+  bond: ['💞', '연리: 차례 시작마다 공격력 · 방어력 -1'],
+  flame: ['🔥', '온염: 차례 끝에 2 피해 · 회복하면 1층 줄고 공격력 +1'],
+  display: ['🦚', '공작 개병: 청동 공작과 싸울 때 층 차이마다 공격력 · 방어력 +2'],
+  problem: ['📝', '문제아: 학원 안전관이 쫓아온다'],
+};
+
+/** 원작 맵 상태 아이콘 */
+function apStatusChips(p: Player): string {
+  const a = p.ap;
+  if (!a) return '';
+  return Object.entries(AP_STATUS)
+    .filter(([k]) => (a[k as keyof typeof a] ?? 0) > 0)
+    .map(([k, [icon, tip]]) => `<span class="ap-st" title="${esc(tip)}">${icon}${a[k as keyof typeof a]}</span>`)
+    .join('');
 }
 
 /** 임무: 마치면 유물 (원작 Tasks) */
@@ -497,6 +548,12 @@ function targetPicker(state: GameState, handIndex: number): string {
     options = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i)
       .map((n) => `<button class="pick-num" data-value="${n}">${n}</button>`)
       .join('');
+  } else if (info.target === 'tile') {
+    const dist = distances(state.board, p.tile);
+    options = (cardTargets(state, p, hand.card) ?? [])
+      .sort((a, b) => (dist.get(a) ?? 99) - (dist.get(b) ?? 99))
+      .map((id) => `<button class="pick-target" data-target="${id}"><b>${tileLabel(state.board, id)}</b><small>${dist.get(id) ?? '-'}칸</small></button>`)
+      .join('');
   } else if (info.target === 'enemy') {
     const dist = distances(state.board, p.tile);
     options = (cardTargets(state, p, hand.card) ?? [])
@@ -587,6 +644,16 @@ function actionArea(state: GameState): string {
           ${options}
         </div>
         <button class="go-btn wait" disabled><b>선택</b><small>EVENT</small></button>`;
+    }
+
+    case 'mapChoice': {
+      const options = phase.options.map((o) => `<button class="path-btn" data-choice="${esc(o.id)}">${esc(o.label)}</button>`).join('');
+      return `
+        <div class="path-pick">
+          <div class="path-title">${phase.id === 'vote' ? '투표' : '루트'}</div>
+          ${options}
+        </div>
+        <button class="go-btn wait" disabled><b>선택</b><small>CHOOSE</small></button>`;
     }
 
     case 'stopChoice': {
