@@ -61,6 +61,7 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
         <section class="chars-hero">
           <img class="hero-art${swap ? ' swap' : ''}" src="${art.main}" alt="${c.name}" draggable="false">
           <div class="nameplate">
+            ${c.title ? `<small>${esc(c.title)}</small>` : ''}
             <b>${c.name}</b>
           </div>
         </section>
@@ -137,6 +138,8 @@ export function renderCharacterScreen(root: HTMLElement, onBack: () => void) {
         <ul class="growth-list">
           <li class="base"><span class="stars">${starIcons(0)}</span><b>기본</b><span>체력 ${c.hp} · 공격력 ${c.atk} · 방어력 ${c.def}</span></li>
           ${rows}
+          ${c.startBonus ? `<li><span class="stars">🪙</span><b>시작</b><span class="growth-gain">코인 +${c.startBonus}</span></li>` : ''}
+          <li><span class="stars">🔷</span><b>유물</b><span class="growth-gain">재선택 2 · 별마다 +1</span></li>
         </ul>`;
     } else if (current === 'potential' && c.potential) {
       body = `

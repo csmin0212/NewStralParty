@@ -166,6 +166,23 @@ export interface CharacterArt {
 }
 
 const DRAWN_ART: Partial<Record<CharacterId, CharacterArt>> = {
+  mimi: {
+    name: '미미',
+    color: '#FFB3C7',
+    main: `${root}characters/mimi/main.webp`,
+    token: `${root}characters/mimi/token.webp`,
+    portrait: `${root}characters/mimi/portrait.webp`,
+    skillActive: `${root}characters/mimi/skill-active.webp`,
+    skillPassive: `${root}characters/mimi/skill-passive.webp`,
+    poses: {
+      idle: `${root}characters/mimi/battle-idle.webp`,
+      attack: `${root}characters/mimi/battle-attack.webp`,
+      hit: `${root}characters/mimi/battle-hit.webp`,
+      block: `${root}characters/mimi/battle-block.webp`,
+      evade: `${root}characters/mimi/battle-evade.webp`,
+      down: `${root}characters/mimi/battle-down.webp`,
+    },
+  },
   mutbyeol: {
     name: '뭇별',
     color: '#8EDBD9',

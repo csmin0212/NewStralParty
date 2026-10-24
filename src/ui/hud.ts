@@ -5,9 +5,11 @@ import { relicPrice } from '../engine/game';
 import { cardPlayLimit, taskProgress } from '../engine/relics';
 import { currentPlayer, describeGimmick } from '../engine/game';
 import { skillTargets } from '../engine/skills';
+import { skillCardOk, skillCards } from '../engine/kits';
 import { RULES } from '../engine/rules';
 import type { Action, GameState, MapRes, Player } from '../engine/types';
 import { MAP_RES_INFO } from '../data/board';
+import { EVENTS, type EventId } from '../data/events';
 import { tileLabel } from './boardView';
 import { campusVector } from './campusMap';
 import { esc } from './html';
@@ -79,16 +81,19 @@ export function renderHud(
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!btn || btn.disabled) return;
     const player = state.current;
-    const { action, card, path, buy, target, value, gift, send, relic, stop } = btn.dataset;
+    const { action, card, path, buy, target, value, gift, send, relic, stop, event } = btn.dataset;
     if (relic) h.dispatch({ type: 'PICK_RELIC', player, relic: relic as RelicId });
     else if (action === 'reroll-relic') h.dispatch({ type: 'REROLL_RELIC', player });
     else if (action === 'buy-relic') h.dispatch({ type: 'BUY_RELIC', player });
     else if (action === 'roll') h.dispatch({ type: 'ROLL', player });
     else if (action === 'skill') {
-      const def = CHARACTERS[currentPlayer(state).character].active;
-      if (skillTargets(state, currentPlayer(state)) || def.value) {
+      const me = currentPlayer(state);
+      const def = CHARACTERS[me.character].active;
+      // 대상 없이 손패만 고르는 액티브 (루카 잠재)는 바로 카드 고르기
+      const selfCards = !def.target && skillCards(me);
+      if (skillTargets(state, me) || def.value || selfCards) {
         picking = SKILL_PICK;
-        giftTo = null;
+        giftTo = selfCards ? me.id : null;
         giftCards = [];
         h.refresh();
       } else h.dispatch({ type: 'USE_SKILL', player });
@@ -98,6 +103,7 @@ export function renderHud(
     else if (action === 'boss-info') openBossInfo(state.boss);
     else if (action === 'log') h.toggleLog();
     else if (stop !== undefined) h.dispatch({ type: 'STOP_HERE', player, stop: stop === '1' });
+    else if (event) h.dispatch({ type: 'PICK_EVENT', player, event: event as EventId });
     else if (buy !== undefined) h.dispatch({ type: 'BUY_CARD', player, offer: Number(buy) });
     else if (send !== undefined) h.dispatch({ type: 'SEND_COINS', player, to: Number(send) });
     else if (action === 'leave-shop') h.dispatch({ type: 'LEAVE_SHOP', player });
@@ -109,7 +115,7 @@ export function renderHud(
       h.dispatch({ type: 'USE_SKILL', player, value: Number(value) });
       h.refresh();
     } else if (target !== undefined && picking === SKILL_PICK) {
-      if (CHARACTERS[currentPlayer(state).character].active.cards) {
+      if (skillCards(currentPlayer(state))) {
         giftTo = Number(target); // 다음: 줄 카드 고르기
         h.refresh();
       } else {
@@ -119,7 +125,7 @@ export function renderHud(
       }
     } else if (gift !== undefined) {
       const i = Number(gift);
-      const max = CHARACTERS[currentPlayer(state).character].active.cards?.[1] ?? 2;
+      const max = skillCards(currentPlayer(state))?.[1] ?? 2;
       giftCards = giftCards.includes(i) ? giftCards.filter((x) => x !== i) : [...giftCards, i].slice(-max);
       h.refresh();
     } else if (action === 'gift-confirm') {
@@ -142,7 +148,7 @@ export function renderHud(
     } else if (card !== undefined) {
       const hand = currentPlayer(state).hand[Number(card)];
       // 대상 · 눈을 골라야 하는 카드는 고르기 창을 먼저 띄운다
-      if (CARDS[hand.card].target || hand.card === 'remoteDice') {
+      if (CARDS[hand.card].target || CARDS[hand.card].pick) {
         picking = Number(card);
         h.refresh();
       } else h.dispatch({ type: 'PLAY_CARD', player, handIndex: Number(card) });
@@ -441,7 +447,7 @@ function shopPanel(state: GameState): string {
     </div>`;
 }
 
-/** 대상 고르기: 아군 · 사거리 안 에너미 · 리모컨 주사위 눈 */
+/** 대상 고르기: 아군 · 사거리 안 에너미 · 고르는 숫자 */
 function targetPicker(state: GameState, handIndex: number): string {
   const p = currentPlayer(state);
   if (handIndex === SKILL_PICK) {
@@ -455,7 +461,7 @@ function targetPicker(state: GameState, handIndex: number): string {
         .join('');
       return pickerPanel(active.name, nums);
     }
-    if (active.target === 'ally' || active.target === 'anyAlly') {
+    if (active.target === 'ally' || active.target === 'anyAlly' || giftTo === p.id) {
       if (giftTo === null) {
         const allies = (skillTargets(state, p) ?? [])
           .map((id) => allyOption(state, id, dist.get(state.players[id].tile)!))
@@ -463,16 +469,16 @@ function targetPicker(state: GameState, handIndex: number): string {
         return pickerPanel(active.name, allies);
       }
       // 함께 고르는 손패 (모나 1~2 · 알 1~3 · 질 3)
-      const [min, max] = active.cards ?? [1, 2];
+      const [min, max] = skillCards(p) ?? [1, 2];
       const cards = p.hand
         .map(
           (h, i) =>
-            `<button class="pick-card ${giftCards.includes(i) ? 'on' : ''}" data-gift="${i}">${cardFace(h.card)}</button>`,
+            `<button class="pick-card ${giftCards.includes(i) ? 'on' : ''}" data-gift="${i}" ${skillCardOk(p, h.card) ? '' : 'disabled'}>${cardFace(h.card)}</button>`,
         )
         .join('');
       const ok = giftCards.length >= min && giftCards.length <= max;
       return pickerPanel(
-        `${active.name} → ${state.players[giftTo].name}`,
+        giftTo === p.id ? active.name : `${active.name} → ${state.players[giftTo].name}`,
         cards,
         `<button class="ba-btn ba-btn--yellow" data-action="gift-confirm" ${ok ? '' : 'disabled'}>확인 ${giftCards.length}/${max}</button>`,
       );
@@ -486,8 +492,11 @@ function targetPicker(state: GameState, handIndex: number): string {
   if (!hand) return '';
   const info = CARDS[hand.card];
   let options = '';
-  if (hand.card === 'remoteDice') {
-    options = [1, 2, 3, 4, 5, 6].map((n) => `<button class="pick-num" data-value="${n}">${n}</button>`).join('');
+  if (info.pick) {
+    const [lo, hi] = info.pick;
+    options = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i)
+      .map((n) => `<button class="pick-num" data-value="${n}">${n}</button>`)
+      .join('');
   } else if (info.target === 'enemy') {
     const dist = distances(state.board, p.tile);
     options = (cardTargets(state, p, hand.card) ?? [])
@@ -567,6 +576,18 @@ function actionArea(state: GameState): string {
 
     case 'shop':
       return `<button class="go-btn wait" disabled><b>상점</b><small>SHOP</small></button>`;
+
+    case 'eventPick': {
+      const options = phase.options
+        .map((id) => `<button class="path-btn" data-event="${id}">${EVENTS[id].icon} ${esc(EVENTS[id].name)}<small>${esc(EVENTS[id].text)}</small></button>`)
+        .join('');
+      return `
+        <div class="path-pick">
+          <div class="path-title">이벤트</div>
+          ${options}
+        </div>
+        <button class="go-btn wait" disabled><b>선택</b><small>EVENT</small></button>`;
+    }
 
     case 'stopChoice': {
       const tile = state.board.tiles[p.tile];

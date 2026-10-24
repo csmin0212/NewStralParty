@@ -524,9 +524,16 @@
   box-shadow: inset 6px 0 0 var(--c), 0 8px 20px rgba(42, 59, 85, 0.3);
 }
 .nameplate b {
-  font-size: 40px;
+  font-size: clamp(28px, 3.4vw, 40px);
   font-weight: 900;
   line-height: 1.1;
+  white-space: nowrap;
+}
+.nameplate small {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  opacity: 0.85;
 }
 
 /* 오른쪽 패널: 밝은 회색 + 위에 기울어진 탭 */

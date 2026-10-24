@@ -23,7 +23,7 @@ const face = (n: number, side: string) =>
 
 /**
  * 원작처럼 화면 가운데에서 굴러가다 멈추는 3D 주사위. 멈춘 뒤 합계를 띄운다.
- * fixed: 리모컨 주사위처럼 정해 둔 눈이면 굴리지 않고 바로 보여 준다.
+ * fixed: 스마트 주사위처럼 정해 둔 눈이면 굴리지 않고 바로 보여 준다.
  */
 export function diceHtml(values: number[], extra: number, fixed = false): string {
   const dice = values

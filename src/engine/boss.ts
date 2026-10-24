@@ -8,7 +8,7 @@ import { advanceProgress, bossAppear, damage, heal, isOver, log, notice, summon 
 import type { Rng } from './rng';
 import { bossDamageTaken } from './skills';
 import { decayMarks, markBonus, onAttacked } from './relics';
-import { kitDef, kitEnemyAtk, kitFought, kitSafe, kitSlow } from './kits';
+import { kitDef, kitEnemyAtk, kitFought, kitRetaliate, kitSafe, kitSlow, kitTaunter } from './kits';
 import type {
   BossDef,
   BossEffect,
@@ -114,7 +114,7 @@ export function hurtEnemy(s: GameState, rng: Rng, e: Enemy, amount: number): num
     log(s, `  🎩 분신이었다!`);
     return 0;
   }
-  // 표식 +1 · 숙명의 메아리 +1 (남해청)
+  // 표식 +1 · 허약의 표식 +1 (키이세이)
   const marked = amount > 0 ? markBonus(e) + (e.tags?.vuln ? 1 : 0) : 0;
   const dealt = (e.isBoss ? bossDamageTaken(s, amount) : amount) + marked;
   // 연결된 미니언은 남은 체력까지만 보스에게 넘긴다 (넘친 피해는 넘어가지 않는다)
@@ -758,8 +758,10 @@ function roam(s: GameState, rng: Rng, e: Enemy, steps: number, turn: BossTurn) {
   for (let i = 0; i < steps; i++) {
     const here = path[path.length - 1];
     let options: number[];
-    if (info.chase) {
-      const targets = alive(s).filter((p) => !kitSafe(s, p)).map((p) => p.tile);
+    // 도발 (판다맨 잠재): 도발한 캐릭터를 쫓는다
+    const taunter = kitTaunter(s, e);
+    if (info.chase || taunter) {
+      const targets = taunter ? [taunter.tile] : alive(s).filter((p) => !kitSafe(s, p)).map((p) => p.tile);
       const dist = (t: number) => {
         const d = distances(s.board, t);
         return Math.min(...targets.map((x) => d.get(x) ?? 99));
@@ -772,7 +774,7 @@ function roam(s: GameState, rng: Rng, e: Enemy, steps: number, turn: BossTurn) {
       options = s.board.tiles[here].next.filter((t) => freeTile(s, t, e.id));
     }
     if (options.length === 0) break;
-    const step = info.chase ? options[0] : rng.pick(options);
+    const step = info.chase || taunter ? options[0] : rng.pick(options);
     path.push(step);
     e.tile = step;
     const victims = alive(s).filter((p) => p.tile === step && !kitSafe(s, p));
@@ -794,6 +796,7 @@ function roam(s: GameState, rng: Rng, e: Enemy, steps: number, turn: BossTurn) {
       const dmg = Math.max(1, e.atk + kitEnemyAtk(e, p) + rng.d6() - (p.def + statusDef(p) + kitDef(s, p) + rng.d6()));
       kitFought(s, p, e);
       hit(s, rng, p, dmg, turn, e.name);
+      if (!p.ko && !isOver(s)) kitRetaliate(s, rng, p, e, true);
     }
     break;
   }

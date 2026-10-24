@@ -29,7 +29,7 @@ import {
 } from './boss';
 import { DIFFICULTIES, type DifficultyId } from '../data/difficulty';
 import { ENEMIES } from '../data/enemies';
-import { EVENT_IDS, EVENTS } from '../data/events';
+import { EVENT_IDS, EVENTS, type EventId } from '../data/events';
 import { RELIC_SHOP, type RelicId } from '../data/relics';
 import {
   afterChallenge,
@@ -74,6 +74,7 @@ import {
   kitAtk,
   kitBattleCard,
   kitBattleEnd,
+  kitBite,
   kitBeforeDamage,
   kitCreate,
   kitDamaged,
@@ -92,9 +93,26 @@ import {
   kitMoved,
   kitNoCounter,
   kitPass,
+  kitRoar,
+  kitShopOffers,
+  kitSignStop,
+  kitTackleEnd,
+  kitTransfer,
+  placeSign,
+  skillCardOk,
+  skillCards,
+  kitHaste,
   kitRoundEnd,
   kitShop,
   kitTrapImmune,
+  kitAttackRolled,
+  kitCardsGained,
+  kitDefenseRolled,
+  kitForcedAttack,
+  kitRetaliate,
+  kitBattleCost,
+  kitCardDamage,
+  kitSpare,
 } from './kits';
 import { createRng, type Rng } from './rng';
 import { RULES } from './rules';
@@ -177,7 +195,8 @@ export function createGame({ board, boss, players, seed, difficulty = 'normal' }
         relics: [],
         relicOffer: null,
         relicQueue: [],
-        relicVars: {},
+        // 원작 협동 Lv5: 유물 재선택 2회
+        relicVars: { rerolls: 2 },
         healStacks: 0,
         starlight: 0,
         energy: 0,
@@ -254,7 +273,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       playCard(s, rng, action.handIndex, action.target, action.value);
       break;
     case 'BUY_CARD':
-      buyCard(s, action.offer);
+      buyCard(s, rng, action.offer);
       break;
     case 'SEND_COINS':
       sendCoins(s, rng, action.to);
@@ -273,6 +292,9 @@ export function applyAction(state: GameState, action: Action): GameState {
       break;
     case 'STOP_HERE':
       stopHere(s, rng, action.stop);
+      break;
+    case 'PICK_EVENT':
+      pickEvent(s, rng, action.event);
       break;
     case 'ROLL':
       roll(s, rng);
@@ -367,8 +389,9 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
   const info = CARDS[hand.card];
   const targets = cardTargets(s, p, hand.card);
   if (targets && (target === undefined || !targets.includes(target))) throw new RuleError('대상을 골라야 합니다');
-  if (hand.card === 'remoteDice' && !(Number.isInteger(value) && value! >= 1 && value! <= 6)) {
-    throw new RuleError('1~6 중에서 골라야 합니다');
+  const pick = info.pick;
+  if (pick && !(Number.isInteger(value) && value! >= pick[0] && value! <= pick[1])) {
+    throw new RuleError(`${pick[0]}~${pick[1]} 중에서 골라야 합니다`);
   }
 
   p.hand.splice(handIndex, 1);
@@ -378,7 +401,7 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
   const cost = cardCoinCost(hand.card, p);
   p.coins -= cost;
   if (info.type === 'battle') {
-    s.turn.battle.costUsed += info.battleCost!;
+    s.turn.battle.costUsed += kitBattleCost(p, hand.card);
     kitBattleCard(s, p, hand.card);
   } else s.turn.cardsPlayed += 1;
 
@@ -399,7 +422,7 @@ function playCard(s: GameState, rng: Rng, handIndex: number, target?: number, va
 function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: number, value?: number, giver?: Player) {
   // 모나가 준 카드면 + 팬, 책갈피 · 닌자 표창
   const bonus = giftDamageBonus(giver);
-  const strike = (e: Enemy, amount: number) => strikeEnemy(s, rng, p, e, amount + relicCardDamage(p, e), giver);
+  const strike = (e: Enemy, amount: number) => strikeEnemy(s, rng, p, e, amount + relicCardDamage(p, e) + kitCardDamage(p), giver);
   const t = s.turn;
   const b = t.battle;
   const st = p.status;
@@ -427,7 +450,11 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       st.skipTurn = true;
       break;
     case 'remoteDice':
+    case 'fateGuide':
       t.fixedMove = value!;
+      break;
+    case 'banSign':
+      placeSign(s, p, value!);
       break;
     case 'portal': {
       const warps = s.board.tiles.filter((x) => x.kind === 'warp' && x.id !== p.tile);
@@ -484,20 +511,36 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       break;
     case 'talismanFu':
       heal(ally!, 2);
-      // 희몽조 → 희몽풍: 기력
-      if (p.character === 'zhao' && ally!.character === 'fen') ally!.stacks = 1;
+      t.extraPlays += 1;
+      // 유메 → 펭: 에너지 보존 +1
+      if (p.character === 'zhao' && ally!.character === 'fen') ally!.stacks = Math.min(ally!.potential ? 5 : 1, ally!.stacks + 1);
       break;
     case 'talismanHuo':
-      damage(s, rng, p, 1);
+      strike(enemy!, 1 + bonus);
       break;
     case 'livingPage':
       strike(enemy!, 2 + (p.charVars.page ?? 0) + bonus);
+      // 표식 1 · 표식 3 이상이면 이번 턴 카드 +1
+      if (s.enemies.includes(enemy!)) {
+        enemy!.mark = (enemy!.mark ?? 0) + 1;
+        if (enemy!.mark >= 3) t.extraPlays += 1;
+      }
       break;
-    case 'bite':
-      b.atk += 2;
+    case 'bite': {
+      const v = kitBite(s, p);
+      b.atk += v;
       b.noCounter = true;
-      battleEvent({ value: 2 });
+      battleEvent({ value: v });
       break;
+    }
+    case 'dragonRoar': {
+      b.atk += 3;
+      b.noCounter = true;
+      b.enemyDefDown += 3;
+      if (s.phase.kind === 'encounter') kitRoar(s, findEnemy(s, s.phase.enemy));
+      battleEvent({ value: 3 });
+      break;
+    }
     case 'backup': {
       const from = p.tile;
       p.tile = ally!.tile;
@@ -673,12 +716,13 @@ function openShop(s: GameState, rng: Rng, stepsLeft: number, chips = false) {
   if (hyper) offers.push({ card: hyper.card, price: hyper.price, sold: false });
   const extra = kitShop(s, rng, p);
   if (extra) offers.push({ card: extra, price: Math.max(0, RULES.shopPrice - relicShopDiscount(p)), sold: false });
+  kitShopOffers(s, rng, offers, Math.max(0, RULES.shopPrice - relicShopDiscount(p)));
   s.phase = { kind: 'shop', stepsLeft, offers, free: stepsLeft === 0 };
   log(s, `${p.name}: 🛒 상점${stepsLeft === 0 ? ' (멈춤: 첫 구매 무료)' : ''}`);
 }
 
 /** 상점에서 산 카드는 손패로. 쓰면 사라진다 */
-function buyCard(s: GameState, offerIndex: number) {
+function buyCard(s: GameState, rng: Rng, offerIndex: number) {
   if (s.phase.kind !== 'shop') throw new RuleError('상점이 아닙니다');
   const p = currentPlayer(s);
   const offer = s.phase.offers[offerIndex];
@@ -690,6 +734,7 @@ function buyCard(s: GameState, offerIndex: number) {
   s.phase.free = false;
   p.hand.push({ card: offer.card, shop: true });
   onCardsGained(p, 1);
+  kitCardsGained(s, rng, p, 1);
   log(s, `${p.name}: 「${CARDS[offer.card].name}」 구매${price ? ` (코인 ${price})` : ' (무료)'}`);
 }
 
@@ -731,6 +776,7 @@ function sendCoins(s: GameState, rng: Rng, to: number) {
   ally.coins += RULES.transferCoins;
   s.phase.sent = true;
   onTransfer(s, rng, p, ally);
+  kitTransfer(s, p, s.phase.offers);
   log(s, `${p.name}: 💌 ${ally.name}에게 코인 ${RULES.transferCoins} 송금`);
 }
 
@@ -768,7 +814,7 @@ function roll(s: GameState, rng: Rng) {
   const steps = Math.min(RULES.moveCap, Math.max(0, dice.reduce((a, b) => a + b, 0) + s.turn.extraSteps));
   s.turn.dice = dice;
   onMove(s, p, steps);
-  kitMoved(s, p, steps);
+  kitMoved(s, rng, p, steps, dice);
 
   const bonus = s.turn.extraSteps > 0 ? ` + ${s.turn.extraSteps}` : '';
   log(s, `${p.name}: 🎲 ${dice.join(' + ')}${bonus} → ${steps}칸 이동`);
@@ -787,6 +833,7 @@ function choosePath(s: GameState, rng: Rng, to: number) {
     return;
   }
   left += passBonus(s, currentPlayer(s));
+  if (left > 0 && kitSignStop(s, currentPlayer(s))) left = 0;
   move(s, rng, left, path);
 }
 
@@ -802,6 +849,7 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
     battle.events.push({ type: 'release' });
     log(s, `  ${enemy.name} 놓아주기`);
     onSpare(s, rng, p, enemy);
+    kitSpare(p);
     if (isOver(s)) {
       battle.done = true;
       return;
@@ -818,9 +866,10 @@ function encounter(s: GameState, rng: Rng, choice: 'attack' | 'release') {
   const hit = resolveAttack({ atk, def: p.def }, foe, enemy.defense, rng, 1, {
     attackDice: mods.attackDice,
     sumDice: mods.sumDice,
-    attackRoll: relicAttackRoll(rng, p),
+    attackRoll: kitForcedAttack(p) ?? relicAttackRoll(rng, p),
     defenseRoll: kitFlaw(enemy, p) ? 0 : undefined,
   });
+  kitAttackRolled(p, hit);
   const decoy = !enemy.isBoss && ENEMIES[enemy.kind as EnemyKind].decoy;
   hit.damage = hurtEnemy(s, rng, enemy, hit.damage);
   battle.events.push({ type: 'attack', attacker: 'player', result: hit, targetHp: enemy.hp });
@@ -884,7 +933,13 @@ function defend(s: GameState, rng: Rng, mode: DefenseMode) {
   log(s, `  ${enemy.name}의 반격 ${hit.attackValue} vs ${defenseName(mode)} ${hit.defenseValue}${rolls} → ${hit.damage} 피해`);
 
   onAttacked(p);
+  kitDefenseRolled(p, hit);
   damage(s, rng, p, hit.damage);
+  if (!p.ko && !isOver(s)) kitRetaliate(s, rng, p, enemy);
+  if (isOver(s)) {
+    battle.done = true;
+    return;
+  }
   if (p.ko) {
     // KO 되면 이동도 끝. 진행도가 올라 패배했을 수도 있다
     battle.events.push({ type: 'playerKO' });
@@ -962,10 +1017,13 @@ function useSkill(s: GameState, rng: Rng, target?: number, cards?: number[], val
   const def = CHARACTERS[p.character].active;
   const targets = skillTargets(s, p);
   if (targets && (target === undefined || !targets.includes(target))) throw new RuleError('사거리 안의 대상을 골라야 합니다');
-  if (def.cards) {
+  const cardRange = skillCards(p);
+  if (cardRange) {
     const picked = [...new Set(cards ?? [])];
-    const [min, max] = def.cards;
-    if (picked.length < min || picked.length > max || picked.some((i) => !p.hand[i])) throw new RuleError(`줄 카드를 ${min === max ? min : `${min}~${max}`}장 골라야 합니다`);
+    const [min, max] = cardRange;
+    if (picked.length < min || picked.length > max || picked.some((i) => !p.hand[i] || !skillCardOk(p, p.hand[i].card))) {
+      throw new RuleError(`카드를 ${min === max ? min : `${min}~${max}`}장 골라야 합니다`);
+    }
   }
   if (def.value && !(Number.isInteger(value) && value! >= def.value[0] && value! <= def.value[1])) {
     throw new RuleError(`${def.value[0]}~${def.value[1]} 중에서 골라야 합니다`);
@@ -1025,6 +1083,20 @@ function useSkill(s: GameState, rng: Rng, target?: number, cards?: number[], val
 function endTurn(s: GameState, rng: Rng) {
   if (s.phase.kind !== 'endTurn') throw new RuleError('아직 턴을 끝낼 수 없습니다');
   const p = currentPlayer(s);
+  // 패니 트러블 메이커: 턴 종료 시 이벤트 1번 더 (잠재: 2개 중 고르기)
+  if (s.turn.extraEvent && !p.ko) {
+    s.turn.extraEvent = false;
+    if (p.potential && p.character === 'fanny') {
+      const first = rng.pick(EVENT_IDS);
+      const second = rng.pick(EVENT_IDS.filter((id) => id !== first));
+      s.phase = { kind: 'eventPick', options: [first, second] };
+      return;
+    }
+    const path = [p.tile];
+    runEvent(s, rng, p, path);
+    recordMove(s, path);
+    if (isOver(s)) return;
+  }
   onTurnEnd(s, rng, p);
   if (isOver(s)) return;
   // 손패 한도를 넘으면 늦게 얻은 카드부터 버린다
@@ -1203,6 +1275,7 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
       return;
     }
     left += passBonus(s, p);
+    if (left > 0 && kitSignStop(s, p)) left = 0;
   }
 
   arrive(s, rng, path);
@@ -1212,10 +1285,14 @@ function move(s: GameState, rng: Rng, steps: number, path: number[]) {
 function arrive(s: GameState, rng: Rng, path: number[]) {
   const p = currentPlayer(s);
   s.turn.noBattle = false;
-  // 링링 돌진: 멈춘 칸에서 붙잡은 몬스터와 싸울지
+  // 링링 태클: 멈춘 뒤 튕겨 낸 순서대로 싸울지 고른다
   if (s.turn.charge) {
     s.turn.charge = false;
-    const grabbed = s.enemies.find((e) => e.tile === p.tile && targetable(s, e));
+    s.turn.tackleQueue = kitTackleEnd(s, p);
+  }
+  while (s.turn.tackleQueue?.length) {
+    const id = s.turn.tackleQueue.shift()!;
+    const grabbed = s.enemies.find((e) => e.id === id && e.tile === p.tile && targetable(s, e));
     if (grabbed) {
       startEncounter(s, grabbed, 0);
       recordMove(s, path);
@@ -1226,10 +1303,6 @@ function arrive(s: GameState, rng: Rng, path: number[]) {
   if (!s.turn.landed) {
     s.turn.landed = true;
     land(s, rng, path);
-    if (s.turn.extraEvent && !isOver(s)) {
-      s.turn.extraEvent = false;
-      runEvent(s, rng, p, path);
-    }
   }
   if (s.turn.haste) {
     s.turn.haste = false;
@@ -1239,6 +1312,18 @@ function arrive(s: GameState, rng: Rng, path: number[]) {
     s.phase = { kind: 'endTurn' };
   }
   recordMove(s, path);
+}
+
+/** 패니 잠재: 고른 이벤트를 일으키고 턴을 마친다 */
+function pickEvent(s: GameState, rng: Rng, id: EventId) {
+  if (s.phase.kind !== 'eventPick' || !s.phase.options.includes(id)) throw new RuleError('고를 수 있는 이벤트가 아닙니다');
+  const p = currentPlayer(s);
+  s.phase = { kind: 'endTurn' };
+  const path = [p.tile];
+  runEvent(s, rng, p, path, id);
+  recordMove(s, path);
+  if (isOver(s)) return;
+  endTurn(s, rng);
 }
 
 /** 지나가던 거점 · 확인 지점에서 멈출지 */
@@ -1358,6 +1443,8 @@ function tryLevelUp(s: GameState, rng: Rng, p: Player) {
     gains.push(`코인 +${growth.coins}`);
   }
   log(s, `${p.name}: ⭐ 코인 ${cost}개로 ${p.level}성 달성!${gains.length ? ` (${gains.join(', ')})` : ''}`);
+  // 원작 협동 Lv6: 별마다 재선택 +1
+  p.relicVars.rerolls = (p.relicVars.rerolls ?? 0) + 1;
   // 원작처럼 성이 오르면 유물 3개 중 1개 (확률표는 성 기준)
   offerRelic(s, rng, p, p.level, `${p.level}성`);
 }
@@ -1409,6 +1496,7 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
       monsterTile(s, rng, p);
       break;
     case 'haste':
+      kitHaste(s, p);
       s.turn.haste = true;
       log(s, `${p.name}: 💨 질주 — 한 번 더`);
       notice(s, `💨 질주`);
@@ -1504,8 +1592,8 @@ function tileEffect(s: GameState, rng: Rng, p: Player, path: number[], depth: nu
 }
 
 /** 이벤트 칸: 무작위 이벤트 하나 (data/events.ts의 글과 맞춘다) */
-function runEvent(s: GameState, rng: Rng, p: Player, path: number[]) {
-  const id = rng.pick(EVENT_IDS);
+function runEvent(s: GameState, rng: Rng, p: Player, path: number[], picked?: EventId) {
+  const id = picked ?? rng.pick(EVENT_IDS);
   const ev = EVENTS[id];
   log(s, `${p.name}: ${ev.icon} 이벤트 「${ev.name}」 ${ev.text}`);
   notice(s, `${ev.icon} ${ev.name} — ${ev.text}`);
@@ -1577,11 +1665,12 @@ function distanceTiles(s: GameState, from: number, range: number): number[] {
 }
 
 /** 공용 카드에서 n장. 손패 한도는 차례가 끝날 때 본다 */
-export function drawCards(_s: GameState, p: Player, rng: Rng, n: number) {
+export function drawCards(s: GameState, p: Player, rng: Rng, n: number) {
   for (let i = 0; i < n; i++) {
     p.hand.push({ card: randomCard(rng) });
     onCardsGained(p, 1);
   }
+  kitCardsGained(s, rng, p, n);
 }
 
 // ───────────────────────── 에너미 · 전투 ─────────────────────────

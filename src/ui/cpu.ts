@@ -5,6 +5,7 @@ import { RELICS } from '../data/relics';
 import { bossEnemy } from '../engine/boss';
 import { CHARACTERS } from '../data/characters';
 import { skillTargets } from '../engine/skills';
+import { skillCardOk, skillCards } from '../engine/kits';
 import { cardBlocker, cardTargets, distances, handLimit } from '../engine/cards';
 import { applyAction, currentPlayer, relicPrice, RuleError } from '../engine/game';
 import { RULES } from '../engine/rules';
@@ -93,7 +94,9 @@ export function cpuAction(s: GameState): Action {
       // 상대 눈이 낮으면 회피가 유리하다
       return { type: 'DEFEND', player: me, mode: roll <= 3 ? 'evade' : 'block' };
     }
-    case 'stopChoice': {
+    case 'eventPick':
+      return { type: 'PICK_EVENT', player: me, event: s.phase.options[0] };
+        case 'stopChoice': {
       // 성을 올릴 수 있거나 체력이 깎였으면 멈춘다
       const cost = RULES.levelUpCost[p.level];
       const stop = (cost !== undefined && p.coins >= cost) || p.hp <= p.maxHp - 2;
@@ -133,8 +136,9 @@ function skillAction(s: GameState, p: Player): Action | null {
       target = [...targets].sort((a, b) => s.players[a].hp / s.players[a].maxHp - s.players[b].hp / s.players[b].maxHp)[0];
     }
   }
-  const cards = def.cards ? Array.from({ length: Math.min(def.cards[1], p.hand.length) }, (_, i) => i) : undefined;
-  if (def.cards && (cards?.length ?? 0) < def.cards[0]) return null;
+  const range = skillCards(p);
+  const cards = range ? p.hand.map((h, i) => (skillCardOk(p, h.card) ? i : -1)).filter((i) => i >= 0).slice(0, range[1]) : undefined;
+  if (range && (cards?.length ?? 0) < range[0]) return null;
   const value = def.value ? def.value[1] : undefined;
   const a: Action = { type: 'USE_SKILL', player: p.id, target, cards, value };
   return ok(s, a) ? a : null;

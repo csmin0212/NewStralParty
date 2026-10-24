@@ -2,7 +2,7 @@
 
 import { CARDS, DECK_CARD_IDS } from '../data/cards';
 import { cardPlayLimit, relicRange } from './relics';
-import { kitRange } from './kits';
+import { kitBattleCost, kitRange } from './kits';
 import type { Rng } from './rng';
 import { RULES } from './rules';
 import type { BattleMods, Board, CardId, Enemy, GameState, HandCard, Player, PlayerStatus } from './types';
@@ -130,7 +130,7 @@ export function cardBlocker(s: GameState, p: Player, hand: HandCard): string | n
   if (info.type === 'battle') {
     if (info.timing === 'attack' && phase !== 'encounter') return '공격할 때 쓰는 카드';
     if (info.timing === 'defend' && phase !== 'defend') return '반격을 받을 때 쓰는 카드';
-    if (s.turn.battle.costUsed + info.battleCost! > battleBudget(p)) return '전투 코스트 부족';
+    if (s.turn.battle.costUsed + kitBattleCost(p, hand.card) > battleBudget(p)) return '전투 코스트 부족';
   } else {
     if (phase !== 'preRoll') return '주사위 전에 쓰는 카드';
     const limit = cardPlayLimit(s, p);

@@ -34,6 +34,8 @@ export interface CardInfo {
   target?: 'ally' | 'otherAlly' | 'enemy';
   /** 에너미 대상 카드의 사거리 (칸) */
   range?: number;
+  /** 숫자를 골라서 쓰는 카드 (스마트 주사위 1~6 · 금지 표지판 앞 칸 수) */
+  pick?: [number, number];
   icon: string;
   text: string;
   /** 참고한 원작 카드 */
@@ -79,11 +81,11 @@ export const CARDS: Record<CardId, CardInfo> = {
   tripleDice: card('tripleDice', '트리플 주사위', 'boost', '🎰', '이동 주사위 3개 · 다음 차례 쉼', 'OJ Overtime (Lv3 10★)', {
     level: 2, points: 2, limit: 1, cost: 5,
   }),
-  remoteDice: card('remoteDice', '리모컨 주사위', 'boost', '🎮', '이동 1~6 중 고르기', 'AP 遥控骰子', { level: 1, points: 2, limit: 2 }),
+  remoteDice: card('remoteDice', '스마트 주사위', 'boost', '🎮', '이동 1~6 중 고르기', 'AP 遥控骰子', { level: 1, points: 2, limit: 2, pick: [1, 6] }),
   portal: card('portal', '랜덤 포털', 'boost', '🌀', '무작위 워프 칸으로 이동한 뒤 주사위', 'AP 随机传送门', { limit: 2 }),
   cookie: card('cookie', '매점 쿠키', 'boost', '🍪', '체력 +1', "OJ Saki's Cookie (Lv1 0★)"),
-  cake: card('cake', '초코 케이크', 'boost', '🍰', '체력 +2', 'AP 巧克力蛋糕'),
-  bandage: card('bandage', '붕대', 'boost', '🩹', '체력 +4', 'AP 汉堡', { level: 1, points: 2 }),
+  cake: card('cake', '초콜릿 케이크', 'boost', '🍰', '체력 +2', 'AP 巧克力蛋糕'),
+  bandage: card('bandage', '햄버거', 'boost', '🍔', '체력 +4', 'AP 汉堡', { level: 1, points: 2 }),
   pudding: card('pudding', '푸딩', 'boost', '🍮', '체력 전부 회복', 'OJ Pudding (Lv4 0★)', { level: 3, points: 5, limit: 1 }),
   poisonCure: card('poisonCure', '이독제독', 'boost', '🧪', '체력 -2 · 2턴 동안 차례 시작에 체력 +3', 'AP 以毒攻毒', { level: 1, points: 2, limit: 2 }),
   notes: card('notes', '수업 노트', 'boost', '📒', '카드 2장 뽑기', 'OJ Nice Present (Lv2 10★, 1장)', { level: 2, limit: 1, cost: 5 }),
@@ -136,7 +138,7 @@ export const CARDS: Record<CardId, CardInfo> = {
   shadowRaid: card('shadowRaid', '그림자 습격', 'battle', '🌑', '공격력 +3 · 반격 없음 (보스 제외)', 'AP 暗影突袭', {
     timing: 'attack', battleCost: 2, level: 1, points: 2, limit: 2, battle: { atk: [3, 3], noCounter: true },
   }),
-  gawu: card('gawu', '명검', 'battle', '🗡', '공격력 +1~20', 'AP 名刀：嘎呜切 (코스트 4, 1성 → 2성)', {
+  gawu: card('gawu', '명검: 가우 베기', 'battle', '🗡', '공격력 +1~20', 'AP 名刀：嘎呜切 (코스트 4, 1성 → 2성)', {
     timing: 'attack', battleCost: 4, level: 2, points: 5, limit: 1, battle: { atk: [1, 20] },
   }),
   charge: card('charge', '축적', 'battle', '🌀', '공격력 +5 · 「전력 공격」 획득', 'AP 蓄力 (코스트 5, 2성)', {
@@ -166,14 +168,23 @@ export const CARDS: Record<CardId, CardInfo> = {
   }),
 
   // ── 캐릭터가 만드는 카드 (공용 카드에는 없다) ──
-  livingPage: card('livingPage', '살아있는 책장', 'event', '📖', '6칸 안 에너미 2 피해 (린: 쓸 때마다 +1)', 'AP 活体书页 (린)', {
-    limit: 0, target: 'enemy', range: 6,
+  livingPage: card('livingPage', '리빙 북', 'event', '📖', '5칸 안 몬스터 2 피해 · 표식 +1 · 표식 3 이상이면 이번 턴 카드 +1', 'AP 活体书页 (린)', {
+    limit: 0, target: 'enemy', range: 5,
   }),
-  talismanFu: card('talismanFu', '부적-복', 'support', '🧧', '아군 체력 +2', 'AP 符卡-福 (희몽조)', { limit: 0, target: 'ally' }),
-  talismanHuo: card('talismanHuo', '부적-화', 'boost', '🀄', '체력 -1', 'AP 符卡-祸 (희몽조)', { limit: 0 }),
-  bite: card('bite', '물어뜯기', 'battle', '🦷', '공격력 +2 · 반격 없음', 'AP 撕咬 (마무시)', {
-    timing: 'attack', battleCost: 1, limit: 0, battle: { atk: [2, 2], noCounter: true },
+  talismanFu: card('talismanFu', '부적 카드 - 행운', 'support', '🧧', '아군 체력 +2 · 이번 턴 카드 +1', 'AP 符卡-福 (유메)', { limit: 0, target: 'ally' }),
+  talismanHuo: card('talismanHuo', '부적 카드 - 불행', 'event', '🀄', '10칸 안 몬스터 1 피해 · 턴 끝에 손에 있으면 체력 -1', 'AP 符卡-祸 (유메)', {
+    limit: 0, target: 'enemy', range: 10,
   }),
+  bite: card('bite', '깨물기', 'battle', '🦷', '각성 +1 · 이번 턴 각성만큼 공격력 + (최대 4) · 반격 없음', 'AP 撕咬 (마무시)', {
+    timing: 'attack', battleCost: 2, limit: 0, battle: { atk: [1, 4], noCounter: true },
+  }),
+  dragonRoar: card('dragonRoar', '용의 포효', 'battle', '🐉', '공격력 +3 · 이번 턴 대상 방어력 -3 · 이동 -9 · 반격 없음', 'AP 龙之咆哮 (마무시 진룡)', {
+    timing: 'attack', battleCost: 3, limit: 0, battle: { atk: [3, 3], noCounter: true },
+  }),
+  banSign: card('banSign', '금지 표지판', 'event', '⛔', '앞쪽 1~10칸에 배치 · 지나는 캐릭터는 멈추고 다음 이동 +2', 'AP 强化拒止 (링링)', {
+    limit: 0, pick: [1, 10],
+  }),
+  fateGuide: card('fateGuide', '운명의 인도', 'boost', '🔮', '이동 1~6 중 고르기', 'AP 命运的指引 (키이세이)', { limit: 0, pick: [1, 6] }),
 };
 
 export const CARD_IDS = Object.keys(CARDS) as CardId[];

@@ -1219,10 +1219,10 @@ describe('원작 캐릭터 스킬', () => {
   const skill = (s: GameState, extra: { target?: number; cards?: number[]; value?: number } = {}) =>
     applyAction(s, { type: 'USE_SKILL', player: s.current, ...extra });
 
-  it('협동 보너스: A형은 시작 코인 +6 · 1성 코인 +10', () => {
+  it('협동 보너스: A형은 시작 코인 +6 · 1성 코인 +10 · 최대 HP +2', () => {
     const s = game('parunan');
     expect(s.players[0].coins).toBe(RULES.startCoins + 6);
-    expect(CHARACTERS.parunan.stars[0]).toEqual({ coins: 10 });
+    expect(CHARACTERS.parunan.stars[0]).toEqual({ coins: 10, maxHp: 2 });
   });
 
   it('Z3000: 7칸 안 몬스터를 끌어와 5 피해', () => {
@@ -1239,9 +1239,14 @@ describe('원작 캐릭터 스킬', () => {
     expect(s.players[0].charVars.shield).toBe(0);
   });
 
-  it('남해청: 이동이 정확히 6이면 코인 +6', () => {
-    const s = rollExactly(game('haiqing'), 6);
+  it('키이세이: 이동 주사위 눈이 6이면 코인 +6 (최종 이동과 무관)', () => {
+    const s0 = game('haiqing');
+    s0.turn.fixedMove = 6;
+    s0.turn.extraSteps = 2;
+    const s = applyAction(s0, { type: 'ROLL', player: 0 });
     expect(s.players[0].coins).toBe(RULES.startCoins + 6 + 6);
+    const t = rollExactly(game('haiqing'), 6);
+    expect(t.players[0].coins).toBe(RULES.startCoins + 6);
   });
 
   it('미사키: 4칸 안 몬스터 2 피해 + 검기 · 검기만큼 공격력', () => {
@@ -1285,6 +1290,277 @@ describe('원작 캐릭터 스킬', () => {
     s = skill(s, { target: 1, cards: [0, 1] });
     expect(s.players[0].coins).toBe(coins + 2);
     expect(s.players[1].hand.slice(-2).map((h) => h.card)).toEqual(['dash', 'cake']);
-    expect([s.players[0].starlight, s.players[1].starlight]).toEqual([2, 2]);
+    expect([s.players[0].starlight, s.players[1].starlight]).toEqual([1, 1]);
+  });
+});
+
+describe('원작 공식 문구 (미미 · 패니 · 패드맨 · 렌 · Z3000)', () => {
+  const game = (character: CharacterId, kinds: TileKind[] = empties(14), potential = false) =>
+    newGame(ring(kinds), { character, potential });
+  const skill = (s: GameState, extra: { target?: number } = {}) => applyAction(s, { type: 'USE_SKILL', player: s.current, ...extra });
+
+  it('유물 재선택: 시작 2회 · 별마다 +1', () => {
+    let s = game('mimi');
+    expect(s.players[0].relicVars.rerolls).toBe(2);
+    s.players[0].coins = 50;
+    s.players[0].tile = 14;
+    s = rollExactly(s, 1); // 거점에 멈춤
+    expect(s.players[0].level).toBe(1);
+    expect(s.players[0].relicVars.rerolls).toBe(3);
+  });
+
+  it('Z3000: 재사용 대기 4 · 잠재: 2마리마다 공격력 +1', () => {
+    expect(CHARACTERS.z3000.active.cooldown).toBe(4);
+    let s = withEnemy(withEnemy(game('z3000', empties(14), true), 'thief', 3), 'thief', 5);
+    for (const e of s.enemies) e.hp = 1;
+    const atk = s.players[0].atk;
+    s = skill(s, { target: s.enemies[0].id });
+    s.players[0].skillCooldown = 0;
+    s.turn.skillUsed = false;
+    s = skill(s, { target: s.enemies[0].id });
+    expect(s.players[0].atk).toBe(atk + 1);
+  });
+
+  it('패니: 턴 종료 시 이벤트 1번 더 · 잠재: 2개 중 고르기', () => {
+    let s = skill(game('fanny'));
+    s = rollExactly(s, 1);
+    const coins = s.players[0].coins;
+    s = applyAction(s, { type: 'END_TURN', player: 0 });
+    expect(s.current).toBe(1);
+    expect(s.players[0].coins).toBeGreaterThanOrEqual(coins + 3 - 4); // 결정적 단서 +3 (지갑 분실 -4가 나올 수 있다)
+    let t = skill(game('fanny', empties(14), true));
+    t = rollExactly(t, 1);
+    t = applyAction(t, { type: 'END_TURN', player: 0 });
+    expect(t.phase.kind).toBe('eventPick');
+    if (t.phase.kind !== 'eventPick') return;
+    t = applyAction(t, { type: 'PICK_EVENT', player: 0, event: t.phase.options[1] });
+    expect(t.current).toBe(1);
+  });
+
+  it('렌 잠재: 슈슈 쉴드와 함께 반격 1중첩', () => {
+    const s = skill(game('ren', empties(14), true), { target: 1 });
+    expect(s.players[1].charVars).toMatchObject({ shield: 1, counter: 1 });
+  });
+
+  it('미미 잠재: 카드 25장마다 유물', () => {
+    let s = game('mimi', ['card', ...empties(13)], true);
+    s.players[0].charVars.gained = 24;
+    s = rollExactly(s, 1);
+    expect(s.players[0].relicOffer).not.toBeNull();
+  });
+});
+
+describe('원작 공식 문구 2 (펑 · 마무시 · 사이크스 · 알라나 · 코마치 · 미사키 · 나르디스)', () => {
+  const game = (character: CharacterId, kinds: TileKind[] = empties(14), potential = false) =>
+    newGame(ring(kinds), { character, potential });
+  const skill = (s: GameState, extra: { target?: number } = {}) => applyAction(s, { type: 'USE_SKILL', player: s.current, ...extra });
+
+  it('펑: 에너지 보존 상태면 공 +2 · 방 +2 (중첩과 무관) · 잠재: 5중첩 공격 시 2칸 안 88%', async () => {
+    const { kitAtk, kitDef } = await import('./kits');
+    const s = game('fen', empties(14), true);
+    s.players[0].stacks = 3;
+    const dummy = { ...s.enemies[0], mark: 0 } as GameState['enemies'][number];
+    expect([kitAtk(s, s.players[0], dummy), kitDef(s, s.players[0])]).toEqual([2, 2]);
+    let t = withEnemy(withEnemy(game('fen', empties(14), true), 'elite', 1), 'elite', 2);
+    t.players[0].stacks = 5;
+    t.enemies[1].hp = 50;
+    t = rollExactly(t, 1);
+    t = attack(t);
+    const dealt = ENEMIES.elite.hp - t.enemies[0].hp;
+    if (dealt > 0) expect(t.enemies[1].hp).toBe(50 - Math.floor(dealt * 0.88));
+  });
+
+  it('알라나 잠재: 액티브를 쓴 턴에 피해 0', () => {
+    let s = skill(game('alana', ['calamity', ...empties(13)], true));
+    s = rollExactly(s, 1);
+    expect(s.players[0].hp).toBe(CHARACTERS.alana.hp);
+  });
+
+  it('코마치 잠재: 효과 카드 3장마다 재사용 -1 · 효과 카드 피해 +1', () => {
+    let s = game('komachi', empties(14), true);
+    s.players[0].charVars.effects = 2;
+    s.players[0].skillCooldown = 2;
+    s.players[0].hand = [{ card: 'cake' }];
+    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
+    expect(s.players[0].skillCooldown).toBe(1);
+    expect(s.players[0].charVars.fxDamage).toBe(1);
+  });
+
+  it('미사키 잠재: 사거리 6 · 검기 3에서 쓰면 2 소모 · 명검 1장 · 명검 코스트 -1', async () => {
+    const { kitBattleCost } = await import('./kits');
+    let s = withEnemy(game('misaki', empties(14), true), 'elite', 6);
+    s.players[0].stacks = 3;
+    s = skill(s, { target: s.enemies[0].id });
+    expect(s.players[0].stacks).toBe(2);
+    expect(s.players[0].hand.at(-1)?.card).toBe('gawu');
+    expect(kitBattleCost(s.players[0], 'gawu')).toBe(CARDS.gawu.battleCost! - 1);
+  });
+
+  it('마무시: 각성 8이면 진룡 · 깨물기 → 용의 포효', () => {
+    let s = game('mamushi');
+    s.players[0].stacks = 7;
+    s.players[0].hand = [{ card: 'bite' }];
+    s = skill(s);
+    expect(s.players[0].stacks).toBe(8);
+    expect(s.players[0].hand.filter((h) => h.card === 'bite')).toHaveLength(0);
+    expect(s.players[0].hand.some((h) => h.card === 'dragonRoar')).toBe(true);
+  });
+
+  it('사이크스: 촉수를 소환하고 어비스 존의 촉수가 몬스터를 친다', () => {
+    let s = withEnemy(game('sykes'), 'elite', 3);
+    s = skill(s);
+    expect(Object.keys(s.players[0].charTiles)).toHaveLength(1);
+    expect(s.enemies[0].hp).toBe(ENEMIES.elite.hp - 1);
+  });
+});
+
+describe('원작 공식 문구 3', () => {
+  const game = (character: CharacterId, kinds: TileKind[] = empties(14), potential = false) =>
+    newGame(ring(kinds), { character, potential });
+  const skill = (s: GameState, extra: { target?: number; cards?: number[]; value?: number } = {}) =>
+    applyAction(s, { type: 'USE_SKILL', player: s.current, ...extra });
+
+  it('링링: 금지 표지판 2장으로 시작 · 태클로 튕겨 낸 몬스터와 순서대로 싸운다', () => {
+    expect(game('lingling').players[0].hand.filter((h) => h.card === 'banSign')).toHaveLength(2);
+    let s = withEnemy(withEnemy(game('lingling'), 'elite', 1), 'elite', 3);
+    const [a, b] = s.enemies.map((e) => e.id);
+    s = skill(s, { value: 5 });
+    s = applyAction(s, { type: 'ROLL', player: 0 });
+    expect(s.enemies.map((e) => e.tile)).toEqual([5, 5]);
+    expect(s.phase).toMatchObject({ kind: 'encounter', enemy: a });
+    s = release(s);
+    expect(s.phase).toMatchObject({ kind: 'encounter', enemy: b });
+  });
+
+  it('링링: 태클 중 금지 표지판을 지나면 방어력 -2 · 공격력 +2 · 표지판 1장', async () => {
+    const { kitAtk } = await import('./kits');
+    let s = withEnemy(game('lingling'), 'elite', 1);
+    s.players[0].charTiles[2] = 1;
+    s = skill(s, { value: 4 });
+    s = applyAction(s, { type: 'ROLL', player: 0 });
+    expect(s.enemies[0].tags?.grab).toBe(2);
+    expect(kitAtk(s, s.players[0], s.enemies[0])).toBe(2);
+    expect(s.players[0].charTiles[2]).toBeUndefined();
+    expect(s.players[0].hand.filter((h) => h.card === 'banSign')).toHaveLength(3);
+  });
+
+  it('금지 표지판: 지나는 캐릭터는 멈추고 다음 이동 +2', () => {
+    let s = game('lingling', empties(14));
+    const i = s.players[0].hand.findIndex((h) => h.card === 'banSign');
+    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: i, value: 3 });
+    expect(s.players[0].charTiles[3]).toBe(1);
+    s.current = 1;
+    s.phase = { kind: 'preRoll' };
+    s = rollExactly(s, 6);
+    expect(s.players[1].tile).toBe(3);
+    expect(s.players[1].relicVars.warpBoost).toBe(2);
+  });
+
+  it('파루난 잠재: 상점 전투 카드 +1 · 송금하면 1장 1코인', () => {
+    let s = game('parunan', ['shop', ...empties(13)], true);
+    s = rollExactly(s, 1);
+    if (s.phase.kind !== 'shop') throw new Error('상점 아님');
+    expect(s.phase.offers).toHaveLength(RULES.shopOffers + 2);
+    s.players[0].coins = 20;
+    s = applyAction(s, { type: 'SEND_COINS', player: 0, to: 1 });
+    if (s.phase.kind !== 'shop') throw new Error('상점 아님');
+    expect(s.phase.offers.some((o) => o.price === 1)).toBe(true);
+  });
+
+  it('파파라 잠재: 체력을 쓰지 않고 한 입만 동안 공격력 +3', async () => {
+    const { kitAtk } = await import('./kits');
+    let s = withEnemy(game('papara', empties(14), true), 'elite', 5);
+    s = skill(s);
+    expect(s.players[0].hp).toBe(s.players[0].maxHp);
+    expect(kitAtk(s, s.players[0], s.enemies[0])).toBe(3);
+  });
+
+  it('판다맨 잠재: 햄버거 → 반격 1 · 최대 체력 +2 · 액티브로 5칸 안 도발', () => {
+    let s = withEnemy(game('pandaman', empties(14), true), 'elite', 4);
+    const max = s.players[0].maxHp;
+    s.players[0].level = 1;
+    s.players[0].hand = [{ card: 'bandage' }];
+    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: 0 });
+    expect(s.players[0].charVars.counter).toBe(1);
+    expect(s.players[0].maxHp).toBe(max + 2);
+    s = skill(s);
+    expect(s.enemies[0].tags?.taunt).toBe(1);
+  });
+
+  it('루루 잠재: 사거리 제한 없음 · 4칸 안 몬스터 이동 -3 · 미니 슬라임', async () => {
+    const { kitSlow, kitHealLost } = await import('./kits');
+    const { createRng } = await import('./rng');
+    let s = withEnemy(game('lulu', empties(14), true), 'elite', 3);
+    s.players[1].tile = 12;
+    s = skill(s, { target: 1 });
+    expect(s.players[1].healStacks).toBe(3);
+    expect(kitSlow(s, s.enemies[0])).toBe(3);
+    kitHealLost(s, createRng(1), s.players[0], 4);
+    expect(Object.keys(s.players[0].charTiles)).toHaveLength(2);
+  });
+
+  it('키이세이 잠재: 스마트 주사위 → 운명의 인도 · 표식 몬스터를 처치하면 운명의 인도', () => {
+    let s = withEnemy(game('haiqing', empties(14), true), 'elite', 4);
+    s.players[0].level = 1;
+    s.players[0].hand = [{ card: 'remoteDice' }, { card: 'laser' }];
+    s = skill(s, { target: s.enemies[0].id });
+    expect(s.players[0].hand[0].card).toBe('fateGuide');
+    s.enemies[0].hp = 1;
+    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: 1, target: s.enemies[0].id });
+    expect(s.enemies).toHaveLength(0);
+    expect(s.players[0].hand.filter((h) => h.card === 'fateGuide')).toHaveLength(2);
+  });
+
+  it('메가스: 궤도 폭격 피해 3 + 버린 코스트 3마다 1 · 잠재 6장 이상이면 레일건', () => {
+    let s = withEnemy(game('megas', empties(14), true), 'elite', 3);
+    s.enemies[0].hp = 99;
+    s.players[0].hand = [{ card: 'atkM' }, { card: 'atkM' }, { card: 'atkM' }, { card: 'dash' }, { card: 'dash' }, { card: 'dash' }];
+    const cost = CARDS.atkM.battleCost! * 3;
+    s = skill(s);
+    expect(s.enemies[0].hp).toBe(99 - 3 * (3 + Math.floor(cost / 3)));
+    expect(s.players[0].hand.some((h) => h.card === 'railgun')).toBe(true);
+  });
+
+  it('리빙 북: 2 피해 · 표식 +1 · 표식 3 이상이면 이번 턴 카드 +1', () => {
+    let s = withEnemy(game('rin'), 'elite', 4);
+    s.enemies[0].mark = 2;
+    s.players[0].hand = [{ card: 'livingPage' }];
+    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: 0, target: s.enemies[0].id });
+    expect(s.enemies[0].mark).toBe(3);
+    expect(s.turn.extraPlays).toBe(1);
+  });
+
+  it('루카 잠재: 전투 카드 1장을 버리면 이번 턴 공격력 + (성 + 코스트)', async () => {
+    const { kitAtk } = await import('./kits');
+    const s0 = withEnemy(game('luka', empties(14), true), 'elite', 9);
+    s0.players[0].hand = [{ card: 'dash' }, { card: 'atkM' }];
+    expect(() => skill(s0, { cards: [0] })).toThrow(RuleError);
+    const s = skill(s0, { cards: [1] });
+    expect(kitAtk(s, s.players[0], s.enemies[0])).toBe(s.players[0].level + CARDS.atkM.battleCost!);
+  });
+
+  it('초텐짱 잠재: 최대 10코인 · 팬 9 이상이면 다른 아군 코인 +3', () => {
+    let s = game('kangel', empties(14), true);
+    for (let i = 0; i < 10; i++) s = withEnemy(s, 'robot', 2 + i);
+    for (const e of s.enemies) e.tags = { fan: 1 };
+    const [mine, theirs] = s.players.map((p) => p.coins);
+    s = skill(s);
+    expect(s.players[0].coins).toBe(mine + 10);
+    expect(s.players[1].coins).toBe(theirs + 3);
+  });
+
+  it('유메: 이동 주사위 1 → 불행 · 불행을 들고 턴을 마치면 체력 -1', () => {
+    const s0 = game('zhao');
+    s0.players[0].hand = [];
+    s0.turn.fixedMove = 1;
+    let s = applyAction(s0, { type: 'ROLL', player: 0 });
+    expect(s.players[0].hand.map((h) => h.card)).toEqual(['talismanHuo']);
+    const hp = s.players[0].hp;
+    s = applyAction(s, { type: 'END_TURN', player: 0 });
+    expect(s.players[0].hp).toBe(hp - 1);
+  });
+
+  it('용의 포효 코스트 3 · 깨물기 코스트 2', () => {
+    expect([CARDS.dragonRoar.battleCost, CARDS.bite.battleCost]).toEqual([3, 2]);
   });
 });

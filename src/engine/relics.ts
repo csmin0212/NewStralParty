@@ -18,7 +18,7 @@ import { drawCards, heal, log, notice, strikeEnemy } from './game';
 import type { Rng } from './rng';
 import type { CharacterId, Enemy, GameState, MapRes, Player } from './types';
 import { MAP_RES_INFO } from '../data/board';
-import { kitEffectCard, kitKill, kitTurnEnd, kitTurnStart } from './kits';
+import { kitEffectCard, kitHealLost, kitKill, kitTurnEnd, kitTurnStart } from './kits';
 
 export function hasRelic(p: Player, id: RelicId): boolean {
   return p.relics?.includes(id) ?? false;
@@ -356,7 +356,9 @@ export function onTurnEnd(s: GameState, rng: Rng, p: Player) {
       for (const e of targets) if (s.enemies.includes(e) && !over(s)) relicStrike(s, rng, p, e, 2);
     }
   }
+  const heals = p.healStacks;
   p.healStacks = Math.floor(p.healStacks / 2);
+  kitHealLost(s, rng, p, heals - p.healStacks);
   const res = p.mapRes;
   if (hasRelic(p, 'hannaDoll') && res.evidence) p.coins += res.evidence;
   if (hasRelic(p, 'entTerminal') && res.mind) res.mind -= 1;
@@ -418,7 +420,7 @@ export function onBoostTile(p: Player) {
 
 /** 주사위 전 카드(효과 카드)를 썼다. target: 대상 몬스터 */
 export function onEffectCard(s: GameState, rng: Rng, p: Player, card: Player['hand'][number], target?: Enemy, dealt?: number) {
-  kitEffectCard(s, rng, p, card);
+  kitEffectCard(s, rng, p, card, target);
   const v = p.relicVars;
   v.effects = (v.effects ?? 0) + 1;
   if (hasRelic(p, 'tome') && v.effects % 3 === 0) {

@@ -301,7 +301,7 @@ id: `binah` 비나 · `chesed` 케세드 · `shirokuro` 시로 · `hieronymus` �
 
 **캐릭터** — `characters/<id>/` (뭇별 · Soda · 모나와 같은 규격: main · token · portrait · battle-idle · attack · hit · block · evade · down)
 
-`parunan` 파루난 (帕露南) · `fanny` 페니 (芬妮) · `alana` 알라나 (阿兰娜) · `komachi` 코마치 (小町) · `padman` 패드맨 (派德曼) · `papara` 파파라 (帕帕拉) · `ren` 렌 (恋) · `mimi` 미미 (米米) · `z3000` Z3000 · `pandaman` 판다맨 (潘大猛) · `inkshadow` 묵영 (墨影) · `lulu` 루루 (璐璐) · `fen` 희몽풍 (姬梦枫) · `haiqing` 남해청 (蓝海晴) · `misaki` 미사키 (美咲) · `nardis` 나디스 (娜蒂斯) · `jasmine` 자스민 (茉莉) · `al` 알 (阿尔) · `luka` 루카 (星魅琉华) · `nancy` 낸시 (南希露) · `rin` 린 (凛) · `megas` 메가스 (梅加斯) · `zhao` 희몽조 (姬梦朝) · `teru` 테루 (照) · `moses` 모세 (摩西) · `mamushi` 마무시 (真梦梓) · `bonnie` 보니 (邦妮) · `lingling` 링링 (玲玲) · `sykes` 사이크스 (赛克斯) · `kangel` 초텐짱 (超天酱) · `ame` 아메짱 (糖糖) · `jill` 질 (吉尔) · `dorothy` 도로시 (多萝西) · `hanna` 한나 (远野汉娜) · `sherry` 셰리 (橘雪莉)
+`parunan` 파루난 (帕露南) · `fanny` 패니 (芬妮) · `alana` 알라나 (阿兰娜) · `komachi` 코마치 (小町) · `padman` 패드맨 (派德曼) · `papara` 파파라 (帕帕拉) · `ren` 렌 (恋) · `mimi` 미미 (米米) · `z3000` Z3000 · `pandaman` 판다맨 (潘大猛) · `inkshadow` 잉크 섀도우 (墨影) · `lulu` 루루 (璐璐) · `fen` 펭 (姬梦枫) · `haiqing` 키이세이 (蓝海晴) · `misaki` 미사키 (美咲) · `nardis` 나르디스 (娜蒂斯) · `jasmine` 자스민 (茉莉) · `al` AL (阿尔) · `luka` 루카 (星魅琉华) · `nancy` 낸시 루 (南希露) · `rin` 린 (凛) · `megas` 메가스 (梅加斯) · `zhao` 유메 (姬梦朝) · `teru` 테루 (照) · `moses` 모제스 (摩西) · `mamushi` 마무시 (真梦梓) · `bonnie` 보니 (邦妮) · `lingling` 링링 (玲玲) · `sykes` 사이크스 (赛克斯) · `kangel` 최고귀염뽀짝천사 (超天酱) · `ame` 니디 걸 (糖糖) · `jill` 질 (吉尔) · `dorothy` 도로시 (多萝西) · `hanna` 토노 한나 (远野汉娜) · `sherry` 타치바나 세리 (橘雪莉)
 
 **칸** — `tiles/<file>.png` 512×512
 
@@ -382,7 +382,7 @@ isolated on transparent background, no text, no letters, no frame, no border
 | 파일 | 카드 | 내용 (카드 공통 뒤에) |
 |---|---|---|
 | `cards/triple-dice.png` | 트리플 주사위 | `three white dice with sky blue pips tumbling in the air, sparkling trail, sky blue glow` |
-| `cards/remote-dice.png` | 리모컨 주사위 | `a white game controller with a single die floating above it, the die face changing, sky blue glow` |
+| `cards/remote-dice.png` | 스마트 주사위 | `a white game controller with a single die floating above it, the die face changing, sky blue glow` |
 | `cards/portal.png` | 랜덤 포털 | `a swirling cyan portal ring standing upright, sparkles spiraling into it, sky blue glow` |
 | `cards/cookie.png` | 매점 쿠키 | `one round chocolate chip cookie in a small school snack wrapper, crumbs, warm sky blue glow` |
 | `cards/cake.png` | 초코 케이크 | `a slice of chocolate cake with a strawberry on top on a small white plate, sky blue glow` |
@@ -523,3 +523,30 @@ isolated on transparent background, no text, no letters, no frame, no border
 |---|---|---|
 | Soda | memorial-soda.html | scene-v7-pastel.webp |
 | 모나 | memorial-mona.html | scene-v7-pastel.webp |
+
+
+## 미미 · 2026-10-24
+
+| 에셋 | 크기 | 파일 |
+|---|---|---|
+| 스탠딩 | 1024 × 1536 | `characters/mimi/main.webp` |
+| SD · 초상화 | 512 × 512 | `token.webp` · `portrait.webp` |
+| 전투 6종 | 768 × 768 | `battle-{idle,attack,hit,block,evade,down}.webp` |
+| 스킬 2종 | 256 × 256 | `skill-active.webp` · `skill-passive.webp` |
+| 메모리얼 · 보관 · 미사용 | 1920 × 1080 | `memorial/scene-v2-covered.webp` |
+
+- 경로: `public/assets/characters/mimi/`
+- 원본 · 프롬프트: `assets-raw/mimi-2026-10-24/`
+
+## 9차 요청: 캐릭터 카드
+
+| 파일 | 카드 |
+|---|---|
+| `cards/bandage.webp` | 햄버거 (지금 그림은 붕대) |
+| `cards/ban-sign.webp` | 금지 표지판 (링링) |
+| `cards/fate-guide.webp` | 운명의 인도 (키이세이) |
+| `cards/living-page.webp` | 리빙 북 (린) |
+| `cards/talisman-fu.webp` | 부적 카드 - 행운 (유메) |
+| `cards/talisman-huo.webp` | 부적 카드 - 불행 (유메) |
+| `cards/bite.webp` | 깨물기 (마무시) |
+| `cards/dragon-roar.webp` | 용의 포효 (마무시) |

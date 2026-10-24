@@ -2,6 +2,7 @@
 
 import type { RelicId } from '../data/relics';
 import type { DifficultyId } from '../data/difficulty';
+import type { EventId } from '../data/events';
 
 /** 맵 기믹이 주는 자원 */
 export type MapRes = 'evidence' | 'overclock' | 'mind' | 'problem';
@@ -130,7 +131,10 @@ export type CardId =
   | 'livingPage'
   | 'talismanFu'
   | 'talismanHuo'
-  | 'bite';
+  | 'bite'
+  | 'dragonRoar'
+  | 'banSign'
+  | 'fateGuide';
 
 export interface HandCard {
   card: CardId;
@@ -138,7 +142,7 @@ export interface HandCard {
   shop?: boolean;
   /** 다른 플레이어가 준 카드 (모나 역조공): 준 사람 id */
   from?: number;
-  /** 임시 카드: 차례 끝에 버린다 (나디스) */
+  /** 임시 카드: 차례 끝에 버린다 (나르디스) */
   temp?: boolean;
 }
 
@@ -191,7 +195,7 @@ export interface Player {
   mapRes: Partial<Record<MapRes, number>>;
   /** 캐릭터 스킬이 세는 값 (engine/kits.ts) */
   charVars: Record<string, number>;
-  /** 캐릭터가 깔아 둔 칸 (묵영 그림자): 칸 → 남은 차례 */
+  /** 캐릭터가 깔아 둔 칸 (잉크 섀도우 그림자 · 링링 표지판 · 루루 미니 슬라임 · 사이크스 촉수): 칸 → 남은 차례 */
   charTiles: Record<number, number>;
   /** 지금 임무 (base: 받을 때 값) · 끝낸 임무 */
   task: { id: string; base: number } | null;
@@ -258,10 +262,10 @@ export interface Enemy {
   timer?: number;
   /** 표식: 있으면 모든 피해 +1, 보스 차례마다 -1 */
   mark?: number;
-  /** 캐릭터 스킬이 붙인 상태 (engine/kits.ts): 받는 피해 + · 팬 · 빈틈 · 조사 · 붙잡힘 · 침식 · 마역 */
-  tags?: Partial<Record<'vuln' | 'fan' | 'flaw' | 'probe' | 'grab' | 'erode' | 'abyss', number>>;
+  /** 캐릭터 스킬이 붙인 상태 (engine/kits.ts): 받는 피해 + · 팬 · 약점 · 조사 · 붙잡힘 · 침식 · 마역 */
+  tags?: Partial<Record<'vuln' | 'fan' | 'flaw' | 'probe' | 'grab' | 'erode' | 'abyss' | 'taunt' | 'slow' | 'roar' | 'fanDown', number>>;
   /** tags를 건 플레이어 */
-  tagBy?: Partial<Record<'vuln' | 'flaw' | 'probe', number>>;
+  tagBy?: Partial<Record<'vuln' | 'flaw' | 'probe' | 'taunt', number>>;
 }
 
 /** 보드 위의 표식. 플레이어가 그 칸에 멈추면 발동한다 */
@@ -538,6 +542,8 @@ export type Phase =
   | { kind: 'shop'; stepsLeft: number; offers: ShopOffer[]; free: boolean; chips?: boolean; sent?: boolean }
   /** 내 거점 · 확인 지점을 지나갈 때: 멈출지 고른다 */
   | { kind: 'stopChoice'; stepsLeft: number }
+  /** 이벤트 2개 중 하나 (패니 잠재) */
+  | { kind: 'eventPick'; options: EventId[] }
   | { kind: 'endTurn' }
   | { kind: 'gameOver'; result: 'victory' | 'defeat' };
 
@@ -596,9 +602,12 @@ export interface TurnInfo {
   /** 링링 돌진 · 붙잡은 몬스터 */
   charge?: boolean;
   grabbed?: number[];
-  /** 멈춘 뒤 이벤트 1번 더 (페니) */
+  /** 태클 중 금지 표지판을 지났다 · 멈춘 뒤 싸울 순서 */
+  signPassed?: boolean;
+  tackleQueue?: number[];
+  /** 멈춘 뒤 이벤트 1번 더 (패니) */
   extraEvent?: boolean;
-  /** 이번 차례 몬스터에게 도전했다 (희몽풍) */
+  /** 이번 차례 몬스터에게 도전했다 (펭) */
   challenged?: boolean;
   /** 원격 도전 중 (낸시): 끝나면 주사위 전으로 · 멀면 반격 없음 */
   remote?: boolean;
@@ -618,7 +627,7 @@ export interface TurnInfo {
   skillUsed: boolean;
   diceCount: number;
   extraSteps: number;
-  /** 정해 둔 이동 칸 (리모컨 주사위) */
+  /** 정해 둔 이동 칸 (스마트 주사위 · 운명의 인도) */
   fixedMove: number | null;
   dice: number[];
   battle: BattleMods;
@@ -700,7 +709,7 @@ export interface GameState {
 }
 
 export type Action =
-  /** target: 아군이면 플레이어 id, 에너미면 에너미 id · value: 리모컨 주사위 눈 */
+  /** target: 아군이면 플레이어 id, 에너미면 에너미 id · value: 고른 숫자 (스마트 주사위 · 금지 표지판) */
   | { type: 'PLAY_CARD'; player: number; handIndex: number; target?: number; value?: number }
   | { type: 'BUY_CARD'; player: number; offer: number }
   /** 상점에서 아군에게 코인 송금 (한 번에 5) */
@@ -720,4 +729,6 @@ export type Action =
   | { type: 'USE_SKILL'; player: number; target?: number; cards?: number[]; value?: number }
   /** 거점 · 확인 지점에서 멈출지 */
   | { type: 'STOP_HERE'; player: number; stop: boolean }
+  /** 고른 이벤트 (패니 잠재) */
+  | { type: 'PICK_EVENT'; player: number; event: EventId }
   | { type: 'END_TURN'; player: number };

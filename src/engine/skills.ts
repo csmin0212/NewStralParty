@@ -4,6 +4,7 @@
 import { CHARACTERS } from '../data/characters';
 import { distances, targetable } from './cards';
 import { hasRelic } from './relics';
+import { kitEnemyDef, kitSkillRange } from './kits';
 import type { Enemy, GameState, Player } from './types';
 
 /** Soda 연마: 스택 몇 개당 방어력 -1 */
@@ -33,7 +34,8 @@ export function activateSkill(s: GameState, p: Player) {
 
 /** 대상을 골라야 하는 액티브의 대상 (에너미 id 또는 아군 id). 대상이 필요 없는 스킬은 null */
 export function skillTargets(s: GameState, p: Player): number[] | null {
-  const { target, range } = CHARACTERS[p.character].active;
+  const { target } = CHARACTERS[p.character].active;
+  const range = kitSkillRange(p);
   if (!target || range === undefined) return null;
   const dist = distances(s.board, p.tile);
   const near = (tile: number) => (dist.get(tile) ?? Infinity) <= range;
@@ -47,7 +49,7 @@ export function enemyDefAgainst(s: GameState, p: Player, enemy: Enemy): number {
   if (enemy.isBoss && s.bossState.groggy > 0) return 0;
   let down = s.turn.battle.enemyDefDown;
   if (p.character === 'soda') down += Math.floor(p.stacks / POLISH_PER_DEF);
-  return Math.max(0, enemy.def + bossDefBonus(s, enemy) - down);
+  return Math.max(0, enemy.def + bossDefBonus(s, enemy) + kitEnemyDef(enemy) - down);
 }
 
 /** 보스 규칙으로 오르는 방어력: 지켜 주는 미니언 (호드 필러) · 꺼진 난로 (게부라) */
