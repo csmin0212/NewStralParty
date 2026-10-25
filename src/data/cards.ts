@@ -181,8 +181,8 @@ export const CARDS: Record<CardId, CardInfo> = {
   dragonRoar: card('dragonRoar', '용의 포효', 'battle', '🐉', '공격력 +3 · 이번 턴 대상 방어력 -3 · 이동 -9 · 반격 없음', 'AP 龙之咆哮 (마무시 진룡)', {
     timing: 'attack', battleCost: 3, limit: 0, battle: { atk: [3, 3], noCounter: true },
   }),
-  banSign: card('banSign', '금지 표지판', 'event', '⛔', '앞쪽 1~10칸에 배치 · 지나는 캐릭터는 멈추고 다음 이동 +2', 'AP 强化拒止 (링링)', {
-    limit: 0, pick: [1, 10],
+  banSign: card('banSign', '금지 표지판', 'event', '⛔', '10칸 안 칸에 배치 · 지나는 캐릭터는 멈추고 다음 이동 +2', 'AP 强化拒止 (링링)', {
+    limit: 0, target: 'tile',
   }),
   fateGuide: card('fateGuide', '운명의 인도', 'boost', '🔮', '이동 1~6 중 고르기', 'AP 命运的指引 (키이세이)', { limit: 0, pick: [1, 6] }),
 

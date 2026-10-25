@@ -68,7 +68,8 @@ export function renderHud(
     ${handCards(state)}
     <div class="hud-action ${busy ? 'busy' : ''}">${actionArea(state)}</div>
     ${state.phase.kind === 'shop' ? shopPanel(state) : ''}
-    ${picking !== null ? targetPicker(state, picking) : ''}
+    ${picking !== null ? (boardPick(state) ? boardPickBar(state) : targetPicker(state, picking)) : ''}
+    ${choicePanel(state, busy)}
     ${!busy && showRelicPicker(state) ? relicPicker(state) : ''}
     <aside class="hud-log ${logOpen ? 'open' : ''}">
       <h3>기록</h3>
@@ -504,6 +505,82 @@ function shopPanel(state: GameState): string {
     </div>`;
 }
 
+/** 보드에서 고르는 칸 (칸 카드 · 칸 액티브). 그 밖의 고르기는 null */
+export function boardPick(state: GameState): { title: string; tiles: number[] } | null {
+  if (picking === null) return null;
+  const p = currentPlayer(state);
+  if (picking === SKILL_PICK) {
+    const active = CHARACTERS[p.character].active;
+    return active.target === 'tile' ? { title: active.name, tiles: skillTargets(state, p) ?? [] } : null;
+  }
+  const hand = p.hand[picking];
+  if (!hand || CARDS[hand.card].target !== 'tile') return null;
+  return { title: CARDS[hand.card].name, tiles: cardTargets(state, p, hand.card) ?? [] };
+}
+
+/** 보드 칸을 눌렀다: 고르는 중인 칸이면 쓰고 true */
+export function pickBoardTile(state: GameState, tile: number, h: HudHandlers): boolean {
+  const pick = boardPick(state);
+  if (!pick || !pick.tiles.includes(tile)) return false;
+  const player = state.current;
+  if (picking === SKILL_PICK) {
+    picking = null;
+    h.dispatch({ type: 'USE_SKILL', player, target: tile });
+  } else {
+    const handIndex = picking!;
+    picking = null;
+    h.dispatch({ type: 'PLAY_CARD', player, handIndex, target: tile });
+  }
+  h.refresh();
+  return true;
+}
+
+/** 보드에서 칸 고르기: 위쪽 띠 (이름 · 고를 수 있는 칸 수 · 취소) */
+function boardPickBar(state: GameState): string {
+  const pick = boardPick(state)!;
+  return `
+    <div class="board-pick-bar">
+      <div class="ba-band">${esc(pick.title)}</div>
+      <span class="bp-count">📍 <b>${pick.tiles.length}</b></span>
+      <button class="ba-btn ba-btn--white" data-action="cancel-pick">취소</button>
+    </div>`;
+}
+
+/** 멈추기 · 이벤트 · 투표 · 루트: 가운데 큰 창 */
+function choicePanel(state: GameState, busy: boolean): string {
+  if (busy) return '';
+  const phase = state.phase;
+  const p = currentPlayer(state);
+  let title = '';
+  let cards = '';
+  if (phase.kind === 'stopChoice') {
+    title = `${tileLabel(state.board, p.tile)} · ${phase.stepsLeft}칸`;
+    cards = `
+      <button class="choice-card" data-stop="1"><span class="cc-icon">🏁</span><b>멈추기</b><small>체력 +2 · 성 오름</small></button>
+      <button class="choice-card" data-stop="0"><span class="cc-icon">👟</span><b>계속</b><small>${phase.stepsLeft}칸</small></button>`;
+  } else if (phase.kind === 'eventPick') {
+    title = '이벤트';
+    cards = phase.options
+      .map((id) => `<button class="choice-card" data-event="${id}"><span class="cc-icon">${EVENTS[id].icon}</span><b>${esc(EVENTS[id].name)}</b><small>${esc(EVENTS[id].text)}</small></button>`)
+      .join('');
+  } else if (phase.kind === 'mapChoice') {
+    title = phase.id === 'vote' ? '투표' : '루트';
+    cards = phase.options
+      .map((o) => {
+        const [icon, ...rest] = o.label.split(' ');
+        return `<button class="choice-card" data-choice="${esc(o.id)}"><span class="cc-icon">${esc(icon)}</span><b>${esc(rest.join(' '))}</b></button>`;
+      })
+      .join('');
+  } else return '';
+  return `
+    <div class="choice-pick ${p.cpu ? 'wait' : ''}" style="--c:${p.color}">
+      <div class="choice-panel">
+        <div class="ba-band">${esc(p.name)} · ${title}</div>
+        <div class="choice-row">${cards}</div>
+      </div>
+    </div>`;
+}
+
 /** 대상 고르기: 아군 · 사거리 안 에너미 · 고르는 숫자 */
 function targetPicker(state: GameState, handIndex: number): string {
   const p = currentPlayer(state);
@@ -640,38 +717,14 @@ function actionArea(state: GameState): string {
     case 'shop':
       return `<button class="go-btn wait" disabled><b>상점</b><small>SHOP</small></button>`;
 
-    case 'eventPick': {
-      const options = phase.options
-        .map((id) => `<button class="path-btn" data-event="${id}">${EVENTS[id].icon} ${esc(EVENTS[id].name)}<small>${esc(EVENTS[id].text)}</small></button>`)
-        .join('');
-      return `
-        <div class="path-pick">
-          <div class="path-title">이벤트</div>
-          ${options}
-        </div>
-        <button class="go-btn wait" disabled><b>선택</b><small>EVENT</small></button>`;
-    }
+    case 'eventPick':
+      return `<button class="go-btn wait" disabled><b>선택</b><small>EVENT</small></button>`;
 
-    case 'mapChoice': {
-      const options = phase.options.map((o) => `<button class="path-btn" data-choice="${esc(o.id)}">${esc(o.label)}</button>`).join('');
-      return `
-        <div class="path-pick">
-          <div class="path-title">${phase.id === 'vote' ? '투표' : '루트'}</div>
-          ${options}
-        </div>
-        <button class="go-btn wait" disabled><b>선택</b><small>CHOOSE</small></button>`;
-    }
+    case 'mapChoice':
+      return `<button class="go-btn wait" disabled><b>선택</b><small>CHOOSE</small></button>`;
 
-    case 'stopChoice': {
-      const tile = state.board.tiles[p.tile];
-      return `
-        <div class="path-pick">
-          <div class="path-title">${esc(tileLabel(state.board, tile.id))} · 남은 <b>${phase.stepsLeft}</b>칸</div>
-          <button class="path-btn" data-stop="1">멈추기<small>체력 +2 · 성 오름</small></button>
-          <button class="path-btn" data-stop="0">계속<small>${phase.stepsLeft}칸</small></button>
-        </div>
-        <button class="go-btn wait" disabled><b>선택</b><small>STOP?</small></button>`;
-    }
+    case 'stopChoice':
+      return `<button class="go-btn wait" disabled><b>선택</b><small>STOP?</small></button>`;
 
     case 'endTurn': {
       const result = p.ko ? `K.O. · ${p.reviveRound}R 부활` : `${tileLabel(state.board, p.tile)} 도착`;

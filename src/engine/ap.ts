@@ -1407,6 +1407,9 @@ export function apTileTargets(s: GameState, p: Player, card: CardId): number[] |
     const built = new Set(s.marks.filter((m) => ['mushroom', 'starfruit', 'peach', 'moneyTree'].includes(m.kind)).map((m) => m.tile));
     return (s.board.buildable ?? []).filter((t) => !built.has(t));
   }
+  if (card === 'banSign') {
+    return [...dist(s, p.tile)].filter(([, d]) => d >= 1 && d <= 10).map(([t]) => t);
+  }
   if (card === 'feather') {
     return [...dist(s, p.tile)].filter(([t, d]) => d >= 1 && d <= 5 && s.board.tiles[t].kind !== 'base').map(([t]) => t);
   }

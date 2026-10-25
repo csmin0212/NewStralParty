@@ -497,7 +497,7 @@ function cardEffect(s: GameState, rng: Rng, p: Player, card: CardId, target?: nu
       t.fixedMove = value!;
       break;
     case 'banSign':
-      placeSign(s, p, value!);
+      placeSign(s, p, target!);
       break;
     case 'portal': {
       const warps = s.board.tiles.filter((x) => x.kind === 'warp' && x.id !== p.tile);

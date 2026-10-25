@@ -20,7 +20,7 @@ import { diceHtml } from './dice';
 import { BoardView } from './boardView';
 import { FxLayer } from './fx';
 import { deltaEvents, resultEvents, turnEvents, type FxEvent } from './fxEvents';
-import { renderHud, type HudHandlers } from './hud';
+import { boardPick, pickBoardTile, renderHud, type HudHandlers } from './hud';
 import { openEnemyInfo, openPlayerInfo } from './playerInfo';
 
 /**
@@ -220,6 +220,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
   const draw = (s: GameState, isBusy: boolean) => {
     shownState = s;
     renderHud(hud, s, isBusy, logOpen, handlers);
+    board.setPickable(isBusy ? null : (boardPick(s)?.tiles ?? null));
   };
 
   const handlers: HudHandlers = {
@@ -325,6 +326,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
   }
 
   board.onTileClick = (tileId) => {
+    if (!busy && pickBoardTile(state, tileId, handlers)) return;
     if (state.phase.kind === 'choosePath' && state.phase.options.includes(tileId)) {
       dispatch({ type: 'CHOOSE_PATH', player: state.current, to: tileId });
     }
@@ -332,7 +334,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
   // 말을 누르면 그 캐릭터 정보 (갈림길에서 고를 칸 위의 말이면 그 칸으로)
   board.onTokenClick = (player) => {
     const tile = state.players[player].tile;
-    if (state.phase.kind === 'choosePath' && state.phase.options.includes(tile)) board.onTileClick(tile);
+    if ((state.phase.kind === 'choosePath' && state.phase.options.includes(tile)) || boardPick(state)?.tiles.includes(tile)) board.onTileClick(tile);
     else openPlayerInfo(state, player);
   };
   board.onEnemyClick = (id) => {

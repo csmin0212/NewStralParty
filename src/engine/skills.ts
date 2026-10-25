@@ -4,7 +4,7 @@
 import { CHARACTERS } from '../data/characters';
 import { distances, targetable } from './cards';
 import { hasRelic } from './relics';
-import { kitEnemyDef, kitSkillRange, kitSkillReach } from './kits';
+import { kitEnemyDef, kitSkillRange, kitSkillReach, kitSkillTiles } from './kits';
 import { apEnemyDef } from './ap';
 import type { Enemy, GameState, Player } from './types';
 
@@ -36,6 +36,7 @@ export function activateSkill(s: GameState, p: Player) {
 /** 대상을 골라야 하는 액티브의 대상 (에너미 id 또는 아군 id). 대상이 필요 없는 스킬은 null */
 export function skillTargets(s: GameState, p: Player): number[] | null {
   const { target } = CHARACTERS[p.character].active;
+  if (target === 'tile') return kitSkillTiles(s, p);
   const range = kitSkillRange(p);
   if (!target || range === undefined) return null;
   const dist = distances(s.board, p.tile);

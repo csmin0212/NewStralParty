@@ -754,3 +754,119 @@
     translate: none;
   }
 }
+
+/* ───────── 보드에서 칸 고르기 ───────── */
+.board.picking .tile:not(.pick) {
+  filter: saturate(0.4) brightness(0.92);
+  opacity: 0.55;
+}
+.tile.pick {
+  cursor: pointer;
+  box-shadow: 0 0 0 4px var(--yellow, #ffd34d), 0 0 18px 4px rgba(255, 211, 77, 0.75);
+  animation: pick-glow 1s ease-in-out infinite alternate;
+}
+.tile.pick:hover {
+  box-shadow: 0 0 0 5px var(--white), 0 0 0 9px var(--yellow, #ffd34d), 0 0 22px 6px rgba(255, 211, 77, 0.9);
+}
+@keyframes pick-glow {
+  to { box-shadow: 0 0 0 4px var(--yellow, #ffd34d), 0 0 26px 8px rgba(255, 211, 77, 0.45); }
+}
+.board-pick-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 200px;
+  translate: -50% 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 0;
+  border-radius: 6px;
+  background: var(--surface, rgba(255, 255, 255, 0.92));
+  box-shadow: 0 8px 22px rgba(31, 58, 104, 0.3);
+}
+.board-pick-bar .ba-band {
+  padding: 6px 22px;
+  font-size: 16px;
+}
+.bp-count {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--navy, #2a3b55);
+}
+
+/* ───────── 멈추기 · 이벤트 · 투표 · 루트 (가운데 창) ───────── */
+.choice-pick {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 30, 48, 0.32);
+  pointer-events: auto;
+}
+.choice-pick.wait .choice-card {
+  pointer-events: none;
+}
+.choice-panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--ba-panel, #eff3f7);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), inset 0 4px 0 var(--c);
+}
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+.choice-card {
+  width: 200px;
+  min-height: 190px;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  justify-items: center;
+  align-content: start;
+  gap: 8px;
+  padding: 18px 14px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sky, #33aef3) 14%, #fff), #fff 50%);
+  box-shadow: inset 0 0 0 2px #cfe0ef, 0 6px 14px rgba(42, 59, 85, 0.15);
+  font-family: inherit;
+  color: var(--navy, #2a3b55);
+  cursor: pointer;
+  transition: translate 0.15s, box-shadow 0.15s;
+}
+.choice-card:hover {
+  translate: 0 -4px;
+  box-shadow: inset 0 0 0 3px var(--sky, #33aef3), 0 10px 20px rgba(51, 174, 243, 0.3);
+}
+.cc-icon {
+  font-size: 46px;
+  line-height: 1.1;
+}
+.choice-card b {
+  font-size: 18px;
+  font-weight: 900;
+}
+.choice-card small {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #53657f;
+}
+@media (max-width: 900px) {
+  .choice-card {
+    width: 150px;
+    min-height: 150px;
+  }
+  .cc-icon {
+    font-size: 34px;
+  }
+  .board-pick-bar {
+    bottom: 150px;
+  }
+}

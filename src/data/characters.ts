@@ -16,7 +16,7 @@ export interface SkillText {
 }
 
 /** 액티브 대상: 에너미 · 다른 아군 · 나를 포함한 아군 */
-export type SkillTarget = 'enemy' | 'ally' | 'anyAlly';
+export type SkillTarget = 'enemy' | 'ally' | 'anyAlly' | 'tile';
 
 export interface CharacterDef {
   id: CharacterId;
@@ -149,12 +149,13 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
   },
   laurel: {
     id: 'laurel',
-    name: '라우렐',
+    name: '라우엘',
     color: '#8E7CC3',
     hp: 8,
     atk: 2,
     def: 0,
-    startBonus: 6,
+    // 시작 코인 12 (기본 RULES.startCoins + 7)
+    startBonus: 7,
     stars: [{ atk: 1, maxHp: 2 }, { atk: 1 }, { maxHp: 1 }],
     active: {
       name: '너 때문이야',
@@ -166,7 +167,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     passive: {
       name: '형언할 수 없는',
       description:
-        '자신과 전투한 캐릭터에게 [불운] 1스택을 준다. 전투 시 상대의 [불운] 스택만큼 방어력이 증가한다. 액티브 스킬로 적을 2명 죽일 때마다 공격력이 1 증가한다. [불운]: 스택당 라우렐에게 받는 피해 +1 (최대 3).',
+        '자신과 전투한 캐릭터에게 [불운] 1스택을 준다. 전투 시 상대의 [불운] 스택만큼 방어력이 증가한다. 액티브 스킬로 적을 2명 죽일 때마다 공격력이 1 증가한다. [불운]: 스택당 라우엘에게 받는 피해 +1 (최대 3).',
     },
   },
 
@@ -233,7 +234,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
   }),
   inkshadow: ap('inkshadow', 111, '墨影', '小猎手', '잉크 섀도우', '#4A4A7A', [2, 1, 10], 'B', {
     title: '견습 사냥꾼',
-    active: { name: '그림자 융합', cooldown: 3, description: '그림자 하나를 선택해 순간이동한 뒤, 모든 그림자를 흡수합니다. 흡수한 그림자 하나당 자신의 공격력이 1 증가하며, 1라운드 동안 지속됩니다.' },
+    active: { name: '그림자 융합', cooldown: 3, target: 'tile', description: '그림자 하나를 선택해 순간이동한 뒤, 모든 그림자를 흡수합니다. 흡수한 그림자 하나당 자신의 공격력이 1 증가하며, 1라운드 동안 지속됩니다.' },
     passive: { name: '쌍둥이 그림자', description: '턴 시작 시와 공격 적중 시, 잉크 섀도우가 있는 칸에 [그림자]를 배치합니다. (2라운드 지속) 적 캐릭터나 몬스터가 그림자 위에 머물면 1의 피해를 입습니다.' },
   }),
   lulu: ap('lulu', 112, '璐璐', '史莱姆', '루루', '#6FD6A8', [2, 2, 9], 'C', {
@@ -338,7 +339,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
   }),
   sykes: ap('sykes', 129, '赛克斯', '魔渊幼体', '사이크스', '#5B3F8C', [0, 2, 9], 'C', {
     title: '심연의 유체',
-    active: { name: '심연 전환', cooldown: 3, description: '4칸 이내 중 한 칸을 선택합니다. 그 칸에 심연 촉수 1마리를 소환하고, 주위 2칸을 어비스 존으로 만듭니다. 그 후에 어비스 존 안에 있는 모든 촉수를 작동시킵니다. 어비스 존 안으로 어떤 방법으로든 침입한 적 몬스터는 다음 이동 거리 -2. 어비스 존은 사이크스의 다음 턴 시작 시 사라집니다.' },
+    active: { name: '심연 전환', cooldown: 3, target: 'tile', range: 4, description: '4칸 이내 중 한 칸을 선택합니다. 그 칸에 심연 촉수 1마리를 소환하고, 주위 2칸을 어비스 존으로 만듭니다. 그 후에 어비스 존 안에 있는 모든 촉수를 작동시킵니다. 어비스 존 안으로 어떤 방법으로든 침입한 적 몬스터는 다음 이동 거리 -2. 어비스 존은 사이크스의 다음 턴 시작 시 사라집니다.' },
     passive: { name: '분노하는 심연', description: '자신이 피해를 주면, 그 대상에게 심연 침식 인장을 1중첩 부여합니다. (1턴 지속) 턴 종료시, 자신 칸에 「심연 촉수」를 생성하고 「심연 촉수」를 전부 작동시킵니다. 「심연 촉수」 작동: 「심연 촉수」는 주변 2칸 이내의 모든 몬스터에게 1피해를 주고, 이동 거리 감소 효과를 받은 몬스터에게 심연 침식 인장를 1중첩을 부여합니다. (1턴 지속) 「심연 촉수」는 영구적으로 존재하며, 한 칸에 최대 한 개까지 존재합니다.' },
   }),
   kangel: ap('kangel', 301, '超天酱', 'NEEDY STREAMER OVERLOAD', '최고귀염뽀짝천사', '#FF8FD0', [0, 1, 9], 'A', {
@@ -373,7 +374,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
   }),
   sherry: ap('sherry', 306, '橘雪莉', '魔法少女的魔女审判', '타치바나 세리', '#F28C38', [2, 1, 10], 'D', {
     title: '세리',
-    active: { name: '괴력 마법', cooldown: 2, description: '3칸 이내의 모든 몬스터를 7칸 이내의 지정한 칸으로 던진 후, 해당 칸의 모든 몬스터에게 2피해를 줍니다.' },
+    active: { name: '괴력 마법', cooldown: 2, target: 'tile', range: 7, description: '3칸 이내의 모든 몬스터를 7칸 이내의 지정한 칸으로 던진 후, 해당 칸의 모든 몬스터에게 2피해를 줍니다.' },
     passive: { name: '탐정님 출격', description: '몬스터에게 직접 도전한 후 추리 시간을 1중첩 획득합니다. (최대 4중첩)' },
     passive2: { name: '절친의 수호', description: '토노 한나가 타치바나 세리의 4칸 이내에 있을 때, 토노 한나는 받는 피해 -1.' },
     stack: { name: '추리 시간', max: 4 },

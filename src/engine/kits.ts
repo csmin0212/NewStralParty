@@ -46,7 +46,7 @@ function tag(e: Enemy, key: keyof NonNullable<Enemy['tags']>, n: number) {
   e.tags = { ...e.tags, [key]: n };
 }
 
-/** 라우렐 불운: 스택당 라우렐에게 받는 피해 +1 (최대 3) */
+/** 라우엘 불운: 스택당 라우엘에게 받는 피해 +1 (최대 3) */
 export const UNLUCK_MAX = 3;
 
 export function unluck(e: Enemy, p: Player): number {
@@ -364,7 +364,7 @@ export function kitAtk(s: GameState, p: Player, e: Enemy): number {
   return n;
 }
 
-/** 방어할 때 더하는 방어력. e: 싸우는 몬스터 (라우렐: 그 몬스터의 불운만큼) */
+/** 방어할 때 더하는 방어력. e: 싸우는 몬스터 (라우엘: 그 몬스터의 불운만큼) */
 export function kitDef(s: GameState, p: Player, e?: Enemy): number {
   const c = v(p);
   let n = 0;
@@ -381,12 +381,12 @@ export function kitDef(s: GameState, p: Player, e?: Enemy): number {
   return n;
 }
 
-/** 내가 주는 피해 + (라우렐: 불운) */
+/** 내가 주는 피해 + (라우엘: 불운) */
 export function kitDamageBonus(p: Player, e: Enemy): number {
   return p.character === 'laurel' ? unluck(e, p) : 0;
 }
 
-/** 사거리 밖이어도 액티브로 고를 수 있는 몬스터 (라우렐: 불운) */
+/** 사거리 밖이어도 액티브로 고를 수 있는 몬스터 (라우엘: 불운) */
 export function kitSkillReach(p: Player, e: Enemy): boolean {
   return p.character === 'laurel' && unluck(e, p) > 0;
 }
@@ -508,7 +508,7 @@ export function kitBattleEnd(s: GameState, p: Player) {
 
 /** 에너미를 쓰러뜨렸다 */
 export function kitKill(s: GameState, rng: Rng, p: Player, e: Enemy) {
-  // 라우렐: 너 때문이야로 건 전투에서 처치 → 재사용 -2 · 2마리마다 공격력 +1
+  // 라우엘: 너 때문이야로 건 전투에서 처치 → 재사용 -2 · 2마리마다 공격력 +1
   if (p.character === 'laurel' && v(p).skillBattle) {
     v(p).skillBattle = 0;
     p.skillCooldown = Math.max(0, p.skillCooldown - 2);
@@ -856,12 +856,12 @@ export function kitActive(s: GameState, rng: Rng, p: Player, input: KitInput): K
       }
       break;
     case 'inkshadow': {
-      const tiles = Object.keys(p.charTiles).map(Number).filter((t) => t !== p.tile);
+      const dest = input.target ?? kitAutoTile(s, p);
       const n = Object.keys(p.charTiles).length;
       p.charTiles = {};
       c.absorbed = n;
       log(s, `${p.name}: 그림자 ${n}개 흡수 — 공격력 +${n}`);
-      if (tiles.length) return { kind: 'teleport', tile: tiles[tiles.length - 1] };
+      if (dest !== undefined && dest !== p.tile) return { kind: 'teleport', tile: dest };
       break;
     }
     case 'lulu':
@@ -990,11 +990,7 @@ export function kitActive(s: GameState, rng: Rng, p: Player, input: KitInput): K
       s.turn.signPassed = false;
       break;
     case 'sykes': {
-      // 4칸 안에서 몬스터가 가장 많이 걸리는 칸 (2칸 안)
-      const dist = distances(s.board, p.tile);
-      const tiles = [...dist].filter(([, d]) => d <= 4).map(([t]) => t);
-      const score = (t: number) => monstersNear(s, t, 2).length;
-      const tile = tiles.sort((a, b) => score(b) - score(a) || (dist.get(a) ?? 0) - (dist.get(b) ?? 0))[0] ?? p.tile;
+      const tile = input.target ?? kitAutoTile(s, p) ?? p.tile;
       p.charTiles[tile] = 1;
       c.zone = tile + 1;
       activateTentacles(s, rng, p, tile, 2);
@@ -1054,8 +1050,7 @@ export function kitActive(s: GameState, rng: Rng, p: Player, input: KitInput): K
       break;
     case 'sherry': {
       const near = monstersNear(s, p.tile, 3).filter((e) => !e.isBoss);
-      let dest = p.tile;
-      for (let i = 0; i < 7; i++) dest = s.board.tiles[dest].next[0];
+      const dest = input.target ?? kitAutoTile(s, p) ?? p.tile;
       for (const e of near) {
         e.tile = dest;
         strikeEnemy(s, rng, p, e, 2);
@@ -1135,6 +1130,25 @@ export function kitCardDamage(p: Player): number {
   return p.character === 'komachi' ? (v(p).fxDamage ?? 0) : 0;
 }
 
+/** 칸을 고르는 액티브의 고를 수 있는 칸 (잉크 섀도우: 그림자 · 지금 칸 / 사이크스 4칸 · 세리 7칸 안) */
+export function kitSkillTiles(s: GameState, p: Player): number[] {
+  if (p.character === 'inkshadow') return [...new Set([p.tile, ...Object.keys(p.charTiles).map(Number)])];
+  const range = kitSkillRange(p) ?? 0;
+  return [...distances(s.board, p.tile)].filter(([, d]) => d <= range).map(([t]) => t);
+}
+
+/** CPU · 고르지 않았을 때 칸: 잉크 섀도우 가장 최근 그림자 · 사이크스 몬스터가 가장 많이 걸리는 칸 · 세리 7칸 앞 */
+export function kitAutoTile(s: GameState, p: Player): number | undefined {
+  if (p.character === 'inkshadow') return Object.keys(p.charTiles).map(Number).filter((t) => t !== p.tile).at(-1) ?? p.tile;
+  if (p.character === 'sykes') {
+    const dist = distances(s.board, p.tile);
+    const score = (t: number) => monstersNear(s, t, 2).length;
+    return kitSkillTiles(s, p).sort((a, b) => score(b) - score(a) || (dist.get(a) ?? 0) - (dist.get(b) ?? 0))[0];
+  }
+  if (p.character === 'sherry') return tileAhead(s, p, 7);
+  return undefined;
+}
+
 /** 액티브 사거리 (미사키 잠재 6 · 마무시 진룡) */
 export function kitSkillRange(p: Player): number | undefined {
   const range = CHARACTERS[p.character].active.range;
@@ -1161,12 +1175,23 @@ function signOwner(s: GameState, tile: number): Player | undefined {
 }
 
 /** 앞쪽 n칸에 금지 표지판 (링링의 칸 목록에 둔다) */
-export function placeSign(s: GameState, p: Player, ahead: number) {
+export function placeSign(s: GameState, p: Player, tile: number) {
   const owner = p.character === 'lingling' ? p : (teammate(s, 'lingling') ?? p);
-  let tile = p.tile;
-  for (let i = 0; i < ahead; i++) tile = s.board.tiles[tile].next[0];
   owner.charTiles[tile] = 1;
-  log(s, `${p.name}: ⛔ 금지 표지판 — ${ahead}칸 앞`);
+  log(s, `${p.name}: ⛔ 금지 표지판 — ${distances(s.board, p.tile).get(tile) ?? '-'}칸`);
+}
+
+/** 지나온 칸으로 되돌아가지 않고 n칸 앞 */
+export function tileAhead(s: GameState, p: Player, n: number): number {
+  let prev = p.prev;
+  let tile = p.tile;
+  for (let i = 0; i < n; i++) {
+    const next = s.board.tiles[tile].next;
+    const step = next.find((t) => t !== prev) ?? next[0];
+    prev = tile;
+    tile = step;
+  }
+  return tile;
 }
 
 /** 표지판을 지난다: 없어지고 링링이면 1장 돌려받는다 */

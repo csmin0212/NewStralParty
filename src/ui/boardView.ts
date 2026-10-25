@@ -262,6 +262,13 @@ export class BoardView {
     for (const t of this.tokenEls) t.classList.remove('aimed');
   }
 
+  /** 보드에서 칸 고르기: 고를 수 있는 칸을 밝히고 나머지를 흐리게. null이면 끈다 */
+  setPickable(tiles: number[] | null) {
+    const set = new Set(tiles ?? []);
+    this.el.classList.toggle('picking', !!tiles);
+    this.tileEls.forEach((t, id) => t.classList.toggle('pick', set.has(id)));
+  }
+
   /** 이 보드 그림인지 (매직 아카데미 2단처럼 맵이 바뀌면 새로 그린다) */
   isFor(board: Board): boolean {
     return board.id === this.board.id && board.tiles.length === this.board.tiles.length;
@@ -494,7 +501,7 @@ export class BoardView {
       const markEl = el.querySelector<HTMLElement>('.emark')!;
       const unluck = enemy.tags?.unluck ?? 0;
       markEl.textContent = [enemy.mark ? `🎯${enemy.mark}` : '', unluck ? `🌀${unluck}` : ''].filter(Boolean).join(' ');
-      markEl.title = [enemy.mark ? `표식 ${enemy.mark} · 모든 피해 +1` : '', unluck ? `불운 ${unluck} · 라우렐에게 받는 피해 +${unluck}` : '']
+      markEl.title = [enemy.mark ? `표식 ${enemy.mark} · 모든 피해 +1` : '', unluck ? `불운 ${unluck} · 라우엘에게 받는 피해 +${unluck}` : '']
         .filter(Boolean)
         .join(' · ');
       this.renderAim(state, enemy, el);

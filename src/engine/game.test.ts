@@ -1408,9 +1408,21 @@ describe('원작 공식 문구 2 (펑 · 마무시 · 사이크스 · 알라나 
 
   it('사이크스: 촉수를 소환하고 어비스 존의 촉수가 몬스터를 친다', () => {
     let s = withEnemy(game('sykes'), 'elite', 3);
-    s = skill(s);
-    expect(Object.keys(s.players[0].charTiles)).toHaveLength(1);
+    expect(() => skill(s)).toThrow(RuleError);
+    expect(() => skill(s, { target: 5 })).toThrow(RuleError);
+    s = skill(s, { target: 3 });
+    expect(Object.keys(s.players[0].charTiles)).toEqual(['3']);
     expect(s.enemies[0].hp).toBe(ENEMIES.elite.hp - 1);
+  });
+
+  it('세리 · 잉크 섀도우: 보드에서 고른 칸', () => {
+    let s = withEnemy(game('sherry'), 'robot', 2);
+    s = skill(s, { target: 6 });
+    expect(s.enemies[0].tile).toBe(6);
+    let t = game('inkshadow');
+    t.players[0].charTiles = { 0: 1, 4: 1, 9: 1 };
+    t = skill(t, { target: 4 });
+    expect(t.players[0].tile).toBe(4);
   });
 });
 
@@ -1447,7 +1459,8 @@ describe('원작 공식 문구 3', () => {
   it('금지 표지판: 지나는 캐릭터는 멈추고 다음 이동 +2', () => {
     let s = game('lingling', empties(14));
     const i = s.players[0].hand.findIndex((h) => h.card === 'banSign');
-    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: i, value: 3 });
+    expect(() => applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: i, target: 0 })).toThrow(RuleError);
+    s = applyAction(s, { type: 'PLAY_CARD', player: 0, handIndex: i, target: 3 });
     expect(s.players[0].charTiles[3]).toBe(1);
     s.current = 1;
     s.phase = { kind: 'preRoll' };
@@ -1565,13 +1578,13 @@ describe('원작 공식 문구 3', () => {
   });
 });
 
-describe('라우렐', () => {
+describe('라우엘', () => {
   const game = () => newGame(ring(empties(30)), { character: 'laurel' });
   const skill = (s: GameState, target: number) => applyAction(s, { type: 'USE_SKILL', player: s.current, target });
 
-  it('능력치 · 시작 코인 +6', () => {
+  it('능력치 · 시작 코인 12', () => {
     const p = game().players[0];
-    expect(p).toMatchObject({ hp: 8, maxHp: 8, atk: 2, def: 0, coins: RULES.startCoins + 6 });
+    expect(p).toMatchObject({ hp: 8, maxHp: 8, atk: 2, def: 0, coins: 12 });
     expect(CHARACTERS.laurel.stars).toEqual([{ atk: 1, maxHp: 2 }, { atk: 1 }, { maxHp: 1 }]);
   });
 
@@ -1590,7 +1603,7 @@ describe('라우렐', () => {
     expect(s.enemies.find((e) => e.id === near.id)?.tags?.unluck ?? 2).toBe(2);
   });
 
-  it('불운: 라우렐이 주는 피해 + · 방어력 + · 최대 3', async () => {
+  it('불운: 라우엘이 주는 피해 + · 방어력 + · 최대 3', async () => {
     const { kitDef, kitFought } = await import('./kits');
     const { strikeEnemy } = await import('./game');
     const { createRng } = await import('./rng');

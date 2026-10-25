@@ -5,7 +5,7 @@ import { RELICS } from '../data/relics';
 import { bossEnemy } from '../engine/boss';
 import { CHARACTERS } from '../data/characters';
 import { skillTargets } from '../engine/skills';
-import { skillCardOk, skillCards } from '../engine/kits';
+import { kitAutoTile, skillCardOk, skillCards, tileAhead } from '../engine/kits';
 import { cardBlocker, cardTargets, distances, handLimit } from '../engine/cards';
 import { applyAction, currentPlayer, relicPrice, RuleError } from '../engine/game';
 import { RULES } from '../engine/rules';
@@ -36,6 +36,7 @@ function apCardTarget(s: GameState, p: Player, card: string, targets: number[] |
   }
   if (card === 'energyBar') return null;
   if (card === 'feather' && p.hp > p.maxHp - 3) return null;
+  if (card === 'banSign') return tileAhead(s, p, 6);
   if (card === 'hisFault') return targets?.slice().sort((a, b) => s.players[b].hp - s.players[a].hp)[0];
   return undefined;
 }
@@ -161,6 +162,8 @@ function skillAction(s: GameState, p: Player): Action | null {
     if (def.target === 'enemy') {
       const boss = bossEnemy(s);
       target = boss && targets.includes(boss.id) ? boss.id : targets[0];
+    } else if (def.target === 'tile') {
+      target = kitAutoTile(s, p);
     } else {
       target = [...targets].sort((a, b) => s.players[a].hp / s.players[a].maxHp - s.players[b].hp / s.players[b].maxHp)[0];
     }
