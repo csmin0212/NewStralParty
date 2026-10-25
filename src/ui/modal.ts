@@ -1,7 +1,22 @@
 import type { BossDef } from '../engine/types';
 import { movesTab, rulesTab } from './bossScreen';
 import { esc } from './html';
-import { getSpeed, getVolumeSetting, setSpeed, setVolume, type Speed, type Volume } from './settings';
+import {
+  getAnnouncer,
+  getBgmSetting,
+  getSpeed,
+  getVoiceSetting,
+  getVolumeSetting,
+  setAnnouncer,
+  setBgm,
+  setSpeed,
+  setVoice,
+  setVolume,
+  type Announcer,
+  type Speed,
+  type Volume,
+} from './settings';
+import { announce } from './voice';
 import { sfx } from './sound';
 
 /** 가운데 흰 판 (블루 아카이브 팝업): 남색 머리띠 + 내용 + 아래 버튼. 바깥을 누르면 닫힌다 */
@@ -63,19 +78,21 @@ export function openSettings(on: { exit?: () => void } = {}) {
     ['low', '작게'],
     ['high', '크게'],
   ];
+  const announcers: [Announcer, string][] = [
+    ['female', '여성'],
+    ['male', '남성'],
+  ];
+  const row = (name: string, key: string, now: string, items: [string, string][]) => `
+    <div class="set-row">
+      <b>${name}</b>
+      <div class="ba-tabs">${items.map(([id, label]) => `<button class="ba-tab ${now === id ? 'on' : ''}" data-${key}="${id}">${label}</button>`).join('')}</div>
+    </div>`;
   const render = () => `
-    <div class="set-row">
-      <b>연출 속도</b>
-      <div class="ba-tabs">${speeds
-        .map(([id, label]) => `<button class="ba-tab ${getSpeed() === id ? 'on' : ''}" data-speed="${id}">${label}</button>`)
-        .join('')}</div>
-    </div>
-    <div class="set-row">
-      <b>효과음</b>
-      <div class="ba-tabs">${volumes
-        .map(([id, label]) => `<button class="ba-tab ${getVolumeSetting() === id ? 'on' : ''}" data-volume="${id}">${label}</button>`)
-        .join('')}</div>
-    </div>
+    ${row('연출 속도', 'speed', getSpeed(), speeds)}
+    ${row('효과음', 'volume', getVolumeSetting(), volumes)}
+    ${row('배경 음악', 'bgm', getBgmSetting(), volumes)}
+    ${row('목소리', 'voice', getVoiceSetting(), volumes)}
+    ${row('아나운서', 'announcer', getAnnouncer(), announcers)}
     <div class="bm-foot">
       ${on.exit ? '<button class="ba-btn ba-btn--sky" data-modal="exit">로비로 · 저장됨</button>' : ''}
       <button class="ba-btn ba-btn--yellow" data-modal="close">닫기</button>
@@ -85,6 +102,14 @@ export function openSettings(on: { exit?: () => void } = {}) {
     const t = e.target as HTMLElement;
     const speed = t.closest<HTMLElement>('[data-speed]')?.dataset.speed as Speed | undefined;
     const volume = t.closest<HTMLElement>('[data-volume]')?.dataset.volume as Volume | undefined;
+    const bgm = t.closest<HTMLElement>('[data-bgm]')?.dataset.bgm as Volume | undefined;
+    const voice = t.closest<HTMLElement>('[data-voice]')?.dataset.voice as Volume | undefined;
+    const who = t.closest<HTMLElement>('[data-announcer]')?.dataset.announcer as Announcer | undefined;
+    if (bgm) setBgm(bgm);
+    if (voice) setVoice(voice);
+    if (who) setAnnouncer(who);
+    if (voice || who) announce('ready');
+    if (bgm || voice || who) el.querySelector('.bm-body')!.innerHTML = render();
     if (speed) {
       setSpeed(speed);
       el.querySelector('.bm-body')!.innerHTML = render();

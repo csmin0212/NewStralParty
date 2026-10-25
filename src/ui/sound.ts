@@ -1,5 +1,5 @@
 // 효과음. 파일(SFX_ART, Kenney CC0)을 미리 풀어 두고, 아직 못 불러왔으면 WebAudio로 짧게 합성한다.
-// 출처: public/assets/sfx/LICENSE-kenney.txt · 크기: 설정의 효과음 (끄기 · 작게 · 크게)
+// 목소리 (voice.ts)도 여기 playUrl로 낸다. 출처 · 목록: docs/AUDIO.md · 크기: 설정 (끄기 · 작게 · 크게)
 
 import { getVolume } from './settings';
 
@@ -17,9 +17,28 @@ export type SfxId =
   | 'levelup'
   | 'ko'
   | 'victory'
-  | 'defeat';
+  | 'defeat'
+  | 'diceShake'
+  | 'draw'
+  | 'shuffle'
+  | 'chips'
+  | 'buy'
+  | 'hit'
+  | 'block'
+  | 'evade'
+  | 'skill'
+  | 'warp'
+  | 'buff'
+  | 'debuff'
+  | 'relic'
+  | 'page'
+  | 'open'
+  | 'hover';
 
-const SFX_IDS: SfxId[] = ['click', 'step', 'dice', 'coin', 'hurt', 'heal', 'card', 'turn', 'boss', 'warning', 'levelup', 'ko', 'victory', 'defeat'];
+const SFX_IDS: SfxId[] = [
+  'click', 'step', 'dice', 'coin', 'hurt', 'heal', 'card', 'turn', 'boss', 'warning', 'levelup', 'ko', 'victory', 'defeat',
+  'diceShake', 'draw', 'shuffle', 'chips', 'buy', 'hit', 'block', 'evade', 'skill', 'warp', 'buff', 'debuff', 'relic', 'page', 'open', 'hover',
+];
 
 /** 소리 파일 (public/assets/sfx/<id>.ogg, Kenney CC0 · docs/SYSTEMS.md 효과음 표) */
 export const SFX_ART: Partial<Record<SfxId, string>> = Object.fromEntries(
@@ -46,7 +65,8 @@ function preload(a: AudioContext) {
 
 let ctx: AudioContext | null = null;
 
-function audio(): AudioContext | null {
+/** 소리를 낼 수 있는 AudioContext (사용자가 한 번 누르기 전에는 null일 수 있다) */
+export function audio(): AudioContext | null {
   if (typeof window === 'undefined' || !('AudioContext' in window)) return null;
   ctx ??= new AudioContext();
   if (ctx.state === 'suspended') void ctx.resume();
@@ -121,6 +141,25 @@ const SYNTH: Record<SfxId, (a: AudioContext, out: AudioNode) => void> = {
   victory: (a, o) =>
     [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(a, o, f, i === 5 ? 0.6 : 0.16, 'triangle', i * 0.12, undefined, 0.16)),
   defeat: (a, o) => [392, 349, 311, 262].forEach((f, i) => tone(a, o, f, 0.35, 'triangle', i * 0.22, undefined, 0.14)),
+  diceShake: (a, o) => noise(a, o, 0.25, 0, 2200, 0.18),
+  draw: (a, o) => noise(a, o, 0.12, 0, 5200, 0.1),
+  shuffle: (a, o) => [0, 0.06, 0.12].forEach((t) => noise(a, o, 0.08, t, 4800, 0.1)),
+  chips: (a, o) => [1319, 1568].forEach((f, i) => tone(a, o, f, 0.08, 'square', i * 0.05, undefined, 0.06)),
+  buy: (a, o) => [988, 1319].forEach((f, i) => tone(a, o, f, 0.1, 'square', i * 0.06, undefined, 0.07)),
+  hit: (a, o) => {
+    noise(a, o, 0.12, 0, 900, 0.3);
+    tone(a, o, 160, 0.12, 'square', 0, 70, 0.12);
+  },
+  block: (a, o) => tone(a, o, 600, 0.15, 'triangle', 0, 420, 0.14),
+  evade: (a, o) => noise(a, o, 0.18, 0, 3200, 0.12),
+  skill: (a, o) => tone(a, o, 440, 0.3, 'sawtooth', 0, 1320, 0.08),
+  warp: (a, o) => tone(a, o, 1200, 0.25, 'sine', 0, 300, 0.12),
+  buff: (a, o) => [523, 784].forEach((f, i) => tone(a, o, f, 0.12, 'triangle', i * 0.07, undefined, 0.12)),
+  debuff: (a, o) => tone(a, o, 330, 0.3, 'triangle', 0, 160, 0.12),
+  relic: (a, o) => [784, 988, 1319].forEach((f, i) => tone(a, o, f, 0.14, 'sine', i * 0.07, undefined, 0.12)),
+  page: (a, o) => noise(a, o, 0.1, 0, 3800, 0.08),
+  open: (a, o) => noise(a, o, 0.16, 0, 2400, 0.1),
+  hover: (a, o) => tone(a, o, 1500, 0.03, 'sine', 0, undefined, 0.05),
 };
 
 /** 효과음 하나 (기다리지 않는다) */
@@ -141,4 +180,52 @@ export function sfx(id: SfxId) {
     return;
   }
   SYNTH[id](a, master);
+}
+
+// ───────── 파일 소리 (목소리) ─────────
+
+const files = new Map<string, Promise<AudioBuffer | null>>();
+
+function load(a: AudioContext, url: string): Promise<AudioBuffer | null> {
+  let p = files.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(url))))
+      .then((data) => a.decodeAudioData(data))
+      .catch(() => null);
+    files.set(url, p);
+  }
+  return p;
+}
+
+/** 미리 풀어 둔다 (판 시작에 나올 캐릭터 목소리) */
+export function preloadUrls(urls: string[]) {
+  const a = audio();
+  if (a) for (const url of urls) void load(a, url);
+}
+
+/** 채널마다 지금 나는 소리 (같은 채널은 앞 소리를 끊는다) */
+const channels = new Map<string, AudioBufferSourceNode>();
+
+/** 파일 하나를 낸다. channel이 같으면 앞 소리를 끊는다 */
+export async function playUrl(url: string, volume: number, channel?: string) {
+  if (volume <= 0) return;
+  const a = audio();
+  if (!a || a.state !== 'running') return;
+  const buf = await load(a, url);
+  if (!buf) return;
+  const g = a.createGain();
+  g.gain.value = volume;
+  g.connect(a.destination);
+  const src = a.createBufferSource();
+  src.buffer = buf;
+  src.connect(g);
+  if (channel) {
+    channels.get(channel)?.stop();
+    channels.set(channel, src);
+    src.onended = () => {
+      if (channels.get(channel) === src) channels.delete(channel);
+    };
+  }
+  src.start();
 }

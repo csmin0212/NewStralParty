@@ -17,6 +17,7 @@ import {
 } from './assets';
 import { wait as sleep } from './settings';
 import { sfx } from './sound';
+import { announce, growl, say } from './voice';
 import { skinArt } from './skins';
 
 export type BattleChoice =
@@ -255,7 +256,12 @@ export class BattleView {
         await this.rollBadges(attacker, r);
 
         this.pose(attacker, 'lunge');
+        if (attacker === 'player' && this.character) say(this.character, 'attack', record.player);
+        else growl(record.enemy, 'attack');
         await sleep(200);
+        if (defender === 'player' && this.character) say(this.character, r.damage === 0 ? 'dodge' : 'hurt', record.player);
+        else if (r.damage > 0 && event.targetHp > 0) growl(record.enemy, 'hurt');
+        if (r.damage > 0 && r.mode === 'block') sfx('block');
         if (r.damage === 0) {
           this.pose(defender, 'dodge');
           this.burst(defender, 'smoke');
@@ -275,11 +281,14 @@ export class BattleView {
       }
       case 'enemyDefeated':
         this.pose('enemy', 'down');
+        growl(record.enemy, 'die');
+        if (record.enemy.isBoss) announce('war_target_destroyed');
         this.message(record.enemy.isBoss ? `🎉 ${enemyName} 처치!` : `${enemyName} 처치! 코인 +${event.reward}`);
         await sleep(record.enemy.isBoss ? 1600 : 1100);
         break;
       case 'playerKO':
         this.pose('player', 'down');
+        if (this.character) say(this.character, 'ko', record.player);
         this.message('K.O. · 진행도 +1');
         await sleep(1200);
         break;
@@ -430,7 +439,7 @@ export class BattleView {
 
   /** 맞으면 충격, 피하면 연기. 그림이 오면 그림을, 없으면 CSS 모양을 쓴다 */
   private burst(side: Side, kind: 'impact' | 'smoke') {
-    sfx(kind === 'impact' ? 'hurt' : 'step');
+    sfx(kind === 'impact' ? 'hit' : 'evade');
     const el = this.unit(side).querySelector<HTMLElement>('.impact')!;
     const art = BATTLE_ART[kind];
     el.innerHTML = art ? `<img src="${art}" alt="">` : '';

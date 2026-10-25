@@ -21,6 +21,9 @@ import { BoardView } from './boardView';
 import { FxLayer } from './fx';
 import { deltaEvents, resultEvents, turnEvents, type FxEvent } from './fxEvents';
 import { boardPick, pickBoardTile, renderHud, type HudHandlers } from './hud';
+import { ambienceOf, bossTrack, mapTrack, playAmbience, playBgm } from './bgm';
+import { announce, growl, preloadVoices, say } from './voice';
+import { sfx, type SfxId } from './sound';
 import { openEnemyInfo, openPlayerInfo } from './playerInfo';
 
 /**
@@ -64,6 +67,19 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
   }
   battle.onChoice = (choice) => dispatch({ ...choice, player: state.current });
 
+  // ───────── 소리 ─────────
+
+  /** 맵 곡 → 보스가 깨어나면 보스 곡 */
+  function syncBgm(s: GameState) {
+    if (s.phase.kind === 'gameOver') return;
+    const boss = s.enemies.some((e) => e.isBoss) && (!s.ap || s.ap.awake);
+    playBgm(boss ? bossTrack(s.board.id) : mapTrack(s.board.id));
+    playAmbience(ambienceOf(s.board.id));
+  }
+  syncBgm(state);
+  preloadVoices(state.players.map((p) => p.character));
+  board.onHit = (id) => say(state.players[id].character, 'hurt', id);
+
   // ───────── 연출 ─────────
 
   /** 숫자 변화는 말 머리 위로 띄우고 기다리지 않는다. 같은 말에 여러 개면 조금씩 늦춰 겹치지 않게 */
@@ -77,7 +93,10 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
       const point = board.tokenPoint(ev.player);
       if (ev.type === 'coins') fx.float(point, `${sign}${ev.delta} 코인`, 'coin', n * 220);
       else if (ev.type === 'cards') fx.float(point, `+${ev.delta} 카드`, 'card', n * 220);
-      else fx.float(point, `${sign}${ev.delta} HP`, ev.delta > 0 ? 'heal' : 'hurt', n * 220);
+      else {
+        fx.float(point, `${sign}${ev.delta} HP`, ev.delta > 0 ? 'heal' : 'hurt', n * 220);
+        if (ev.delta > 0) say(state.players[ev.player].character, 'healed', ev.player);
+      }
     }
   }
 
@@ -86,6 +105,8 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     switch (ev.type) {
       case 'round': {
         const next = currentIntent(s);
+        if (s.boss.defeatAt - s.progress <= 3) announce('hurry_up');
+        else announce('round', ev.round);
         await fx.play({
           kind: 'round',
           text: `ROUND ${String(ev.round).padStart(2, '0')}`,
@@ -104,6 +125,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
         });
         break;
       case 'skill':
+        say(p!.character, 'skill', p!.id);
         await fx.play({
           kind: 'skill',
           text: CHARACTERS[p!.character].active.name,
@@ -116,12 +138,16 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
         fx.float(board.tokenPoint(ev.player), '부활!', 'heal');
         break;
       case 'levelUp':
+        announce('level_up');
         await fx.play({ kind: 'levelup', text: 'LEVEL UP!', sub: `${p!.name} · ${CHARACTERS[p!.character].name} ${ev.level}성` });
         break;
       case 'ko':
         await fx.play({ kind: 'ko', text: 'K.O.', sub: `${p!.name} · 진행도 +1` });
         break;
       case 'gameOver':
+        playBgm(null);
+        playAmbience(null);
+        announce(ev.result === 'victory' ? 'mission_completed' : 'mission_failed');
         await fx.play(
           ev.result === 'victory'
             ? { kind: 'victory', text: 'VICTORY', sub: `${s.boss.name} 처치` }
@@ -144,6 +170,8 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
       lastNotice = n.seq;
       if (s.phase.kind === 'gameOver' && !n.text.startsWith('⚠')) continue;
       if (n.text.includes(`${s.boss.name} 등장`)) {
+        announce('war_look_out');
+        growl({ kind: 'boss', isBoss: true }, 'attack');
         await fx.play({ kind: 'warning', text: 'WARNING', sub: n.text.replace(/^⚠\s*/, '') });
       } else {
         await fx.play({ kind: 'banner', text: n.text });
@@ -172,6 +200,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
   async function encounterCutin(prev: GameState, s: GameState) {
     const b = s.battles.at(-1);
     if (!b || b.done || b.seq === prev.battles.at(-1)?.seq || !b.enemy.isBoss) return;
+    announce('fight');
     await fx.play({ kind: 'encounter', text: 'BOSS BATTLE', sub: `${b.enemy.name} 등장`, color: '#ffb627' });
   }
 
@@ -203,6 +232,7 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     const rewards = matchRewards(s, acc);
     applyMatch(acc, s, rewards);
     saveAccount(acc);
+    playBgm('result');
     showResult(gameEl, s, rewards, before, {
       lobby: () => {
         cleanup.abort();
@@ -254,6 +284,8 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     const prev = state;
     state = next;
     busy = true;
+    const sound = ACTION_SOUND[action.type];
+    if (sound) sfx(sound);
     draw(prev, true);
     battle.renderChoices(state, true);
     if (action.type === 'USE_SKILL') await present(state, { type: 'skill', player: action.player });
@@ -279,11 +311,12 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
       // 원작 매직 아카데미: 젤리 전사를 쓰러뜨리면 둘째 맵으로
       const area = root.querySelector<HTMLElement>('.board-area')!;
       area.innerHTML = '';
-      const { onTileClick, onTokenClick, onEnemyClick } = board;
+      const { onTileClick, onTokenClick, onEnemyClick, onHit } = board;
       board = new BoardView(area, state.board, state);
-      Object.assign(board, { onTileClick, onTokenClick, onEnemyClick });
+      Object.assign(board, { onTileClick, onTokenClick, onEnemyClick, onHit });
     }
     await board.show(state);
+    syncBgm(state);
     floats(deltaEvents(prev, state));
     for (const ev of resultEvents(prev, state)) {
       if (ev.type !== 'gameOver') await present(state, ev);
@@ -367,6 +400,19 @@ export function startHotseat(root: HTMLElement, opts: HotseatOptions, on: { exit
     cpuTurn();
   })();
 }
+
+/** 고르기 · 사기 소리 (나머지 행동은 연출이 소리를 낸다) */
+const ACTION_SOUND: Partial<Record<Action['type'], SfxId>> = {
+  PICK_RELIC: 'relic',
+  REROLL_RELIC: 'shuffle',
+  BUY_CARD: 'buy',
+  BUY_RELIC: 'buy',
+  SEND_COINS: 'chips',
+  CHOOSE_PATH: 'click',
+  STOP_HERE: 'click',
+  PICK_EVENT: 'click',
+  MAP_CHOICE: 'click',
+};
 
 /** 맵 시점: 휠 · +/- 확대, 끌기 · WASD · 화살표 이동, F 지금 차례, R 전체 */
 function cameraInput(area: HTMLElement, board: () => BoardView, signal: AbortSignal) {

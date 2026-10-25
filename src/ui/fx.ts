@@ -10,7 +10,7 @@ const FX_SOUND: Partial<Record<FxKind, SfxId>> = {
   encounter: 'boss',
   round: 'turn',
   turn: 'turn',
-  skill: 'card',
+  skill: 'skill',
   card: 'card',
   dice: 'dice',
   warning: 'warning',
@@ -159,7 +159,7 @@ export class FxLayer {
 
   /** 말 머리 위에 숫자가 떠올랐다 사라진다 (기다리지 않는다) */
   float(point: { x: number; y: number }, text: string, kind: FloatKind, delay = 0) {
-    const sound: Partial<Record<FloatKind, SfxId>> = { coin: 'coin', hurt: 'hurt', heal: 'heal' };
+    const sound: Partial<Record<FloatKind, SfxId>> = { coin: 'coin', hurt: 'hurt', heal: 'heal', card: 'draw' };
     if (sound[kind]) setTimeout(() => sfx(sound[kind]!), delay);
     const el = document.createElement('span');
     el.className = `fx-float fx-float--${kind}`;

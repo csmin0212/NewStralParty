@@ -2,6 +2,7 @@ import { TILE_INFO } from '../data/board';
 import { ENEMIES } from '../data/enemies';
 import { bossEnemy, dangerTiles, markName } from '../engine/boss';
 import { apIntent, AP_MOVE_DIE } from '../engine/ap';
+import { growl } from './voice';
 import type { Board, BossTurn, Enemy, EnemyAct, EnemyKind, GameState, Mark } from '../engine/types';
 import { esc } from './html';
 import { BOSS_ART, ENEMY_ART, MARK_ART, TILE_ART } from './assets';
@@ -25,6 +26,8 @@ export class BoardView {
   onTileClick: (tileId: number) => void = () => {};
   onTokenClick: (player: number) => void = () => {};
   onEnemyClick: (enemy: number) => void = () => {};
+  /** 몬스터 차례에 말이 맞았다 */
+  onHit: (player: number) => void = () => {};
 
   private readonly el: HTMLElement;
   private readonly tileEls: HTMLElement[];
@@ -140,7 +143,7 @@ export class BoardView {
    */
   async playBossTurn(state: GameState, turn: BossTurn) {
     this.clearAim();
-    if (turn.acts) await this.playActs(turn.acts);
+    if (turn.acts) await this.playActs(turn.acts, state);
     else {
       await Promise.all(
         turn.moved.map(async ({ enemy, path }) => {
@@ -165,7 +168,7 @@ export class BoardView {
    * 원작 맵 몬스터 차례: 몬스터마다 스킬 이름 → 이동 → 맞은 말 순서로.
    * 아무도 안 맞히고 걷기만 하는 몬스터는 다음 일 있는 몬스터 전에 한꺼번에 걷는다
    */
-  private async playActs(acts: EnemyAct[]) {
+  private async playActs(acts: EnemyAct[], state: GameState) {
     let calm: EnemyAct[] = [];
     const flush = async () => {
       await Promise.all(calm.map((a) => this.walkEnemy(a, false)));
@@ -186,10 +189,15 @@ export class BoardView {
       }
       await this.walkEnemy(a, true);
       for (const hit of a.hits) {
-        if (hit.amount > 0) this.strike(hit.player);
+        if (hit.amount > 0) {
+          this.strike(hit.player);
+          this.onHit(hit.player);
+        }
         this.pop(hit.player, hit.amount > 0 ? `-${hit.amount}` : (hit.note ?? ''));
       }
       if (a.hits.length) {
+        const e = state.enemies.find((x) => x.id === a.enemy);
+        if (e) growl(e, 'attack');
         sfx('hurt');
         await sleep(520);
       }

@@ -1,0 +1,25 @@
+NewParty 소리 출처 (모두 CC0 1.0 · https://creativecommons.org/publicdomain/zero/1.0/)
+
+voice/cute · voice/calm · voice/cool
+  Female RPG Voice Starter Pack — Cici Fyre (Type 1 · 2 · 3)
+  https://opengameart.org/content/female-rpg-voice-starter-pack · https://cicifyre.itch.io/rpg-voice-starter-pack
+
+voice/male
+  Male Grunt/Yelling sounds — HaelDB
+  https://opengameart.org/content/male-gruntyelling-sounds
+
+voice/announcer-f · voice/announcer-m
+  Voiceover Pack · Voiceover Pack: Fighter — Kenney (www.kenney.nl)
+  https://kenney.nl/assets/voiceover-pack · https://kenney.nl/assets/voiceover-pack-fighter
+
+sfx
+  Interface Sounds · Casino Audio · RPG Audio · Impact Sounds · UI Audio · Digital Audio — Kenney (www.kenney.nl)
+  https://kenney.nl/assets
+
+bgm
+  Helice Awesome Dance Adventure !! — Komiku
+  https://opengameart.org/node/96795
+  Happy Clappy Loop (result) — OwlishMedia
+  https://opengameart.org/content/happy-clappy-loop
+  Determined Pursuit (boss-garden) — Emma_MA
+  https://opengameart.org/content/determined-pursuit-epic-orchestra-loop
